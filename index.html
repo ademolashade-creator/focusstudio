@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus & Flow Studio</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff3366">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Focus & Flow">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <header>
+        <h1 class="editable-title" contenteditable="true" id="app-title" onblur="saveAppName(this.textContent)">Focus & Flow Studio</h1>
+        <p>Curate your day, honor your energy, and master your workflow.</p>
+
+        <div class="clocks-bar">
+            <div class="clock-item"><div class="clock-label">Date</div><div class="date-display" id="date-display">--/--/----</div></div>
+            <div class="clock-item"><div class="clock-label">WAT (Lagos)</div><div class="clock-time" id="clock-wat">--:--:--</div></div>
+            <div class="clock-item"><div class="clock-label">EST (New York)</div><div class="clock-time" id="clock-est">--:--:--</div></div>
+            <div class="clock-item"><div class="clock-label">MST (Denver)</div><div class="clock-time" id="clock-mst">--:--:--</div></div>
+        </div>
+
+        <div class="top-controls">
+            <button class="btn-secondary" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <div class="sidebar-container">
+            <div class="timer-card">
+                <div id="mode-indicator">Work Time</div>
+                <div class="timer-display" id="time-display">25:00</div>
+                <div class="progress-bar-container"><div class="progress-bar" id="progress-bar"></div></div>
+
+                <div class="controls">
+                    <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
+                    <button id="reset-btn" onclick="resetTimer()">Restart</button>
+                </div>
+
+                <button class="lock-btn" id="focus-lock-btn" onclick="toggleFocusLock()">Enable Focus Lock</button>
+
+                <div class="settings">
+                    <div class="setting-row">
+                        <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
+                        <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
+                    </div>
+                    <div class="toggle-group">
+                        <label for="mandatory-notes-toggle">Mandatory Extra Info:</label>
+                        <input type="checkbox" id="mandatory-notes-toggle" onchange="toggleMandatorySetting()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-card">
+                <h3>Daily Session Counter</h3>
+                <div class="stats-number" id="daily-counter">0 Completed Sessions</div>
+            </div>
+
+            <div class="hacks-card">
+                <h3>Adaptive Brain Engine</h3>
+                <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
+            </div>
+        </div>
+
+        <div class="board-container" id="board-container"></div>
+    </div>
+
+    <div class="log-card">
+        <h3>Estimate vs Actual — Rolling Log</h3>
+        <div class="log-content" id="estimate-log">Complete a tracked task to start your log.</div>
+    </div>
+
+    <div class="summary-container">
+        <div class="monthly-alert-banner" id="monthly-alert">It's the 30th — your monthly client report is ready to generate (or already ran automatically if your API key is saved).</div>
+        <div class="summary-header">
+            <h2>Monthly Summary & Client Report</h2>
+            <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
+        </div>
+        <div class="api-key-box">
+            <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+        </div>
+        <div class="summary-content" id="summary-content">Click "Generate AI Client Report," or it'll run automatically on the 30th if your key is saved.</div>
+    </div>
+
+    <div class="lock-overlay" id="lock-overlay">
+        <div class="lock-overlay-box">
+            <p id="lock-overlay-msg">You left Focus Lock.</p>
+            <div class="lock-overlay-actions">
+                <button class="btn-primary" onclick="reLock()">Stay Locked</button>
+                <button class="btn-secondary" onclick="confirmLeaveLock()">Leave Focus Mode</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+        }
+    </script>
+</body>
+</html>
