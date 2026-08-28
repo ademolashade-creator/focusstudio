@@ -59,7 +59,7 @@ function releaseWakeLock() {
     if (window.wakeLockRef) { try { window.wakeLockRef.release(); } catch (e) {} window.wakeLockRef = null; }
 }
 
-// ---------- Pomodoro timer ----------
+// ---------- Timer engine (manual Pomodoro mode + auto Flow mode) ----------
 let workDuration = 25 * 60;
 let breakDuration = 5 * 60;
 let timeLeft = workDuration;
@@ -69,7 +69,12 @@ let isWorkTime = true;
 let hasStartedOnce = false;
 let timerInterval = null;
 
-let dailySessions = parseInt(localStorage.getItem('focus_daily_sessions')) || 0;
+let timerMode = 'manual'; // 'manual' | 'flow'
+let flowSegments = [];
+let flowSegIndex = 0;
+let flowExtraSeconds = 0; // +5-min additions during the current flow segment
+
+let flowBlocksCompleted = parseInt(localStorage.getItem('focus_daily_sessions')) || 0;
 
 const timeDisplay = $('time-display');
 const startPauseBtn = $('start-pause-btn');
@@ -87,7 +92,8 @@ function updateDisplay() {
     if (progressBar) progressBar.style.width = `${progressPercent}%`;
     document.title = `(${timeDisplay.textContent}) ${appSettings.appName}`;
 
-    const urgent = isWorkTime && isRunning && timeLeft > 0 && timeLeft <= 180;
+    const inWorkSegment = timerMode === 'flow' ? (currentFlowSegment() && currentFlowSegment().type === 'work') : isWorkTime;
+    const urgent = inWorkSegment && isRunning && timeLeft > 0 && timeLeft <= 180;
     timeDisplay.classList.toggle('urgent', urgent);
     if (progressBar) progressBar.classList.toggle('urgent', urgent);
 }
@@ -107,6 +113,28 @@ function playSound() {
     } catch (e) {}
 }
 
+// Short spoken announcement — falls back to the tone above if speech isn't available
+function announce(word) {
+    try {
+        if ('speechSynthesis' in window) {
+            speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(word);
+            u.rate = 0.95;
+            u.volume = 0.85;
+            speechSynthesis.speak(u);
+            return;
+        }
+    } catch (e) {}
+    playSound();
+}
+
+function addFiveMinutes() {
+    timeLeft += 300;
+    totalTime += 300;
+    if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') flowExtraSeconds += 300;
+    updateDisplay();
+}
+
 function toggleTimer() {
     if (isRunning) {
         clearInterval(timerInterval);
@@ -119,23 +147,31 @@ function toggleTimer() {
         startPauseBtn.textContent = 'Pause';
         isRunning = true;
         requestWakeLock();
-        timerInterval = setInterval(() => {
-            if (timeLeft > 0) {
-                timeLeft--;
-                updateDisplay();
-                if (isWorkTime && timeLeft === 180) playSound();
-            } else {
-                playSound();
-                if (isWorkTime) {
-                    dailySessions++;
-                    localStorage.setItem('focus_daily_sessions', dailySessions);
-                    $('daily-counter').textContent = `${dailySessions} Completed Sessions`;
-                }
-                isWorkTime = !isWorkTime;
-                setupMode();
-            }
-        }, 1000);
+        timerInterval = setInterval(runTick, 1000);
     }
+}
+
+function runTick() {
+    if (timeLeft > 0) {
+        timeLeft--;
+        updateDisplay();
+        const inWorkSegment = timerMode === 'flow' ? (currentFlowSegment() && currentFlowSegment().type === 'work') : isWorkTime;
+        if (inWorkSegment && timeLeft === 180) playSound();
+    } else if (timerMode === 'flow') {
+        advanceFlow();
+    } else {
+        playSound();
+        if (isWorkTime) recordFlowBlockCompleted();
+        isWorkTime = !isWorkTime;
+        setupMode();
+    }
+}
+
+function recordFlowBlockCompleted() {
+    flowBlocksCompleted++;
+    localStorage.setItem('focus_daily_sessions', flowBlocksCompleted);
+    const counterEl = $('daily-counter');
+    if (counterEl) counterEl.textContent = `${flowBlocksCompleted} Flow Blocks Completed`;
 }
 
 function setupMode() {
@@ -161,8 +197,229 @@ function setupMode() {
     updateAdaptiveHacks();
 }
 
-function resetTimer() { hasStartedOnce = false; setupMode(); }
+function resetTimer() { hasStartedOnce = false; timerMode = 'manual'; setFlowControlsVisible(false); isWorkTime = true; setupMode(); }
 function updateSettings() { if (!isRunning) { setupMode(); updateAdaptiveHacks(); } }
+
+// ---------- Auto Flow: sequences through your open tasks, chunking long ones intelligently ----------
+function setFlowControlsVisible(active) {
+    const exitBtn = $('exit-flow-btn');
+    const startBtn = $('start-flow-btn');
+    if (exitBtn) exitBtn.style.display = active ? 'inline-block' : 'none';
+    if (startBtn) startBtn.style.display = active ? 'none' : 'inline-block';
+}
+
+// Splits a task's total minutes into work chunks of up to ~25 min each.
+// A small leftover (10 min or less) gets folded into the last chunk instead of
+// becoming its own tiny segment, and the break after that task gets extended
+// by at least 5 minutes to compensate.
+function buildChunks(totalMinutes) {
+    const CHUNK = 25;
+    if (totalMinutes <= CHUNK) return { chunks: [totalMinutes], bonusBreakMinutes: 0 };
+
+    const chunks = [];
+    let remaining = totalMinutes;
+    let bonusBreakMinutes = 0;
+
+    while (remaining > 0) {
+        if (remaining <= CHUNK) {
+            if (remaining <= 10 && chunks.length > 0) {
+                chunks[chunks.length - 1] += remaining;
+                bonusBreakMinutes = Math.max(5, remaining);
+            } else {
+                chunks.push(remaining);
+            }
+            remaining = 0;
+        } else {
+            chunks.push(CHUNK);
+            remaining -= CHUNK;
+        }
+    }
+    return { chunks, bonusBreakMinutes };
+}
+
+function buildFlowSegments() {
+    const segments = [];
+    const openEntries = [];
+    boardData.forEach((col) => {
+        col.tasks.forEach((task) => { if (!task.completed) openEntries.push({ col, task, actualSecondsSoFar: 0 }); });
+    });
+    const standardBreak = parseInt(breakInput.value) || 5;
+
+    openEntries.forEach((entry, entryIdx) => {
+        const { chunks, bonusBreakMinutes } = buildChunks(Math.max(1, entry.task.estimateMinutes || 15));
+        chunks.forEach((chunkMin, i) => {
+            const isLastChunk = i === chunks.length - 1;
+            segments.push({ type: 'work', entry, minutes: chunkMin, isLastChunk });
+            const isVeryLastSegment = (entryIdx === openEntries.length - 1) && isLastChunk;
+            if (!isVeryLastSegment) {
+                const breakMin = isLastChunk ? standardBreak + bonusBreakMinutes : standardBreak;
+                segments.push({ type: 'break', minutes: breakMin });
+            }
+        });
+    });
+    return segments;
+}
+
+function startFlow() {
+    flowSegments = buildFlowSegments();
+    if (flowSegments.length === 0) {
+        alert("No open tasks to flow through — add a task with a time estimate first.");
+        return;
+    }
+
+    timerMode = 'flow';
+    flowSegIndex = 0;
+    hasStartedOnce = true;
+    setFlowControlsVisible(true);
+    beginFlowSegment();
+
+    startPauseBtn.textContent = 'Pause';
+    isRunning = true;
+    requestWakeLock();
+    clearInterval(timerInterval);
+    timerInterval = setInterval(runTick, 1000);
+}
+
+function currentFlowSegment() { return flowSegments[flowSegIndex]; }
+
+function beginFlowSegment() {
+    const seg = currentFlowSegment();
+    if (!seg) { finishFlow(); return; }
+    flowExtraSeconds = 0;
+    totalTime = timeLeft = seg.minutes * 60;
+
+    if (seg.type === 'work') {
+        modeIndicator.textContent = `Flow: ${seg.entry.task.text}`;
+        progressBar.style.backgroundColor = 'var(--cherry-red)';
+        announce('Work');
+    } else {
+        modeIndicator.textContent = 'Flow: Break';
+        progressBar.style.backgroundColor = 'var(--green)';
+        announce('Break');
+    }
+    updateDisplay();
+}
+
+function advanceFlow() {
+    playSound();
+    const seg = currentFlowSegment();
+    if (seg && seg.type === 'work') {
+        seg.entry.actualSecondsSoFar += seg.minutes * 60 + flowExtraSeconds;
+        recordFlowBlockCompleted();
+        if (seg.isLastChunk) completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
+    }
+    flowSegIndex++;
+    beginFlowSegment();
+}
+
+function completeFlowTask(entry, actualSeconds) {
+    const task = entry.task;
+    task.completed = true;
+    task.isTracking = false;
+    task.trackedSeconds = actualSeconds;
+    historyData.unshift({
+        client: entry.col.title,
+        task: task.text,
+        estimateMinutes: task.estimateMinutes,
+        actualMinutes: Math.round(actualSeconds / 60),
+        notes: task.notes || 'Completed via Flow',
+        completedAt: new Date().toISOString()
+    });
+    if (historyData.length > 500) historyData.pop();
+    saveBoardData();
+    renderBoard();
+    renderEstimateLog();
+}
+
+function finishFlow() {
+    clearInterval(timerInterval);
+    isRunning = false;
+    releaseWakeLock();
+    timerMode = 'manual';
+    isWorkTime = true;
+    setFlowControlsVisible(false);
+    startPauseBtn.textContent = hasStartedOnce ? 'Resume' : 'Start';
+    modeIndicator.textContent = 'Flow Complete!';
+    timeLeft = 0;
+    updateDisplay();
+    announce('Flow complete. Nice work.');
+}
+
+function exitFlow() {
+    clearInterval(timerInterval);
+    isRunning = false;
+    releaseWakeLock();
+    timerMode = 'manual';
+    isWorkTime = true;
+    setFlowControlsVisible(false);
+    setupMode();
+}
+
+function skipFlowSegment() {
+    if (timerMode !== 'flow') return;
+    const seg = currentFlowSegment();
+    if (seg && seg.type === 'work') {
+        const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
+        seg.entry.actualSecondsSoFar += elapsed;
+        if (seg.isLastChunk) completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
+    }
+    flowSegIndex++;
+    beginFlowSegment();
+}
+
+// ---------- Clock In / Clock Out ----------
+let clockState = storageGet('ff-clock-state', { clockedIn: false, startedAt: null });
+let clockLog = storageGet('ff-clock-log', []);
+
+function toggleClock() {
+    const btn = $('clock-btn');
+    if (clockState.clockedIn) {
+        const durationMs = Date.now() - clockState.startedAt;
+        const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+        clockLog.unshift({
+            date: new Date(clockState.startedAt).toLocaleDateString(),
+            clockIn: new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            clockOut: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            durationMinutes
+        });
+        if (clockLog.length > 30) clockLog.pop();
+        clockState = { clockedIn: false, startedAt: null };
+        storageSet('ff-clock-log', clockLog);
+    } else {
+        clockState = { clockedIn: true, startedAt: Date.now() };
+    }
+    storageSet('ff-clock-state', clockState);
+    renderClockCard();
+}
+
+function renderClockCard() {
+    const btn = $('clock-btn');
+    const status = $('clock-status');
+    if (!btn || !status) return;
+
+    if (clockState.clockedIn) {
+        btn.textContent = 'Clock Out';
+        btn.classList.add('active');
+        const elapsedMin = Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
+        const h = Math.floor(elapsedMin / 60), m = elapsedMin % 60;
+        status.textContent = `Clocked in since ${new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${h}h ${m}m so far)`;
+    } else {
+        btn.textContent = 'Clock In';
+        btn.classList.remove('active');
+        status.textContent = clockLog.length ? `Last session: ${clockLog[0].durationMinutes} min on ${clockLog[0].date}` : 'Not clocked in.';
+    }
+
+    const logBox = $('clock-log');
+    if (logBox) {
+        if (clockLog.length === 0) {
+            logBox.innerHTML = '<p style="font-size:0.8rem;color:#888;">No sessions logged yet.</p>';
+        } else {
+            logBox.innerHTML = `<ul class="log-list">${clockLog.slice(0, 8).map(c =>
+                `<li class="log-item"><span>${c.date}: ${c.clockIn} – ${c.clockOut}</span><span class="log-variance under">${c.durationMinutes} min</span></li>`
+            ).join('')}</ul>`;
+        }
+    }
+}
 
 // ---------- Task board ----------
 let mandatoryNotes = storageGet('focus_mandatory_notes', false);
@@ -225,6 +482,9 @@ function renderBoard() {
                 <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
             </div>
 
+            <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="3" placeholder="Or paste several tasks, one per line — e.g. 'design post 30 mins'. Leave off the time and AI will suggest one."></textarea>
+            <button class="add-task-btn" style="width:100%;margin-bottom:1rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
+
             <ul class="task-list">
                 ${col.tasks.map((task, taskIndex) => `
                     <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}">
@@ -244,6 +504,7 @@ function renderBoard() {
                         </div>
                         <div class="task-notes-dropdown ${task.showNotes ? 'open' : ''}">
                             <textarea class="task-notes-textarea" placeholder="Add extra task information/notes..." oninput="updateTaskNotes(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.notes || '')}</textarea>
+                            <button class="btn-secondary" style="margin-top:6px;width:100%;" onclick="suggestTimeForTask(${colIndex}, ${taskIndex})">Suggest Time (AI)</button>
                         </div>
                     </li>
                 `).join('')}
@@ -281,7 +542,111 @@ function addTask(colIndex) {
     renderBoard();
 }
 
+// Recognizes a trailing time phrase like "30 mins", "1.5 hrs", "90 secs" and converts it to minutes.
+function parseTimeFromLine(line) {
+    const re = /(\d+(?:\.\d+)?)\s*(hours|hour|hrs|hr|minutes|minute|mins|min|seconds|second|secs|sec)\b/i;
+    const match = line.match(re);
+    if (!match) return { text: line.trim(), minutes: null };
+
+    const value = parseFloat(match[1]);
+    const unit = match[2].toLowerCase();
+    let minutes;
+    if (unit.startsWith('h')) minutes = Math.round(value * 60);
+    else if (unit.startsWith('s')) minutes = Math.max(1, Math.round(value / 60));
+    else minutes = Math.round(value);
+
+    const cleanText = (line.slice(0, match.index) + line.slice(match.index + match[0].length))
+        .replace(/[\s,.:-]+$/, '')
+        .trim();
+    return { text: cleanText || line.trim(), minutes };
+}
+
+function addPastedTasks(colIndex) {
+    const textarea = $(`paste-box-${colIndex}`);
+    const lines = textarea.value.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+
+    const newTasks = lines.map((line) => {
+        const { text, minutes } = parseTimeFromLine(line);
+        return {
+            text,
+            estimateMinutes: minutes || 15,
+            needsAiEstimate: minutes === null,
+            trackedSeconds: 0,
+            isTracking: false,
+            notes: '',
+            completed: false,
+            showNotes: false
+        };
+    });
+
+    boardData[colIndex].tasks.push(...newTasks);
+    textarea.value = '';
+    saveBoardData();
+    renderBoard();
+
+    const needingAi = newTasks.filter((t) => t.needsAiEstimate);
+    if (needingAi.length > 0) suggestAiEstimatesBatch(needingAi);
+}
+
 function handleKeyPress(event, colIndex) { if (event.key === 'Enter') addTask(colIndex); }
+
+// ---------- AI time estimate suggestions (Gemini) ----------
+async function suggestAiEstimatesBatch(tasks) {
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey || tasks.length === 0) return;
+
+    const promptText = `You are helping estimate realistic, feasible time in minutes for short work tasks. For each task below, give your best realistic estimate in minutes as a whole number. Respond with ONLY a JSON array, no other text, in exactly this form: [{"task":"<exact task text given>","minutes": <number>}]. Tasks:\n` +
+        tasks.map((t) => `- "${t.text}"`).join('\n');
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleaned = raw.replace(/```json|```/g, '').trim();
+        const suggestions = JSON.parse(cleaned);
+
+        suggestions.forEach((s) => {
+            const match = tasks.find((t) => t.text === s.task);
+            if (match && s.minutes) {
+                match.estimateMinutes = Math.max(1, Math.round(s.minutes));
+                delete match.needsAiEstimate;
+            }
+        });
+        saveBoardData();
+        renderBoard();
+    } catch (e) { /* keep the fallback estimate silently */ }
+}
+
+async function suggestTimeForTask(colIndex, taskIndex) {
+    const apiKey = storageGet('gemini_api_key', null);
+    const task = boardData[colIndex].tasks[taskIndex];
+    if (!apiKey) { alert('Add your Gemini API key in the Monthly Summary section first.'); return; }
+
+    const promptText = `Estimate a realistic, feasible time in minutes for this work task, using all the detail given. Respond with ONLY a number, no words or units.\nTask: "${task.text}"\nNotes: "${task.notes || 'none'}"`;
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const num = parseInt((raw.match(/\d+/) || [])[0]);
+        if (num) {
+            task.estimateMinutes = Math.max(1, num);
+            saveBoardData();
+            renderBoard();
+        }
+    } catch (e) { /* leave estimate unchanged */ }
+}
 
 function toggleNotes(colIndex, taskIndex) {
     boardData[colIndex].tasks[taskIndex].showNotes = !boardData[colIndex].tasks[taskIndex].showNotes;
@@ -549,7 +914,10 @@ function initApp() {
 
     $('mandatory-notes-toggle').checked = mandatoryNotes;
     $('gemini-api-key').value = storageGet('gemini_api_key', '');
-    $('daily-counter').textContent = `${dailySessions} Completed Sessions`;
+    $('daily-counter').textContent = `${flowBlocksCompleted} Flow Blocks Completed`;
+    setFlowControlsVisible(false);
+    renderClockCard();
+    setInterval(() => { if (clockState.clockedIn) renderClockCard(); }, 30000);
 
     renderBoard();
     renderEstimateLog();

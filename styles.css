@@ -123,6 +123,7 @@ button:active { transform: scale(0.96); }
 .task-input-group { display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap; }
 .task-input { flex: 1; padding: 0.4rem; font-family: Georgia, serif; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; outline: none; background-color: var(--input-bg); color: var(--text-color); min-width: 120px; }
 .task-estimate-new { width: 60px; padding: 0.4rem; font-family: Georgia, serif; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; text-align: center; background-color: var(--input-bg); color: var(--text-color); }
+.paste-textarea { width: 100%; resize: vertical; margin-bottom: 6px; box-sizing: border-box; }
 .add-task-btn { background-color: var(--cherry-red); color: white; padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 700; }
 
 .task-list { list-style: none; padding: 0; margin: 0; flex: 1; overflow-y: auto; max-height: 360px; }
