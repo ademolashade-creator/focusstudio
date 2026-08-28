@@ -64,6 +64,9 @@ header p { color: #888; margin: 0 0 1rem 0; font-size: 0.95rem; }
 .main-layout { display: flex; flex-direction: column; gap: 2rem; width: 100%; max-width: 1100px; }
 @media (min-width: 768px) { .main-layout { display: grid; grid-template-columns: 320px 1fr; align-items: start; } }
 
+.stats-row { display: grid; grid-template-columns: 1fr; gap: 1.2rem; width: 100%; max-width: 1100px; margin-bottom: 1.5rem; }
+@media (min-width: 768px) { .stats-row { grid-template-columns: repeat(3, 1fr); } }
+
 .sidebar-container { display: flex; flex-direction: column; gap: 1.5rem; }
 .board-area { min-width: 0; }
 
@@ -113,7 +116,7 @@ button:active { transform: scale(0.96); }
 .board-container { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
 @media (min-width: 900px) { .board-container { grid-template-columns: repeat(3, 1fr); } }
 
-.task-column { background-color: var(--card-bg); padding: 1.5rem; border-radius: 20px; box-shadow: var(--shadow); border: 2px solid var(--border-color); display: flex; flex-direction: column; min-height: 450px; }
+.task-column { background-color: var(--card-bg); padding: 1.5rem; border-radius: 20px; box-shadow: var(--shadow); border: 2px solid var(--border-color); display: flex; flex-direction: column; }
 
 .column-header-row { display: flex; align-items: center; gap: 6px; margin-bottom: 0.8rem; }
 .column-header-row .column-header-input { margin-bottom: 0; }
@@ -161,6 +164,10 @@ button:active { transform: scale(0.96); }
 .task-notes-textarea { width: 100%; padding: 0.4rem; font-family: Georgia, serif; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--input-bg); color: var(--text-color); resize: vertical; box-sizing: border-box; outline: none; }
 
 .summary-container, .log-card { width: 100%; max-width: 1100px; background: var(--card-bg); padding: 2rem; border-radius: 20px; box-shadow: var(--shadow); border: 2px solid var(--border-color); margin-top: 2rem; box-sizing: border-box; }
+
+.discreet-card { width: 100%; max-width: 1100px; background: transparent; padding: 1rem 0.5rem; margin-top: 1.5rem; box-sizing: border-box; border-top: 1px dashed var(--border-color); }
+.discreet-card h4 { margin: 0 0 6px; font-size: 0.85rem; color: #888; font-weight: 700; }
+.discreet-card p { margin: 0 0 10px; font-size: 0.78rem; color: #999; }
 
 .summary-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px; }
 .summary-header h2 { margin: 0; color: var(--cherry-red); font-size: 1.4rem; }
