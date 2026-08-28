@@ -40,13 +40,12 @@
                 <div class="controls">
                     <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
                     <button id="reset-btn" onclick="resetTimer()">Restart</button>
+                    <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
                     <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes to the current segment">+5 min</button>
                 </div>
 
                 <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
-                <button class="lock-btn" id="exit-flow-btn" onclick="exitFlow()" style="display:none;background:#2b2b2b;">Exit Flow</button>
                 <button class="btn-secondary" id="skip-flow-btn" onclick="skipFlowSegment()" style="width:100%;margin-top:6px;">Skip Segment (Flow only)</button>
-                <button class="lock-btn" id="focus-lock-btn" onclick="toggleFocusLock()">Enable Focus Lock</button>
 
                 <div class="settings">
                     <div class="setting-row">
@@ -76,8 +75,20 @@
                 <h3>Adaptive Brain Engine</h3>
                 <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
             </div>
+
+            <div class="hacks-card">
+                <h3>Time Counter</h3>
+                <div style="font-size:0.8rem;margin-bottom:6px;">
+                    <label>Timezone <select id="timezone-select" onchange="updateTimezone(this.value)" style="width:100%;margin-top:4px;"></select></label>
+                </div>
+                <div class="hacks-content" id="time-counter-box">Add tasks to see your projected completion times.</div>
+            </div>
         </div>
 
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/10 columns</span>
+            <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
+        </div>
         <div class="board-container" id="board-container"></div>
     </div>
 
@@ -98,13 +109,35 @@
         <div class="summary-content" id="summary-content">Click "Generate AI Client Report," or it'll run automatically on the 30th if your key is saved.</div>
     </div>
 
-    <div class="lock-overlay" id="lock-overlay">
-        <div class="lock-overlay-box">
-            <p id="lock-overlay-msg">You left Focus Lock.</p>
-            <div class="lock-overlay-actions">
-                <button class="btn-primary" onclick="reLock()">Stay Locked</button>
-                <button class="btn-secondary" onclick="confirmLeaveLock()">Leave Focus Mode</button>
+    <div class="modal-overlay" id="end-session-overlay">
+        <div class="modal-box">
+            <p>End this session. Do you want to log what you've done so far, or throw it away with no credit?</p>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="endSessionLogProgress()">Log Progress</button>
+                <button class="btn-secondary" onclick="endSessionAbandon()">Abandon (No Credit)</button>
             </div>
+            <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="closeEndSessionModal()">Cancel, Keep Going</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="completion-overlay">
+        <div class="modal-box">
+            <p>How long did <strong id="completion-task-name"></strong> actually take?</p>
+            <input type="number" id="completion-actual-input" min="1" max="600" style="width:100%;text-align:center;margin-bottom:10px;">
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="confirmCompletion()">Confirm</button>
+                <button class="btn-secondary" onclick="cancelCompletion()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="details-overlay">
+        <div class="modal-box" style="text-align:left;">
+            <p style="text-align:center;"><strong id="details-task-name"></strong></p>
+            <textarea id="details-notes-textarea" class="task-notes-textarea" rows="4" placeholder="Add extra task information/notes..." style="width:100%;margin-bottom:8px;"></textarea>
+            <p id="details-estimate-label" style="font-size:0.8rem;color:#888;margin:0 0 8px;"></p>
+            <button class="btn-secondary" style="width:100%;margin-bottom:8px;" onclick="suggestTimeFromDetails()">Suggest Time (AI)</button>
+            <button class="btn-primary" style="width:100%;" onclick="closeDetailsModal()">Save & Close</button>
         </div>
     </div>
 

@@ -202,9 +202,7 @@ function updateSettings() { if (!isRunning) { setupMode(); updateAdaptiveHacks()
 
 // ---------- Auto Flow: sequences through your open tasks, chunking long ones intelligently ----------
 function setFlowControlsVisible(active) {
-    const exitBtn = $('exit-flow-btn');
     const startBtn = $('start-flow-btn');
-    if (exitBtn) exitBtn.style.display = active ? 'inline-block' : 'none';
     if (startBtn) startBtn.style.display = active ? 'none' : 'inline-block';
 }
 
@@ -345,14 +343,54 @@ function finishFlow() {
     announce('Flow complete. Nice work.');
 }
 
-function exitFlow() {
+// ---------- Stop / End Session (log progress, or abandon with no credit) ----------
+function openEndSessionModal() {
+    if (!hasStartedOnce && !isRunning) return; // nothing running to end
+    $('end-session-overlay').style.display = 'flex';
+}
+
+function closeEndSessionModal() {
+    $('end-session-overlay').style.display = 'none';
+}
+
+function endSessionLogProgress() {
+    creditCurrentSegment();
+    finishSessionCleanup('Session Ended (Logged)');
+    closeEndSessionModal();
+}
+
+function endSessionAbandon() {
+    finishSessionCleanup('Session Ended');
+    closeEndSessionModal();
+}
+
+function creditCurrentSegment() {
+    if (timerMode === 'flow') {
+        const seg = currentFlowSegment();
+        if (seg && seg.type === 'work') {
+            const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
+            seg.entry.actualSecondsSoFar += elapsed;
+            recordFlowBlockCompleted();
+            if (seg.isLastChunk) completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
+        }
+    } else if (isWorkTime) {
+        recordFlowBlockCompleted();
+    }
+}
+
+function finishSessionCleanup(label) {
     clearInterval(timerInterval);
     isRunning = false;
     releaseWakeLock();
     timerMode = 'manual';
     isWorkTime = true;
+    hasStartedOnce = false;
     setFlowControlsVisible(false);
-    setupMode();
+    startPauseBtn.textContent = 'Start';
+    modeIndicator.textContent = label;
+    timeLeft = 0;
+    updateDisplay();
+    updateAdaptiveHacks();
 }
 
 function skipFlowSegment() {
@@ -433,11 +471,52 @@ const defaultColumns = [
 let boardData = storageGet('focus_board_data', defaultColumns);
 let historyData = storageGet('focus_history_data', []);
 
-// Migrate older saved tasks that don't yet have time-tracking fields
+// ---------- Date grouping helpers ----------
+function getTodayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatDateKey(dateKey) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const d = new Date(dateKey + 'T00:00:00');
+    if (d.getTime() === today.getTime()) return 'Today';
+    if (d.getTime() === yesterday.getTime()) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function dateKeyFromISO(isoString) {
+    const d = new Date(isoString);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Groups a column's tasks by the day they were added. Within each day: open
+// tasks first (in your manual order), then completed tasks below them,
+// ordered by when you actually checked each one off.
+function groupTasksByDate(tasks) {
+    const groups = {};
+    tasks.forEach((task, originalIndex) => {
+        const key = task.dateAdded || getTodayKey();
+        if (!groups[key]) groups[key] = { incomplete: [], completed: [] };
+        if (task.completed) groups[key].completed.push({ task, originalIndex });
+        else groups[key].incomplete.push({ task, originalIndex });
+    });
+    Object.values(groups).forEach((g) => g.completed.sort((a, b) => (a.task.completedAt || 0) - (b.task.completedAt || 0)));
+    return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map((key) => ({
+        dateKey: key,
+        dateLabel: formatDateKey(key),
+        items: [...groups[key].incomplete, ...groups[key].completed]
+    }));
+}
+
+// Migrate older saved tasks that don't yet have time-tracking or date fields
 boardData.forEach(col => col.tasks.forEach(t => {
     if (t.estimateMinutes === undefined) t.estimateMinutes = 15;
     if (t.trackedSeconds === undefined) t.trackedSeconds = 0;
     if (t.isTracking === undefined) t.isTracking = false;
+    if (t.dateAdded === undefined) t.dateAdded = getTodayKey();
+    if (t.completedAt === undefined) t.completedAt = t.completed ? Date.now() : null;
 }));
 
 function saveBoardData() {
@@ -464,17 +543,48 @@ function renderBoard() {
     if (!container) return;
     container.innerHTML = '';
 
+    const colCountLabel = $('column-count-label');
+    if (colCountLabel) colCountLabel.textContent = `${boardData.length}/10 columns`;
+
     boardData.forEach((col, colIndex) => {
         const columnEl = document.createElement('div');
         columnEl.className = 'task-column';
 
         columnEl.innerHTML = `
-            <input type="text" class="column-header-input" value="${escapeHTML(col.title)}" oninput="updateColumnTitle(${colIndex}, this.value)" placeholder="Project / Client Name">
-
-            <div class="google-link-container">
-                <input type="url" class="google-link-input" value="${escapeHTML(col.googleLink || '')}" oninput="updateGoogleLink(${colIndex}, this.value)" placeholder="Paste Google Doc/Sheet Link...">
-                <a href="${col.googleLink || '#'}" target="_blank" class="google-link-btn" title="Open Link">Open</a>
+            <div class="column-header-row">
+                <input type="text" class="column-header-input" value="${escapeHTML(col.title)}" oninput="updateColumnTitle(${colIndex}, this.value)" placeholder="Project / Client Name">
+                <div class="column-header-actions">
+                    <button class="icon-btn" onclick="moveColumn(${colIndex}, -1)" title="Move Left">◀</button>
+                    <button class="icon-btn" onclick="moveColumn(${colIndex}, 1)" title="Move Right">▶</button>
+                    <button class="delete-btn" onclick="deleteColumn(${colIndex})" title="Delete Column">×</button>
+                </div>
             </div>
+
+            <ul class="task-list">
+                ${groupTasksByDate(col.tasks).map((group) => `
+                    <li class="date-group-header">${group.dateLabel}</li>
+                    ${group.items.map(({ task, originalIndex: taskIndex }) => `
+                        <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}">
+                            <div class="task-main-row">
+                                <div class="task-left">
+                                    <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
+                                    <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
+                                </div>
+                                <div class="task-actions">
+                                    <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
+                                    <button class="track-btn ${task.isTracking ? 'tracking' : ''}" id="track-btn-${colIndex}-${taskIndex}" onclick="toggleTrack(${colIndex}, ${taskIndex})" title="Start or pause a stopwatch for this task">${task.isTracking ? '⏸ Tracking' : '▶ Track Time'} ${formatMinSec(task.trackedSeconds)}</button>
+                                    ${!task.completed ? `
+                                    <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)" title="Move Up">▲</button>
+                                    <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)" title="Move Down">▼</button>
+                                    ` : ''}
+                                    <button class="delete-btn" onclick="deleteTask(${colIndex}, ${taskIndex})">×</button>
+                                </div>
+                            </div>
+                            <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' •' : ''}</button>
+                        </li>
+                    `).join('')}
+                `).join('')}
+            </ul>
 
             <div class="task-input-group">
                 <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add a new task..." onkeypress="handleKeyPress(event, ${colIndex})">
@@ -482,41 +592,121 @@ function renderBoard() {
                 <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
             </div>
 
-            <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="3" placeholder="Or paste several tasks, one per line — e.g. 'design post 30 mins'. Leave off the time and AI will suggest one."></textarea>
-            <button class="add-task-btn" style="width:100%;margin-bottom:1rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
+            <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Or paste several tasks, one per line — e.g. 'design post 30 mins'."></textarea>
+            <button class="add-task-btn" style="width:100%;margin-bottom:0.6rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
 
-            <ul class="task-list">
-                ${col.tasks.map((task, taskIndex) => `
-                    <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}">
-                        <div class="task-main-row">
-                            <div class="task-left">
-                                <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
-                                <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
-                            </div>
-                            <div class="task-actions">
-                                <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
-                                <button class="track-btn ${task.isTracking ? 'tracking' : ''}" id="track-btn-${colIndex}-${taskIndex}" onclick="toggleTrack(${colIndex}, ${taskIndex})" title="Track actual time spent">${task.isTracking ? '⏸' : '▶'} ${formatMinSec(task.trackedSeconds)}</button>
-                                <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)" title="Move Up">▲</button>
-                                <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)" title="Move Down">▼</button>
-                                <button class="notes-toggle-btn" onclick="toggleNotes(${colIndex}, ${taskIndex})" title="Notes">📝</button>
-                                <button class="delete-btn" onclick="deleteTask(${colIndex}, ${taskIndex})">×</button>
-                            </div>
-                        </div>
-                        <div class="task-notes-dropdown ${task.showNotes ? 'open' : ''}">
-                            <textarea class="task-notes-textarea" placeholder="Add extra task information/notes..." oninput="updateTaskNotes(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.notes || '')}</textarea>
-                            <button class="btn-secondary" style="margin-top:6px;width:100%;" onclick="suggestTimeForTask(${colIndex}, ${taskIndex})">Suggest Time (AI)</button>
-                        </div>
-                    </li>
-                `).join('')}
-            </ul>
+            <div class="google-link-container">
+                <input type="url" class="google-link-input" value="${escapeHTML(col.googleLink || '')}" oninput="updateGoogleLink(${colIndex}, this.value)" placeholder="Paste Google Doc/Sheet Link...">
+                <a href="${col.googleLink || '#'}" target="_blank" class="google-link-btn" title="Open Link">Open</a>
+            </div>
         `;
         container.appendChild(columnEl);
     });
     updateAdaptiveHacks();
+    renderTimeCounter();
 }
 
 function updateColumnTitle(colIndex, newTitle) { boardData[colIndex].title = newTitle; saveBoardData(); }
 function updateGoogleLink(colIndex, newLink) { boardData[colIndex].googleLink = newLink; saveBoardData(); }
+
+function moveColumn(colIndex, direction) {
+    const target = colIndex + direction;
+    if (target < 0 || target >= boardData.length) return;
+    [boardData[colIndex], boardData[target]] = [boardData[target], boardData[colIndex]];
+    saveBoardData();
+    renderBoard();
+}
+
+function addColumn() {
+    if (boardData.length >= 10) { alert('Maximum of 10 columns.'); return; }
+    boardData.push({ id: Date.now(), title: `New Column ${boardData.length + 1}`, googleLink: '', tasks: [] });
+    saveBoardData();
+    renderBoard();
+}
+
+function deleteColumn(colIndex) {
+    if (boardData.length <= 1) { alert('Keep at least one column.'); return; }
+    if (!confirm(`Delete "${boardData[colIndex].title}" and all its tasks? This can't be undone.`)) return;
+    boardData.splice(colIndex, 1);
+    saveBoardData();
+    renderBoard();
+}
+
+// ---------- Time Counter: total minutes and projected completion clock times ----------
+function computeColumnTimeline(standardBreakMinutes) {
+    let grandWork = 0;
+    const perColumn = boardData.map((col) => {
+        let colWork = 0, colTotalWithBreaks = 0;
+        const openTasks = col.tasks.filter((t) => !t.completed);
+        openTasks.forEach((task, i) => {
+            const { chunks, bonusBreakMinutes } = buildChunks(Math.max(1, task.estimateMinutes || 15));
+            const taskWork = chunks.reduce((a, b) => a + b, 0);
+            colWork += taskWork;
+            colTotalWithBreaks += taskWork + (chunks.length - 1) * standardBreakMinutes;
+            const isLastTaskInCol = i === openTasks.length - 1;
+            if (!isLastTaskInCol) colTotalWithBreaks += standardBreakMinutes + bonusBreakMinutes;
+        });
+        grandWork += colWork;
+        return { title: col.title, workMinutes: colWork, totalWithBreaksMinutes: colTotalWithBreaks, taskCount: openTasks.length };
+    });
+
+    let grandTotal = 0;
+    perColumn.forEach((c, idx) => {
+        grandTotal += c.totalWithBreaksMinutes;
+        if (idx < perColumn.length - 1 && c.taskCount > 0) grandTotal += standardBreakMinutes;
+    });
+
+    return { perColumn, grandWorkMinutes: grandWork, grandTotalMinutes: grandTotal };
+}
+
+function getSelectedTimezone() {
+    return storageGet('ff-timezone', Intl.DateTimeFormat().resolvedOptions().timeZone);
+}
+
+function updateTimezone(tz) {
+    storageSet('ff-timezone', tz);
+    renderTimeCounter();
+}
+
+function populateTimezoneSelect() {
+    const sel = $('timezone-select');
+    if (!sel) return;
+    let zones;
+    try { zones = Intl.supportedValuesOf('timeZone'); }
+    catch (e) { zones = ['UTC', 'Africa/Lagos', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Australia/Sydney']; }
+    const current = getSelectedTimezone();
+    sel.innerHTML = zones.map((z) => `<option value="${z}" ${z === current ? 'selected' : ''}>${z}</option>`).join('');
+}
+
+function formatTimeInZone(date, tz) {
+    return date.toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+}
+
+function renderTimeCounter() {
+    const box = $('time-counter-box');
+    if (!box) return;
+    const breakMin = parseInt(breakInput.value) || 5;
+    const { perColumn, grandWorkMinutes, grandTotalMinutes } = computeColumnTimeline(breakMin);
+    const tz = getSelectedTimezone();
+    const now = new Date();
+    let cursor = new Date(now);
+    let rows = '';
+
+    perColumn.forEach((c, idx) => {
+        if (c.taskCount === 0) {
+            rows += `<div class="log-item"><span>${escapeHTML(c.title)}</span><span style="color:#999;">No open tasks</span></div>`;
+            return;
+        }
+        cursor = new Date(cursor.getTime() + c.totalWithBreaksMinutes * 60000);
+        rows += `<div class="log-item"><span>${escapeHTML(c.title)} (${c.workMinutes} min work)</span><span class="log-variance under">Done by ${formatTimeInZone(cursor, tz)}</span></div>`;
+        if (idx < perColumn.length - 1 && c.taskCount > 0) cursor = new Date(cursor.getTime() + breakMin * 60000);
+    });
+
+    const grandDone = new Date(now.getTime() + grandTotalMinutes * 60000);
+    box.innerHTML = `<ul class="log-list">${rows}</ul>
+        <p style="margin-top:8px;font-size:0.85rem;"><strong>${grandWorkMinutes} min</strong> total work across all open tasks.</p>
+        <p style="font-weight:700;">All columns done by ${formatTimeInZone(grandDone, tz)} (${tz})</p>`;
+}
 
 function addTask(colIndex) {
     const input = $(`task-input-${colIndex}`);
@@ -535,6 +725,8 @@ function addTask(colIndex) {
         isTracking: false,
         notes: '',
         completed: false,
+        completedAt: null,
+        dateAdded: getTodayKey(),
         showNotes: false
     });
     input.value = '';
@@ -576,6 +768,8 @@ function addPastedTasks(colIndex) {
             isTracking: false,
             notes: '',
             completed: false,
+            completedAt: null,
+            dateAdded: getTodayKey(),
             showNotes: false
         };
     });
@@ -655,26 +849,75 @@ async function suggestTimeForTask(colIndex, taskIndex) {
     } catch (e) { /* leave estimate unchanged */ }
 }
 
-function toggleNotes(colIndex, taskIndex) {
-    boardData[colIndex].tasks[taskIndex].showNotes = !boardData[colIndex].tasks[taskIndex].showNotes;
-    renderBoard();
+// ---------- Details popup (notes + AI time suggestion) ----------
+let openDetailsRef = null; // { colIndex, taskIndex }
+
+function openDetailsModal(colIndex, taskIndex) {
+    openDetailsRef = { colIndex, taskIndex };
+    const task = boardData[colIndex].tasks[taskIndex];
+    $('details-task-name').textContent = task.text;
+    $('details-notes-textarea').value = task.notes || '';
+    $('details-estimate-label').textContent = `Current estimate: ${task.estimateMinutes} min`;
+    $('details-overlay').style.display = 'flex';
 }
+
+function closeDetailsModal() {
+    if (openDetailsRef) saveDetailsNotes();
+    openDetailsRef = null;
+    $('details-overlay').style.display = 'none';
+}
+
+function saveDetailsNotes() {
+    if (!openDetailsRef) return;
+    const { colIndex, taskIndex } = openDetailsRef;
+    updateTaskNotes(colIndex, taskIndex, $('details-notes-textarea').value);
+}
+
+async function suggestTimeFromDetails() {
+    if (!openDetailsRef) return;
+    const { colIndex, taskIndex } = openDetailsRef;
+    saveDetailsNotes();
+    await suggestTimeForTask(colIndex, taskIndex);
+    const task = boardData[colIndex].tasks[taskIndex];
+    $('details-estimate-label').textContent = `Current estimate: ${task.estimateMinutes} min`;
+}
+
 function updateTaskNotes(colIndex, taskIndex, newNotes) { boardData[colIndex].tasks[taskIndex].notes = newNotes; saveBoardData(); }
 function updateTaskText(colIndex, taskIndex, newText) { boardData[colIndex].tasks[taskIndex].text = newText.trim() || 'Untitled task'; saveBoardData(); }
+
+// Updates just this task's dependent visuals instead of rebuilding the whole
+// board, which is what was causing the value to snap back on edit.
 function updateTaskEstimate(colIndex, taskIndex, newVal) {
     if (isNaN(newVal) || newVal < 1) newVal = 1;
     boardData[colIndex].tasks[taskIndex].estimateMinutes = newVal;
     saveBoardData();
-    renderBoard();
+
+    const task = boardData[colIndex].tasks[taskIndex];
+    const li = $(`task-${colIndex}-${taskIndex}`);
+    if (li) {
+        li.classList.remove('time-ok', 'time-warn', 'time-over');
+        const cls = urgencyClassFor(task);
+        if (cls) li.classList.add(cls);
+    }
+    updateAdaptiveHacks();
+    renderTimeCounter();
 }
 
 function moveTask(colIndex, taskIndex, direction) {
     const tasks = boardData[colIndex].tasks;
-    const target = taskIndex + direction;
-    if (target >= 0 && target < tasks.length) {
-        [tasks[taskIndex], tasks[target]] = [tasks[target], tasks[taskIndex]];
-        saveBoardData();
-        renderBoard();
+    const task = tasks[taskIndex];
+    if (task.completed) return; // completed tasks order themselves by when you checked them off
+
+    let target = taskIndex + direction;
+    while (target >= 0 && target < tasks.length) {
+        const candidate = tasks[target];
+        if (candidate.dateAdded === task.dateAdded && !candidate.completed) {
+            [tasks[taskIndex], tasks[target]] = [tasks[target], tasks[taskIndex]];
+            saveBoardData();
+            renderBoard();
+            return;
+        }
+        target += direction;
     }
 }
 
@@ -684,30 +927,80 @@ function toggleTrack(colIndex, taskIndex) {
     renderBoard();
 }
 
+// ---------- Completing / un-completing a task ----------
+let pendingCompletion = null; // { colIndex, taskIndex }
+
 function toggleTask(colIndex, taskIndex) {
     const task = boardData[colIndex].tasks[taskIndex];
 
-    if (mandatoryNotes && !task.completed && (!task.notes || task.notes.trim() === '')) {
+    // Un-checking: remove its history entry so re-checking later doesn't duplicate it.
+    if (task.completed) {
+        task.completed = false;
+        task.completedAt = null;
+        if (task._historyId) {
+            const idx = historyData.findIndex((h) => h._id === task._historyId);
+            if (idx !== -1) historyData.splice(idx, 1);
+            task._historyId = null;
+        }
+        saveBoardData();
+        renderBoard();
+        renderEstimateLog();
+        return;
+    }
+
+    if (mandatoryNotes && (!task.notes || task.notes.trim() === '')) {
         alert("Mandatory Extra Info is turned ON! Please fill out task details before completing this task.");
         renderBoard();
         return;
     }
 
-    task.completed = !task.completed;
-
-    if (task.completed) {
-        task.isTracking = false;
-        const actualMinutes = Math.round(task.trackedSeconds / 60);
-        historyData.unshift({
-            client: boardData[colIndex].title,
-            task: task.text,
-            estimateMinutes: task.estimateMinutes,
-            actualMinutes: actualMinutes,
-            notes: task.notes || 'No extra notes provided',
-            completedAt: new Date().toISOString()
-        });
-        if (historyData.length > 500) historyData.pop();
+    // Never tracked (no stopwatch use, not finished via Flow) — ask what it actually took.
+    if (task.trackedSeconds === 0) {
+        pendingCompletion = { colIndex, taskIndex };
+        $('completion-task-name').textContent = task.text;
+        $('completion-actual-input').value = task.estimateMinutes;
+        $('completion-overlay').style.display = 'flex';
+        return;
     }
+
+    finalizeTaskCompletion(colIndex, taskIndex, task.trackedSeconds);
+}
+
+function confirmCompletion() {
+    if (!pendingCompletion) return;
+    const { colIndex, taskIndex } = pendingCompletion;
+    const task = boardData[colIndex].tasks[taskIndex];
+    const minutes = Math.max(1, parseInt($('completion-actual-input').value) || task.estimateMinutes);
+    finalizeTaskCompletion(colIndex, taskIndex, minutes * 60);
+    pendingCompletion = null;
+    $('completion-overlay').style.display = 'none';
+}
+
+function cancelCompletion() {
+    pendingCompletion = null;
+    $('completion-overlay').style.display = 'none';
+    renderBoard(); // reverts the checkbox's visual state
+}
+
+function finalizeTaskCompletion(colIndex, taskIndex, actualSeconds) {
+    const task = boardData[colIndex].tasks[taskIndex];
+    task.completed = true;
+    task.isTracking = false;
+    task.trackedSeconds = actualSeconds;
+    task.completedAt = Date.now();
+
+    const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    task._historyId = historyId;
+    historyData.unshift({
+        _id: historyId,
+        client: boardData[colIndex].title,
+        task: task.text,
+        estimateMinutes: task.estimateMinutes,
+        actualMinutes: Math.round(actualSeconds / 60),
+        notes: task.notes || 'No extra notes provided',
+        completedAt: new Date().toISOString()
+    });
+    if (historyData.length > 500) historyData.pop();
 
     saveBoardData();
     renderBoard();
@@ -779,76 +1072,31 @@ function updateAdaptiveHacks() {
 function renderEstimateLog() {
     const logBox = $('estimate-log');
     if (!logBox) return;
-    const recent = historyData.slice(0, 20);
+    const recent = historyData.slice(0, 40);
     if (recent.length === 0) {
         logBox.innerHTML = '<p style="font-size:0.85rem;color:#888;">Complete a tracked task to start your log.</p>';
         return;
     }
-    logBox.innerHTML = `<ul class="log-list">${recent.map(h => {
-        const diff = (h.actualMinutes || 0) - (h.estimateMinutes || 0);
-        let cls = 'under', label = `${diff <= 0 ? diff : '+' + diff}m`;
-        if (diff > (h.estimateMinutes * 0.2)) cls = 'over';
-        else if (diff > 0) cls = 'near';
-        const d = new Date(h.completedAt);
-        const dateStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
-        return `<li class="log-item"><span>${escapeHTML(h.task)} <em style="color:#999;">(${dateStr})</em></span><span class="log-variance ${cls}">Est ${h.estimateMinutes}m / Act ${h.actualMinutes}m (${label})</span></li>`;
-    }).join('')}</ul>`;
-}
 
-// ---------- Focus Lock ----------
-let focusLockEnabled = false;
-let hiddenAt = null;
+    const groups = {};
+    recent.forEach((h) => {
+        const key = dateKeyFromISO(h.completedAt);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(h);
+    });
+    const orderedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
 
-async function toggleFocusLock() {
-    focusLockEnabled = !focusLockEnabled;
-    const btn = $('focus-lock-btn');
-    if (focusLockEnabled) {
-        btn.textContent = 'Disable Focus Lock';
-        btn.classList.add('active');
-        try { await document.documentElement.requestFullscreen(); } catch (e) {}
-    } else {
-        btn.textContent = 'Enable Focus Lock';
-        btn.classList.remove('active');
-        if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
-    }
+    logBox.innerHTML = `<ul class="log-list">${orderedKeys.map((key) => `
+        <li class="date-group-header">${formatDateKey(key)}</li>
+        ${groups[key].map((h) => {
+            const diff = (h.actualMinutes || 0) - (h.estimateMinutes || 0);
+            let cls = 'under', label = `${diff <= 0 ? diff : '+' + diff}m`;
+            if (diff > (h.estimateMinutes * 0.2)) cls = 'over';
+            else if (diff > 0) cls = 'near';
+            return `<li class="log-item"><span>${escapeHTML(h.task)}</span><span class="log-variance ${cls}">Est ${h.estimateMinutes}m / Act ${h.actualMinutes}m (${label})</span></li>`;
+        }).join('')}
+    `).join('')}</ul>`;
 }
-
-function showLockWarning(msg) {
-    const overlay = $('lock-overlay');
-    const msgEl = $('lock-overlay-msg');
-    if (!overlay) return;
-    msgEl.textContent = msg;
-    overlay.style.display = 'flex';
-}
-function confirmLeaveLock() {
-    focusLockEnabled = false;
-    const btn = $('focus-lock-btn');
-    if (btn) { btn.textContent = 'Enable Focus Lock'; btn.classList.remove('active'); }
-    $('lock-overlay').style.display = 'none';
-}
-async function reLock() {
-    $('lock-overlay').style.display = 'none';
-    if (focusLockEnabled) { try { await document.documentElement.requestFullscreen(); } catch (e) {} }
-}
-
-window.addEventListener('beforeunload', (e) => {
-    if (focusLockEnabled && isRunning) { e.preventDefault(); e.returnValue = ''; }
-});
-document.addEventListener('visibilitychange', () => {
-    if (!focusLockEnabled) return;
-    if (document.hidden) {
-        hiddenAt = Date.now();
-    } else if (hiddenAt) {
-        const awaySec = Math.round((Date.now() - hiddenAt) / 1000);
-        hiddenAt = null;
-        if (awaySec > 2) showLockWarning(`You stepped away for ${awaySec}s while Focus Lock was on. Staying on track?`);
-    }
-});
-document.addEventListener('fullscreenchange', () => {
-    if (focusLockEnabled && !document.fullscreenElement) {
-        showLockWarning('You exited fullscreen focus mode. Re-lock to keep going, or confirm you want to leave.');
-    }
-});
 
 // ---------- Gemini AI: monthly client report ----------
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
@@ -926,6 +1174,7 @@ function initApp() {
     renderClockCard();
     setInterval(() => { if (clockState.clockedIn) renderClockCard(); }, 30000);
 
+    populateTimezoneSelect();
     renderBoard();
     renderEstimateLog();
     updateDisplay();
