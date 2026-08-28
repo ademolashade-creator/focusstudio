@@ -315,7 +315,12 @@ function completeFlowTask(entry, actualSeconds) {
     task.completed = true;
     task.isTracking = false;
     task.trackedSeconds = actualSeconds;
+    task.completedAt = Date.now();
+
+    const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    task._historyId = historyId;
     historyData.unshift({
+        _id: historyId,
         client: entry.col.title,
         task: task.text,
         estimateMinutes: task.estimateMinutes,
@@ -324,9 +329,11 @@ function completeFlowTask(entry, actualSeconds) {
         completedAt: new Date().toISOString()
     });
     if (historyData.length > 500) historyData.pop();
+    rememberTaskTime(task.text, Math.round(actualSeconds / 60));
     saveBoardData();
     renderBoard();
     renderEstimateLog();
+    renderDailyRecap();
 }
 
 function finishFlow() {
@@ -446,6 +453,7 @@ function renderClockCard() {
         btn.classList.remove('active');
         status.textContent = clockLog.length ? `Last session: ${clockLog[0].durationMinutes} min on ${clockLog[0].date}` : 'Not clocked in.';
     }
+    renderDailyRecap();
 
     const logBox = $('clock-log');
     if (logBox) {
@@ -753,6 +761,28 @@ function parseTimeFromLine(line) {
     return { text: cleanText || line.trim(), minutes };
 }
 
+// ---------- Remembered task times (learns from your own history) ----------
+let taskTimeMemory = storageGet('ff-task-time-memory', {});
+
+function normalizeTaskName(text) {
+    return text.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function rememberTaskTime(text, minutes) {
+    const key = normalizeTaskName(text);
+    if (!key) return;
+    const entry = taskTimeMemory[key] || { total: 0, count: 0 };
+    entry.total += minutes;
+    entry.count += 1;
+    taskTimeMemory[key] = entry;
+    storageSet('ff-task-time-memory', taskTimeMemory);
+}
+
+function getRememberedMinutes(text) {
+    const entry = taskTimeMemory[normalizeTaskName(text)];
+    return entry ? Math.round(entry.total / entry.count) : null;
+}
+
 function addPastedTasks(colIndex) {
     const textarea = $(`paste-box-${colIndex}`);
     const lines = textarea.value.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -760,10 +790,17 @@ function addPastedTasks(colIndex) {
 
     const newTasks = lines.map((line) => {
         const { text, minutes } = parseTimeFromLine(line);
+        let finalMinutes = minutes;
+        let needsAi = false;
+        if (finalMinutes === null) {
+            const remembered = getRememberedMinutes(text);
+            if (remembered) finalMinutes = remembered;
+            else needsAi = true;
+        }
         return {
             text,
-            estimateMinutes: minutes || 15,
-            needsAiEstimate: minutes === null,
+            estimateMinutes: finalMinutes || 15,
+            needsAiEstimate: needsAi,
             trackedSeconds: 0,
             isTracking: false,
             notes: '',
@@ -1001,10 +1038,12 @@ function finalizeTaskCompletion(colIndex, taskIndex, actualSeconds) {
         completedAt: new Date().toISOString()
     });
     if (historyData.length > 500) historyData.pop();
+    rememberTaskTime(task.text, Math.round(actualSeconds / 60));
 
     saveBoardData();
     renderBoard();
     renderEstimateLog();
+    renderDailyRecap();
 }
 
 function deleteTask(colIndex, taskIndex) {
@@ -1066,6 +1105,92 @@ function updateAdaptiveHacks() {
         <li><strong>Time-Blindness Guard:</strong> Your timer flashes red at 3 minutes left in any work session.</li>
         <li><strong>Planning Accuracy:</strong> ${accuracyLine}</li>
     </ul>`;
+}
+
+async function reEstimateAllTasks() {
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) { alert('Add your Gemini API key in the Monthly Summary section first.'); return; }
+
+    const allOpenTasks = [];
+    boardData.forEach((col) => col.tasks.forEach((t) => { if (!t.completed) allOpenTasks.push(t); }));
+    if (allOpenTasks.length === 0) { alert('No open tasks to re-estimate.'); return; }
+    if (!confirm(`Re-estimate all ${allOpenTasks.length} open task(s) with AI? This overwrites their current time estimates.`)) return;
+
+    const promptText = `You are helping estimate realistic, feasible time in minutes for short work tasks. For each task below, give your best realistic estimate in minutes as a whole number. Respond with ONLY a JSON array, no other text, in exactly this form: [{"task":"<exact task text given>","minutes": <number>}]. Tasks:\n` +
+        allOpenTasks.map((t) => `- "${t.text}"`).join('\n');
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+        });
+        if (!res.ok) { alert(`Couldn't reach Gemini (${res.status}).`); return; }
+        const data = await res.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleaned = raw.replace(/```json|```/g, '').trim();
+        const suggestions = JSON.parse(cleaned);
+        suggestions.forEach((s) => {
+            const match = allOpenTasks.find((t) => t.text === s.task);
+            if (match && s.minutes) match.estimateMinutes = Math.max(1, Math.round(s.minutes));
+        });
+        saveBoardData();
+        renderBoard();
+    } catch (e) {
+        alert('Something went wrong re-estimating. Try again.');
+    }
+}
+
+// ---------- Daily Recap ----------
+function renderDailyRecap() {
+    const box = $('daily-recap-box');
+    if (!box) return;
+    const todayKey = getTodayKey();
+    const todayDateStr = new Date().toLocaleDateString();
+
+    const todaysHistory = historyData.filter((h) => dateKeyFromISO(h.completedAt) === todayKey);
+    const totalActualMinutes = todaysHistory.reduce((a, h) => a + (h.actualMinutes || 0), 0);
+
+    let openFromToday = 0;
+    boardData.forEach((col) => col.tasks.forEach((t) => { if (t.dateAdded === todayKey && !t.completed) openFromToday++; }));
+
+    let clockedMinutesToday = clockLog.filter((c) => c.date === todayDateStr).reduce((a, c) => a + c.durationMinutes, 0);
+    if (clockState.clockedIn) clockedMinutesToday += Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
+
+    box.innerHTML = `<ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
+        <li><strong>${todaysHistory.length}</strong> task(s) finished today</li>
+        <li><strong>${openFromToday}</strong> task(s) from today still open (carrying to tomorrow if not finished)</li>
+        <li><strong>${totalActualMinutes} min</strong> of logged task time today</li>
+        <li><strong>${clockedMinutesToday} min</strong> clocked in today${clockState.clockedIn ? ' (still running)' : ''}</li>
+    </ul>`;
+}
+
+// ---------- Export data ----------
+function downloadBlob(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function exportAllDataJSON() {
+    const data = {
+        exportedAt: new Date().toISOString(),
+        appSettings, boardData, historyData, clockLog, clockState, flowBlocksCompleted, taskTimeMemory
+    };
+    downloadBlob(JSON.stringify(data, null, 2), `focus-flow-export-${getTodayKey()}.json`, 'application/json');
+}
+
+function exportHistoryCSV() {
+    const rows = [['Date', 'Client', 'Task', 'Estimate (min)', 'Actual (min)', 'Notes']];
+    historyData.forEach((h) => rows.push([dateKeyFromISO(h.completedAt), h.client, h.task, h.estimateMinutes, h.actualMinutes, (h.notes || '').replace(/"/g, '""')]));
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    downloadBlob(csv, `focus-flow-history-${getTodayKey()}.csv`, 'text/csv');
 }
 
 // ---------- Estimate vs Actual rolling log ----------

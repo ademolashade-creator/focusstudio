@@ -71,9 +71,15 @@
                 <div id="clock-log"></div>
             </div>
 
+            <div class="stats-card">
+                <h3>Daily Recap</h3>
+                <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
+            </div>
+
             <div class="hacks-card">
                 <h3>Adaptive Brain Engine</h3>
                 <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
+                <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
             </div>
 
             <div class="hacks-card">
@@ -97,6 +103,15 @@
     <div class="log-card">
         <h3>Estimate vs Actual — Rolling Log</h3>
         <div class="log-content" id="estimate-log">Complete a tracked task to start your log.</div>
+    </div>
+
+    <div class="log-card">
+        <h3>Backup Your Data</h3>
+        <p style="font-size:0.85rem;color:#666;margin:0 0 10px;">Everything lives only in this browser. Export a copy so a cleared browser or a switch to a new device doesn't lose it.</p>
+        <div style="display:flex;gap:8px;">
+            <button class="add-task-btn" style="flex:1;" onclick="exportAllDataJSON()">Export All Data (JSON)</button>
+            <button class="btn-secondary" style="flex:1;" onclick="exportHistoryCSV()">Export History (CSV)</button>
+        </div>
     </div>
 
     <div class="summary-container">
