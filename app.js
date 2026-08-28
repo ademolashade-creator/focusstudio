@@ -544,7 +544,7 @@ function renderBoard() {
     container.innerHTML = '';
 
     const colCountLabel = $('column-count-label');
-    if (colCountLabel) colCountLabel.textContent = `${boardData.length}/10 columns`;
+    if (colCountLabel) colCountLabel.textContent = `${boardData.length}/6 columns`;
 
     boardData.forEach((col, colIndex) => {
         const columnEl = document.createElement('div');
@@ -618,7 +618,7 @@ function moveColumn(colIndex, direction) {
 }
 
 function addColumn() {
-    if (boardData.length >= 10) { alert('Maximum of 10 columns.'); return; }
+    if (boardData.length >= 6) { alert('Maximum of 6 columns.'); return; }
     boardData.push({ id: Date.now(), title: `New Column ${boardData.length + 1}`, googleLink: '', tasks: [] });
     saveBoardData();
     renderBoard();

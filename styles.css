@@ -65,6 +65,7 @@ header p { color: #888; margin: 0 0 1rem 0; font-size: 0.95rem; }
 @media (min-width: 768px) { .main-layout { display: grid; grid-template-columns: 320px 1fr; align-items: start; } }
 
 .sidebar-container { display: flex; flex-direction: column; gap: 1.5rem; }
+.board-area { min-width: 0; }
 
 .timer-card, .stats-card, .ai-card, .hacks-card, .log-card {
     background-color: var(--card-bg); padding: 1.5rem; border-radius: 20px;
