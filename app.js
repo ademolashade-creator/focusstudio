@@ -594,7 +594,11 @@ function handleKeyPress(event, colIndex) { if (event.key === 'Enter') addTask(co
 // ---------- AI time estimate suggestions (Gemini) ----------
 async function suggestAiEstimatesBatch(tasks) {
     const apiKey = storageGet('gemini_api_key', null);
-    if (!apiKey || tasks.length === 0) return;
+    if (tasks.length === 0) return;
+    if (!apiKey) {
+        alert('Added with a default 15-minute estimate. Save your Gemini API key in the Monthly Summary section to get AI-suggested times instead.');
+        return;
+    }
 
     const promptText = `You are helping estimate realistic, feasible time in minutes for short work tasks. For each task below, give your best realistic estimate in minutes as a whole number. Respond with ONLY a JSON array, no other text, in exactly this form: [{"task":"<exact task text given>","minutes": <number>}]. Tasks:\n` +
         tasks.map((t) => `- "${t.text}"`).join('\n');
@@ -605,7 +609,10 @@ async function suggestAiEstimatesBatch(tasks) {
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+            console.error('Gemini estimate request failed', res.status, await res.text());
+            return;
+        }
         const data = await res.json();
         const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
         const cleaned = raw.replace(/```json|```/g, '').trim();
@@ -620,7 +627,7 @@ async function suggestAiEstimatesBatch(tasks) {
         });
         saveBoardData();
         renderBoard();
-    } catch (e) { /* keep the fallback estimate silently */ }
+    } catch (e) { console.error('Gemini estimate parsing failed', e); }
 }
 
 async function suggestTimeForTask(colIndex, taskIndex) {
