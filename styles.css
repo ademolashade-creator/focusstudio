@@ -58,6 +58,7 @@ header p { color: #888; margin: 0 0 1rem 0; font-size: 0.95rem; }
 }
 .clock-item { text-align: center; }
 .clock-label { font-size: 0.72rem; font-weight: 700; color: var(--cherry-red); text-transform: uppercase; letter-spacing: 0.5px; }
+.clock-tz-select { font-size: 0.68rem; font-weight: 700; color: var(--cherry-red); text-transform: uppercase; letter-spacing: 0.5px; background: transparent; border: none; outline: none; cursor: pointer; font-family: Georgia, serif; max-width: 110px; }
 .clock-time { font-size: 1.05rem; font-weight: 700; color: var(--text-color); font-variant-numeric: tabular-nums; }
 .date-display { font-size: 1.1rem; font-weight: 700; color: var(--text-color); }
 

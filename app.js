@@ -30,6 +30,25 @@ function toggleDarkMode() {
 }
 
 // ---------- Clocks & date ----------
+let headerClockZones = storageGet('ff-header-clock-zones', ['Africa/Lagos', 'America/New_York', 'America/Denver']);
+
+function populateHeaderClockSelects() {
+    let zones;
+    try { zones = Intl.supportedValuesOf('timeZone'); }
+    catch (e) { zones = ['UTC', 'Africa/Lagos', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Australia/Sydney']; }
+    ['clock-tz-1', 'clock-tz-2', 'clock-tz-3'].forEach((id, i) => {
+        const sel = $(id);
+        if (!sel) return;
+        sel.innerHTML = zones.map((z) => `<option value="${z}" ${z === headerClockZones[i] ? 'selected' : ''}>${z}</option>`).join('');
+    });
+}
+
+function updateHeaderClockZone(slot, tz) {
+    headerClockZones[slot - 1] = tz;
+    storageSet('ff-header-clock-zones', headerClockZones);
+    updateClocks();
+}
+
 function updateClocks() {
     const now = new Date();
     const dateEl = $('date-display'), watEl = $('clock-wat'), estEl = $('clock-est'), mstEl = $('clock-mst');
@@ -38,9 +57,9 @@ function updateClocks() {
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         dateEl.textContent = `${dd}/${mm}/${now.getFullYear()}`;
     }
-    if (watEl) watEl.textContent = now.toLocaleTimeString('en-US', { timeZone: 'Africa/Lagos', hour12: true });
-    if (estEl) estEl.textContent = now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: true });
-    if (mstEl) mstEl.textContent = now.toLocaleTimeString('en-US', { timeZone: 'America/Denver', hour12: true });
+    if (watEl) watEl.textContent = now.toLocaleTimeString('en-US', { timeZone: headerClockZones[0], hour12: true });
+    if (estEl) estEl.textContent = now.toLocaleTimeString('en-US', { timeZone: headerClockZones[1], hour12: true });
+    if (mstEl) mstEl.textContent = now.toLocaleTimeString('en-US', { timeZone: headerClockZones[2], hour12: true });
 
     if (now.getDate() === 30) {
         const banner = $('monthly-alert');
@@ -439,32 +458,16 @@ function toggleClock() {
 
 function renderClockCard() {
     const btn = $('clock-btn');
-    const status = $('clock-status');
-    if (!btn || !status) return;
+    if (!btn) return;
 
     if (clockState.clockedIn) {
         btn.textContent = 'Clock Out';
         btn.classList.add('active');
-        const elapsedMin = Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
-        const h = Math.floor(elapsedMin / 60), m = elapsedMin % 60;
-        status.textContent = `Clocked in since ${new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${h}h ${m}m so far)`;
     } else {
         btn.textContent = 'Clock In';
         btn.classList.remove('active');
-        status.textContent = clockLog.length ? `Last session: ${clockLog[0].durationMinutes} min on ${clockLog[0].date}` : 'Not clocked in.';
     }
     renderDailyRecap();
-
-    const logBox = $('clock-log');
-    if (logBox) {
-        if (clockLog.length === 0) {
-            logBox.innerHTML = '<p style="font-size:0.8rem;color:#888;">No sessions logged yet.</p>';
-        } else {
-            logBox.innerHTML = `<ul class="log-list">${clockLog.slice(0, 8).map(c =>
-                `<li class="log-item"><span>${c.date}: ${c.clockIn} – ${c.clockOut}</span><span class="log-variance under">${c.durationMinutes} min</span></li>`
-            ).join('')}</ul>`;
-        }
-    }
 }
 
 // ---------- Task board ----------
@@ -552,7 +555,7 @@ function formatMinSec(totalSeconds) {
 function renderBoard() {
     const container = $('board-container');
     if (!container) return;
-    container.innerHTML = '';
+    container.querySelectorAll('.task-column').forEach((el) => el.remove());
 
     const colCountLabel = $('column-count-label');
     if (colCountLabel) colCountLabel.textContent = `${boardData.length}/9 columns`;
@@ -1171,11 +1174,21 @@ function renderDailyRecap() {
     let clockedMinutesToday = clockLog.filter((c) => c.date === todayDateStr).reduce((a, c) => a + c.durationMinutes, 0);
     if (clockState.clockedIn) clockedMinutesToday += Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
 
+    let clockLine;
+    if (clockState.clockedIn) {
+        clockLine = `Clocked in since ${new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (still running)`;
+    } else if (clockLog.length) {
+        clockLine = `Last session: ${clockLog[0].durationMinutes} min on ${clockLog[0].date}`;
+    } else {
+        clockLine = 'Not clocked in yet today.';
+    }
+
     box.innerHTML = `<ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
         <li><strong>${todaysHistory.length}</strong> task(s) finished today</li>
         <li><strong>${openFromToday}</strong> task(s) from today still open (carrying to tomorrow if not finished)</li>
         <li><strong>${totalActualMinutes} min</strong> of logged task time today</li>
         <li><strong>${clockedMinutesToday} min</strong> clocked in today${clockState.clockedIn ? ' (still running)' : ''}</li>
+        <li>${clockLine}</li>
     </ul>`;
 }
 
@@ -1308,11 +1321,13 @@ function initApp() {
 
     $('mandatory-notes-toggle').checked = mandatoryNotes;
     $('gemini-api-key').value = storageGet('gemini_api_key', '');
-    $('daily-counter').textContent = `${flowBlocksCompleted} Flow Blocks Completed`;
+    const counterEl2 = $('daily-counter');
+    if (counterEl2) counterEl2.textContent = `${flowBlocksCompleted} Flow Blocks Completed`;
     setFlowControlsVisible(false);
     renderClockCard();
     setInterval(() => { if (clockState.clockedIn) renderClockCard(); }, 30000);
 
+    populateHeaderClockSelects();
     populateTimezoneSelect();
     renderBoard();
     renderEstimateLog();

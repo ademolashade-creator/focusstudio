@@ -20,56 +20,53 @@
 
         <div class="clocks-bar">
             <div class="clock-item"><div class="clock-label">Date</div><div class="date-display" id="date-display">--/--/----</div></div>
-            <div class="clock-item"><div class="clock-label">WAT (Lagos)</div><div class="clock-time" id="clock-wat">--:--:--</div></div>
-            <div class="clock-item"><div class="clock-label">EST (New York)</div><div class="clock-time" id="clock-est">--:--:--</div></div>
-            <div class="clock-item"><div class="clock-label">MST (Denver)</div><div class="clock-time" id="clock-mst">--:--:--</div></div>
+            <div class="clock-item"><select class="clock-tz-select" id="clock-tz-1" onchange="updateHeaderClockZone(1, this.value)"></select><div class="clock-time" id="clock-wat">--:--:--</div></div>
+            <div class="clock-item"><select class="clock-tz-select" id="clock-tz-2" onchange="updateHeaderClockZone(2, this.value)"></select><div class="clock-time" id="clock-est">--:--:--</div></div>
+            <div class="clock-item"><select class="clock-tz-select" id="clock-tz-3" onchange="updateHeaderClockZone(3, this.value)"></select><div class="clock-time" id="clock-mst">--:--:--</div></div>
         </div>
 
         <div class="top-controls">
             <button class="btn-secondary" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+            <button class="btn-secondary" id="clock-btn" onclick="toggleClock()">Clock In</button>
         </div>
     </header>
 
+    <div class="board-area">
+        <div class="board-container" id="board-container">
+            <div class="timer-card">
+                <div id="mode-indicator">Work Time</div>
+                <div class="timer-display" id="time-display">25:00</div>
+                <div class="progress-bar-container"><div class="progress-bar" id="progress-bar"></div></div>
+
+                <div class="controls">
+                    <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
+                    <button id="reset-btn" onclick="resetTimer()">Restart</button>
+                    <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
+                    <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes to the current segment">+5 min</button>
+                </div>
+
+                <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
+                <button class="btn-secondary" id="skip-flow-btn" onclick="skipFlowSegment()" style="width:100%;margin-top:6px;">Skip Segment (Flow only)</button>
+
+                <div class="settings">
+                    <div class="setting-row">
+                        <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
+                        <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
+                    </div>
+                    <div class="toggle-group">
+                        <label for="mandatory-notes-toggle">Mandatory Extra Info:</label>
+                        <input type="checkbox" id="mandatory-notes-toggle" onchange="toggleMandatorySetting()">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem;">
+            <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/9 columns</span>
+            <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
+        </div>
+    </div>
+
     <div class="top-section">
-        <div class="timer-card" style="flex:1 1 320px;">
-            <div id="mode-indicator">Work Time</div>
-            <div class="timer-display" id="time-display">25:00</div>
-            <div class="progress-bar-container"><div class="progress-bar" id="progress-bar"></div></div>
-
-            <div class="controls">
-                <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
-                <button id="reset-btn" onclick="resetTimer()">Restart</button>
-                <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
-                <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes to the current segment">+5 min</button>
-            </div>
-
-            <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
-            <button class="btn-secondary" id="skip-flow-btn" onclick="skipFlowSegment()" style="width:100%;margin-top:6px;">Skip Segment (Flow only)</button>
-
-            <div class="settings">
-                <div class="setting-row">
-                    <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
-                    <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
-                </div>
-                <div class="toggle-group">
-                    <label for="mandatory-notes-toggle">Mandatory Extra Info:</label>
-                    <input type="checkbox" id="mandatory-notes-toggle" onchange="toggleMandatorySetting()">
-                </div>
-            </div>
-        </div>
-
-        <div class="stats-card" style="flex:1 1 220px;">
-            <h3>Daily Session Counter</h3>
-            <div class="stats-number" id="daily-counter">0 Flow Blocks Completed</div>
-        </div>
-
-        <div class="stats-card" style="flex:1 1 220px;">
-            <h3>Clock In / Clock Out</h3>
-            <button class="lock-btn" id="clock-btn" onclick="toggleClock()">Clock In</button>
-            <p style="font-size:0.8rem;color:#666;margin:0.6rem 0;" id="clock-status">Not clocked in.</p>
-            <div id="clock-log"></div>
-        </div>
-
         <div class="stats-card" style="flex:1 1 220px;">
             <h3>Daily Recap</h3>
             <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
@@ -90,26 +87,9 @@
         </div>
     </div>
 
-    <div class="board-area">
-        <div class="board-container" id="board-container"></div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem;">
-            <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/9 columns</span>
-            <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
-        </div>
-    </div>
-
     <div class="log-card">
         <h3>Estimate vs Actual — Rolling Log</h3>
         <div class="log-content" id="estimate-log">Complete a tracked task to start your log.</div>
-    </div>
-
-    <div class="log-card">
-        <h3>Backup Your Data</h3>
-        <p style="font-size:0.85rem;color:#666;margin:0 0 10px;">Everything lives only in this browser. Export a copy so a cleared browser or a switch to a new device doesn't lose it.</p>
-        <div style="display:flex;gap:8px;">
-            <button class="add-task-btn" style="flex:1;" onclick="exportAllDataJSON()">Export All Data (JSON)</button>
-            <button class="btn-secondary" style="flex:1;" onclick="exportHistoryCSV()">Export History (CSV)</button>
-        </div>
     </div>
 
     <div class="summary-container">
