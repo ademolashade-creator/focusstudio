@@ -30,73 +30,71 @@
         </div>
     </header>
 
-    <div class="main-layout">
-        <div class="sidebar-container">
-            <div class="timer-card">
-                <div id="mode-indicator">Work Time</div>
-                <div class="timer-display" id="time-display">25:00</div>
-                <div class="progress-bar-container"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="top-section">
+        <div class="timer-card" style="flex:1 1 320px;">
+            <div id="mode-indicator">Work Time</div>
+            <div class="timer-display" id="time-display">25:00</div>
+            <div class="progress-bar-container"><div class="progress-bar" id="progress-bar"></div></div>
 
-                <div class="controls">
-                    <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
-                    <button id="reset-btn" onclick="resetTimer()">Restart</button>
-                    <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
-                    <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes to the current segment">+5 min</button>
+            <div class="controls">
+                <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
+                <button id="reset-btn" onclick="resetTimer()">Restart</button>
+                <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
+                <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes to the current segment">+5 min</button>
+            </div>
+
+            <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
+            <button class="btn-secondary" id="skip-flow-btn" onclick="skipFlowSegment()" style="width:100%;margin-top:6px;">Skip Segment (Flow only)</button>
+
+            <div class="settings">
+                <div class="setting-row">
+                    <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
+                    <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
                 </div>
-
-                <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
-                <button class="btn-secondary" id="skip-flow-btn" onclick="skipFlowSegment()" style="width:100%;margin-top:6px;">Skip Segment (Flow only)</button>
-
-                <div class="settings">
-                    <div class="setting-row">
-                        <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
-                        <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
-                    </div>
-                    <div class="toggle-group">
-                        <label for="mandatory-notes-toggle">Mandatory Extra Info:</label>
-                        <input type="checkbox" id="mandatory-notes-toggle" onchange="toggleMandatorySetting()">
-                    </div>
+                <div class="toggle-group">
+                    <label for="mandatory-notes-toggle">Mandatory Extra Info:</label>
+                    <input type="checkbox" id="mandatory-notes-toggle" onchange="toggleMandatorySetting()">
                 </div>
-            </div>
-
-            <div class="stats-card">
-                <h3>Daily Session Counter</h3>
-                <div class="stats-number" id="daily-counter">0 Flow Blocks Completed</div>
-            </div>
-
-            <div class="stats-card">
-                <h3>Clock In / Clock Out</h3>
-                <button class="lock-btn" id="clock-btn" onclick="toggleClock()">Clock In</button>
-                <p style="font-size:0.8rem;color:#666;margin:0.6rem 0;" id="clock-status">Not clocked in.</p>
-                <div id="clock-log"></div>
-            </div>
-
-            <div class="stats-card">
-                <h3>Daily Recap</h3>
-                <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
-            </div>
-
-            <div class="hacks-card">
-                <h3>Adaptive Brain Engine</h3>
-                <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
-                <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
-            </div>
-
-            <div class="hacks-card">
-                <h3>Time Counter</h3>
-                <div style="font-size:0.8rem;margin-bottom:6px;">
-                    <label>Timezone <select id="timezone-select" onchange="updateTimezone(this.value)" style="width:100%;margin-top:4px;"></select></label>
-                </div>
-                <div class="hacks-content" id="time-counter-box">Add tasks to see your projected completion times.</div>
             </div>
         </div>
 
-        <div class="board-area">
-            <div class="board-container" id="board-container"></div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem;">
-                <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/9 columns</span>
-                <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
+        <div class="stats-card" style="flex:1 1 220px;">
+            <h3>Daily Session Counter</h3>
+            <div class="stats-number" id="daily-counter">0 Flow Blocks Completed</div>
+        </div>
+
+        <div class="stats-card" style="flex:1 1 220px;">
+            <h3>Clock In / Clock Out</h3>
+            <button class="lock-btn" id="clock-btn" onclick="toggleClock()">Clock In</button>
+            <p style="font-size:0.8rem;color:#666;margin:0.6rem 0;" id="clock-status">Not clocked in.</p>
+            <div id="clock-log"></div>
+        </div>
+
+        <div class="stats-card" style="flex:1 1 220px;">
+            <h3>Daily Recap</h3>
+            <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
+        </div>
+
+        <div class="hacks-card" style="flex:1 1 220px;">
+            <h3>Adaptive Brain Engine</h3>
+            <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
+            <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
+        </div>
+
+        <div class="hacks-card" style="flex:1 1 220px;">
+            <h3>Time Counter</h3>
+            <div style="font-size:0.8rem;margin-bottom:6px;">
+                <label>Timezone <select id="timezone-select" onchange="updateTimezone(this.value)" style="width:100%;margin-top:4px;"></select></label>
             </div>
+            <div class="hacks-content" id="time-counter-box">Add tasks to see your projected completion times.</div>
+        </div>
+    </div>
+
+    <div class="board-area">
+        <div class="board-container" id="board-container"></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem;">
+            <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/9 columns</span>
+            <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
         </div>
     </div>
 
@@ -120,9 +118,12 @@
             <h2>Monthly Summary & Client Report</h2>
             <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
         </div>
-        <div class="api-key-box">
-            <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
-        </div>
+        <details style="margin-bottom:1rem;">
+            <summary style="font-size:0.75rem;color:#888;cursor:pointer;">AI settings (Gemini API key)</summary>
+            <div class="api-key-box" style="margin-top:6px;">
+                <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+            </div>
+        </details>
         <div class="summary-content" id="summary-content">Click "Generate AI Client Report," or it'll run automatically on the 30th if your key is saved.</div>
     </div>
 
