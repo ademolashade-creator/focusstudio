@@ -30,25 +30,6 @@
         </div>
     </header>
 
-    <div class="stats-row">
-        <div class="stats-card">
-            <h3>Daily Session Counter</h3>
-            <div class="stats-number" id="daily-counter">0 Flow Blocks Completed</div>
-        </div>
-
-        <div class="stats-card">
-            <h3>Clock In / Clock Out</h3>
-            <button class="lock-btn" id="clock-btn" onclick="toggleClock()">Clock In</button>
-            <p style="font-size:0.8rem;color:#666;margin:0.6rem 0;" id="clock-status">Not clocked in.</p>
-            <div id="clock-log"></div>
-        </div>
-
-        <div class="stats-card">
-            <h3>Daily Recap</h3>
-            <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
-        </div>
-    </div>
-
     <div class="main-layout">
         <div class="sidebar-container">
             <div class="timer-card">
@@ -78,6 +59,23 @@
                 </div>
             </div>
 
+            <div class="stats-card">
+                <h3>Daily Session Counter</h3>
+                <div class="stats-number" id="daily-counter">0 Flow Blocks Completed</div>
+            </div>
+
+            <div class="stats-card">
+                <h3>Clock In / Clock Out</h3>
+                <button class="lock-btn" id="clock-btn" onclick="toggleClock()">Clock In</button>
+                <p style="font-size:0.8rem;color:#666;margin:0.6rem 0;" id="clock-status">Not clocked in.</p>
+                <div id="clock-log"></div>
+            </div>
+
+            <div class="stats-card">
+                <h3>Daily Recap</h3>
+                <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
+            </div>
+
             <div class="hacks-card">
                 <h3>Adaptive Brain Engine</h3>
                 <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
@@ -96,7 +94,7 @@
         <div class="board-area">
             <div class="board-container" id="board-container"></div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem;">
-                <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/6 columns</span>
+                <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/9 columns</span>
                 <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
             </div>
         </div>
@@ -107,18 +105,24 @@
         <div class="log-content" id="estimate-log">Complete a tracked task to start your log.</div>
     </div>
 
+    <div class="log-card">
+        <h3>Backup Your Data</h3>
+        <p style="font-size:0.85rem;color:#666;margin:0 0 10px;">Everything lives only in this browser. Export a copy so a cleared browser or a switch to a new device doesn't lose it.</p>
+        <div style="display:flex;gap:8px;">
+            <button class="add-task-btn" style="flex:1;" onclick="exportAllDataJSON()">Export All Data (JSON)</button>
+            <button class="btn-secondary" style="flex:1;" onclick="exportHistoryCSV()">Export History (CSV)</button>
+        </div>
+    </div>
+
     <div class="summary-container">
         <div class="monthly-alert-banner" id="monthly-alert">It's the 30th — your monthly client report is ready to generate (or already ran automatically if your API key is saved).</div>
         <div class="summary-header">
             <h2>Monthly Summary & Client Report</h2>
             <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
         </div>
-        <details style="margin-bottom:1rem;">
-            <summary style="font-size:0.75rem;color:#888;cursor:pointer;">AI settings (Gemini API key)</summary>
-            <div class="api-key-box" style="margin-top:6px;">
-                <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
-            </div>
-        </details>
+        <div class="api-key-box">
+            <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+        </div>
         <div class="summary-content" id="summary-content">Click "Generate AI Client Report," or it'll run automatically on the 30th if your key is saved.</div>
     </div>
 

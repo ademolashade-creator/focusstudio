@@ -519,13 +519,16 @@ function groupTasksByDate(tasks) {
 }
 
 // Migrate older saved tasks that don't yet have time-tracking or date fields
-boardData.forEach(col => col.tasks.forEach(t => {
-    if (t.estimateMinutes === undefined) t.estimateMinutes = 15;
-    if (t.trackedSeconds === undefined) t.trackedSeconds = 0;
-    if (t.isTracking === undefined) t.isTracking = false;
-    if (t.dateAdded === undefined) t.dateAdded = getTodayKey();
-    if (t.completedAt === undefined) t.completedAt = t.completed ? Date.now() : null;
-}));
+boardData.forEach(col => {
+    if (col.collapsed === undefined) col.collapsed = false;
+    col.tasks.forEach(t => {
+        if (t.estimateMinutes === undefined) t.estimateMinutes = 15;
+        if (t.trackedSeconds === undefined) t.trackedSeconds = 0;
+        if (t.isTracking === undefined) t.isTracking = false;
+        if (t.dateAdded === undefined) t.dateAdded = getTodayKey();
+        if (t.completedAt === undefined) t.completedAt = t.completed ? Date.now() : null;
+    });
+});
 
 function saveBoardData() {
     storageSet('focus_board_data', boardData);
@@ -552,15 +555,18 @@ function renderBoard() {
     container.innerHTML = '';
 
     const colCountLabel = $('column-count-label');
-    if (colCountLabel) colCountLabel.textContent = `${boardData.length}/6 columns`;
+    if (colCountLabel) colCountLabel.textContent = `${boardData.length}/9 columns`;
 
     boardData.forEach((col, colIndex) => {
         const columnEl = document.createElement('div');
         columnEl.className = 'task-column';
+        const openCount = col.tasks.filter((t) => !t.completed).length;
 
         columnEl.innerHTML = `
             <div class="column-header-row">
+                <button class="icon-btn" onclick="toggleColumnCollapse(${colIndex})" title="${col.collapsed ? 'Expand' : 'Collapse'}">${col.collapsed ? '▸' : '▾'}</button>
                 <input type="text" class="column-header-input" value="${escapeHTML(col.title)}" oninput="updateColumnTitle(${colIndex}, this.value)" placeholder="Project / Client Name">
+                ${col.collapsed ? `<span style="font-size:0.75rem;color:#888;white-space:nowrap;">${openCount} open</span>` : ''}
                 <div class="column-header-actions">
                     <button class="icon-btn" onclick="moveColumn(${colIndex}, -1)" title="Move Left">◀</button>
                     <button class="icon-btn" onclick="moveColumn(${colIndex}, 1)" title="Move Right">▶</button>
@@ -568,6 +574,7 @@ function renderBoard() {
                 </div>
             </div>
 
+            <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
             <ul class="task-list">
                 ${groupTasksByDate(col.tasks).map((group) => `
                     <li class="date-group-header">${group.dateLabel}</li>
@@ -607,6 +614,7 @@ function renderBoard() {
                 <input type="url" class="google-link-input" value="${escapeHTML(col.googleLink || '')}" oninput="updateGoogleLink(${colIndex}, this.value)" placeholder="Paste Google Doc/Sheet Link...">
                 <a href="${col.googleLink || '#'}" target="_blank" class="google-link-btn" title="Open Link">Open</a>
             </div>
+            </div>
         `;
         container.appendChild(columnEl);
     });
@@ -617,6 +625,12 @@ function renderBoard() {
 function updateColumnTitle(colIndex, newTitle) { boardData[colIndex].title = newTitle; saveBoardData(); }
 function updateGoogleLink(colIndex, newLink) { boardData[colIndex].googleLink = newLink; saveBoardData(); }
 
+function toggleColumnCollapse(colIndex) {
+    boardData[colIndex].collapsed = !boardData[colIndex].collapsed;
+    saveBoardData();
+    renderBoard();
+}
+
 function moveColumn(colIndex, direction) {
     const target = colIndex + direction;
     if (target < 0 || target >= boardData.length) return;
@@ -626,8 +640,8 @@ function moveColumn(colIndex, direction) {
 }
 
 function addColumn() {
-    if (boardData.length >= 6) { alert('Maximum of 6 columns.'); return; }
-    boardData.push({ id: Date.now(), title: `New Column ${boardData.length + 1}`, googleLink: '', tasks: [] });
+    if (boardData.length >= 9) { alert('Maximum of 9 columns.'); return; }
+    boardData.push({ id: Date.now(), title: `New Column ${boardData.length + 1}`, googleLink: '', collapsed: false, tasks: [] });
     saveBoardData();
     renderBoard();
 }
