@@ -1002,7 +1002,7 @@ function moveTask(ci, ti, dir) {
     }
 }
 
-// AI Batch Estimates & Optimizations
+// ---------- AI Batch Estimates (stub) ----------
 async function suggestColumnTimesAI(ci) {
     const apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add API Key in settings footer first.'); return; }
@@ -1019,4 +1019,160 @@ async function suggestColumnTimesAI(ci) {
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
         const data = await res.json();
-        const cleaned = data.candidates[0].content.parts[0].text.replace(/```json|
+        const raw = data.candidates[0].content.parts[0].text;
+        const cleaned = raw.replace(/```json|```/g, '').trim();
+        const estimates = JSON.parse(cleaned);
+        // apply staged estimates to tasks
+        estimates.forEach(e => {
+            const task = openTasks.find(t => t.id === e.id);
+            if(task) task.stagedEstimate = e.minutes;
+        });
+        saveBoardData();
+        renderBoard();
+    } catch(e) { alert('AI error: '+e.message); }
+}
+// placeholder for other AI functions
+function optimizeColumnFlowAI(ci) { alert('Flow optimization stub'); }
+function generateColumnCheckIn(ci) { alert('Check-in stub'); }
+function generateAISummary(monthly) { alert('Summary stub'); }
+function generateDailyCheckOut() { alert('Daily check-out stub'); }
+function acceptAISuggestion(ci, idx) { /* stub */ }
+function dismissAISuggestion(ci, idx) { /* stub */ }
+function applyTaskEstimate(ci, ti) { /* stub */ }
+function dismissTaskEstimate(ci, ti) { /* stub */ }
+function applyAllEstimates(ci) { /* stub */ }
+function dismissAllEstimates(ci) { /* stub */ }
+function toggleMandatorySetting() { mandatoryNotes = !mandatoryNotes; storageSet('focus_mandatory_notes', mandatoryNotes); }
+function handleKeyPress(e, ci) { if(e.key==='Enter') addTask(ci); }
+function toggleTask(ci, ti) { const task = boardData[ci].tasks[ti]; task.completed = !task.completed; if(task.completed) { task.completedAt = Date.now(); task.completedAtIso = new Date().toISOString(); } else { task.completedAt = null; task.completedAtIso = null; } saveBoardData(); renderBoard(); }
+function toggleTrack(ci, ti) { /* stub */ }
+function deleteTask(ci, ti) { if(!confirm('Delete task?')) return; boardData[ci].tasks.splice(ti,1); saveBoardData(); renderBoard(); }
+function openDetailsModal(ci, ti) { /* stub */ }
+function closeDetailsModal() { /* stub */ }
+function renderDailyRecap() { /* stub */ }
+function renderEstimateLog() { /* stub */ }
+function renderTimeCounter() { /* stub */ }
+function updateAdaptiveHacks() { /* stub */ }
+function updateTimezone(tz) { /* stub */ }
+function rememberTaskTime(text, mins) { /* stub */ }
+function escapeHTML(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ---------- EXPORT / IMPORT ----------
+function exportAllDataJSON() {
+    const data = {
+        board: boardData,
+        history: historyData,
+        clockLog: clockLog,
+        customQueue: customQueueOrder,
+        settings: appSettings,
+        headerClockZones: headerClockZones,
+        flowBlocksCompleted: flowBlocksCompleted
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `FocusFlow_Backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importAllDataJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.board) {
+                boardData = data.board;
+                // ensure schema migration
+                boardData.forEach(col => {
+                    if (col.collapsed === undefined) col.collapsed = false;
+                    col.tasks.forEach(t => {
+                        if (!t.id) t.id = 't_' + Math.random().toString(36).substr(2,9);
+                        if (t.breaks === undefined) t.breaks = [];
+                        if (t.timeSegments === undefined) t.timeSegments = [];
+                        if (t.deadlineTime === undefined) t.deadlineTime = null;
+                        if (t.googleLink === undefined) t.googleLink = '';
+                        if (t.startedAtIso === undefined) t.startedAtIso = null;
+                        if (t.completedAtIso === undefined) t.completedAtIso = null;
+                        if (t.dateAdded === undefined) t.dateAdded = getTodayKey();
+                    });
+                });
+                storageSet('focus_board_data', boardData);
+            }
+            if (data.history) {
+                historyData = data.history;
+                storageSet('focus_history_data', historyData);
+            }
+            if (data.clockLog) {
+                clockLog = data.clockLog;
+                storageSet('ff-clock-log', clockLog);
+            }
+            if (data.customQueue) {
+                customQueueOrder = data.customQueue;
+                storageSet('ff-custom-queue', customQueueOrder);
+            }
+            if (data.settings) {
+                appSettings = data.settings;
+                storageSet('ff-app-settings', appSettings);
+                applySettings();
+            }
+            if (data.headerClockZones) {
+                headerClockZones = data.headerClockZones;
+                storageSet('ff-header-clock-zones', headerClockZones);
+                populateHeaderClockSelects();
+            }
+            if (data.flowBlocksCompleted !== undefined) {
+                flowBlocksCompleted = data.flowBlocksCompleted;
+                localStorage.setItem('focus_daily_sessions', flowBlocksCompleted);
+            }
+            renderBoard();
+            renderDailyRecap();
+            renderEstimateLog();
+            renderClockCard();
+            alert('Import successful!');
+        } catch(err) {
+            alert('Invalid JSON file: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // allow re-import same file
+}
+
+function exportHistoryCSV() {
+    if (!historyData.length) { alert('No history to export.'); return; }
+    const headers = ['client','task','estimateMinutes','actualMinutes','breakMinutes','notes','completedAt'];
+    const rows = historyData.map(h => headers.map(key => `"${(h[key]||'').toString().replace(/"/g,'""')}"`).join(','));
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `FocusFlow_History_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ---------- Initialization ----------
+document.addEventListener('DOMContentLoaded', () => {
+    applySettings();
+    populateHeaderClockSelects();
+    updateClocks();
+    renderBoard();
+    renderDailyRecap();
+    renderEstimateLog();
+    renderClockCard();
+    setupMode();
+    // load API key if stored
+    const key = storageGet('gemini_api_key', '');
+    if (key && $('gemini-api-key')) $('gemini-api-key').value = key;
+    // set mandatory notes toggle
+    if ($('mandatory-notes-toggle')) $('mandatory-notes-toggle').checked = mandatoryNotes;
+    // set work/break inputs
+    if (workInput) workInput.value = Math.round(workDuration / 60);
+    if (breakInput) breakInput.value = Math.round(breakDuration / 60);
+    // start clock updates
+    setInterval(updateClocks, 1000);
+});

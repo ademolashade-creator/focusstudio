@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Focus & Flow Studio Enterprise</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.json?v=2">
     <meta name="theme-color" content="#ff3366">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 
@@ -46,7 +46,7 @@
                 </div>
 
                 <div class="internal-queue-container">
-                    <div class="queue-header">Internal Flow Sequence</div>
+                    <div class="queue-header">Internal Flow Sequence <span style="font-weight:400;font-size:0.65rem;color:#888;">(drag to reorder)</span></div>
                     <ul class="internal-queue" id="internal-flow-queue"></ul>
                 </div>
 
@@ -106,11 +106,14 @@
     </div>
 
     <div class="discreet-card">
-        <h4>Backup Your Data</h4>
-        <div style="display:flex;gap:8px;">
-            <button class="btn-secondary" style="flex:1;" onclick="exportAllDataJSON()">Export JSON</button>
-            <button class="btn-secondary" style="flex:1;" onclick="exportHistoryCSV()">Export CSV</button>
+        <h4>Backup & Restore Your Data</h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-secondary" style="flex:1;" onclick="exportAllDataJSON()">📥 Export JSON</button>
+            <button class="btn-secondary" style="flex:1;" onclick="exportHistoryCSV()">📥 Export CSV</button>
+            <button class="btn-secondary" style="flex:1;background:var(--cherry-red);color:white;" onclick="document.getElementById('import-file-input').click()">📤 Import JSON</button>
+            <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importAllDataJSON(event)">
         </div>
+        <p style="margin-top:8px;font-size:0.7rem;color:#888;">Import replaces all board data and history. Export a backup first.</p>
     </div>
 
     <!-- API Config (Discreet Footer) -->
@@ -169,19 +172,29 @@
         <div class="modal-box" style="text-align:left;">
             <p style="text-align:center;"><strong id="details-task-name"></strong></p>
             <textarea id="details-notes-textarea" class="task-notes-textarea" rows="4" placeholder="Add extra task information/notes..." style="width:100%;margin-bottom:8px;"></textarea>
-            
+
             <label style="font-size:0.75rem; font-weight:700; color:var(--text-color);">Google Doc / Reference Link:</label>
             <input type="url" id="details-link-input" class="task-notes-textarea" placeholder="Paste link here..." style="width:100%; margin-bottom:8px;">
-            
+
             <p id="details-estimate-label" style="font-size:0.8rem;color:#888;margin:0 0 8px;"></p>
             <button class="btn-primary" style="width:100%;" onclick="closeDetailsModal()">Save & Close</button>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+            window.addEventListener('load', () => {
+                // Unregister old service workers to force fresh load
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    registrations.forEach(r => r.unregister());
+                });
+                navigator.serviceWorker.register('sw.js?v=2').catch(() => {});
+            });
+        }
+        // Force reload if the app is stuck in a cached state
+        if (performance.navigation && performance.navigation.type === 2) {
+            location.reload(true);
         }
     </script>
 </body>
