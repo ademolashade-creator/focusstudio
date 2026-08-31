@@ -88,6 +88,46 @@ function updateClocks() {
 
 // ---------- Quote Banner ----------
 const quotes = [
+    "The secret of getting ahead is getting started. — Mark Twain",
+    "Your work is a reflection of your attention. Protect it like gold. — Unknown",
+    "In marketing, clarity is more persuasive than cleverness. — Unknown",
+    "Writing is an act of discovery. You cannot know what you think until you write it. — Joan Didion",
+    "For ADHD: Forget motivation. Build systems and rely on small wins. — Unknown",
+    "Start messy, refine later. Perfection is the enemy of done. — Unknown",
+    "Marketing is not about the product, but about the customer's transformation. — Seth Godin",
+    "You cannot edit a blank page. Write the worst draft you can. — Unknown",
+    "For ADHD: Consistency beats intensity. Five minutes today beats zero. — Unknown",
+    "Rest is the reset button for your cognitive engine. Guard it fiercely. — Unknown",
+    "Simplicity in marketing is the ultimate sophistication. One clear message wins. — Unknown",
+    "The only way to do great work is to give it your full presence. — Unknown",
+    "For ADHD: Break the task into the next five minutes. Nothing else exists. — Unknown",
+    "Marketing is a conversation, not a broadcast. Listen twice as much. — Unknown",
+    "Writing is rewriting. The magic lives in the revision. — Unknown",
+    "The energy you bring to your work is contagious. Choose intention. — Unknown",
+    "For ADHD: Progress is rarely linear. A step back is still valuable data. — Unknown",
+    "To sell something, make the customer the hero of the story. — Unknown",
+    "A writer's greatest tool is not talent, but a willingness to be imperfect. — Unknown",
+    "Work expands to fill the time given. Set strict boundaries to protect your focus. — Parkinson's Law",
+    "For ADHD: Externalize your thinking. Write it down, always. — Unknown",
+    "Marketing without testing is just guessing. Experiment without attachment. — Unknown",
+    "Writing is thinking on paper. Clear writing demands clear thinking. — Unknown",
+    "The greatest gift to your work is your undivided presence. — Unknown",
+    "For ADHD: Action precedes motivation. Start before you feel ready. — Unknown",
+    "Build a brand built on trust, not just recognition. — Unknown",
+    "Nobody sees your first drafts but you. Write freely. — Unknown",
+    "Your most productive hour is the one protected from interruption. — Unknown",
+    "For ADHD: Turn every large task into a micro-step. Eat the elephant bite by bite. — Unknown",
+    "Marketing is about attention. Give value first, and attention follows. — Unknown",
+    "Writing is a daily discipline, not a sudden burst of inspiration. — Unknown",
+    "The quality of your work reflects the quality of your input. Read widely. — Unknown",
+    "For ADHD: Guide your hyperfocus with intention. It is your superpower. — Unknown",
+    "In marketing, speak to the pain before you offer the cure. — Unknown",
+    "The first draft is just you telling yourself the story. — Terry Pratchett",
+    "Work is about progress, not perfection. — Unknown",
+    "For ADHD: Your brain is not broken. It is wired for curiosity. Use it. — Unknown",
+    "Marketing is about saying 'yes' to the right people at the right time. — Unknown",
+    "The words you leave out are as important as the ones you write. — Unknown",
+    "Your work is the signature you leave on the world. Make it intentional. — Unknown"
     "Focus is the art of knowing what to ignore. — James Clear",
     "The secret of getting ahead is getting started. — Mark Twain",
     "It's not about having time; it's about making time. — Unknown",
@@ -1630,7 +1670,7 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// ---------- Start AI Flow ----------
+// ---------- Start AI Flow (fixed) ----------
 async function startAIFlow() {
     const apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key first.'); return; }
@@ -1685,9 +1725,26 @@ async function startAIFlow() {
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
         const data = await res.json();
-        const raw = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
-        const orderedIds = JSON.parse(raw);
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+            throw new Error('Invalid response structure from AI');
+        }
+        const raw = data.candidates[0].content.parts[0].text;
+        const cleaned = raw.replace(/```json|```/g, '').trim();
+        let orderedIds = JSON.parse(cleaned);
+        // If it's an object with an array property, extract
+        if (typeof orderedIds === 'object' && !Array.isArray(orderedIds)) {
+            const firstKey = Object.keys(orderedIds)[0];
+            if (firstKey && Array.isArray(orderedIds[firstKey])) {
+                orderedIds = orderedIds[firstKey];
+            } else {
+                throw new Error('AI response is not a JSON array');
+            }
+        }
+        if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+            throw new Error('AI returned an empty or invalid order');
+        }
 
         // Update customQueueOrder
         customQueueOrder = orderedIds;
