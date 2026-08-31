@@ -163,7 +163,7 @@ function toggleTimer() {
         
         // If in flow mode and tracking work, pausing implies a break.
         if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
-            startPauseBtn.textContent = 'Pause'; // UI locked state logic handled by overlay
+            startPauseBtn.textContent = 'Pause'; 
             initiateBreakOverlay();
         } else {
             startPauseBtn.textContent = 'Resume';
@@ -213,6 +213,7 @@ function resumeFromBreak() {
             resumedAt: new Date().toISOString()
         });
         saveBoardData();
+        renderDailyRecap(); // Update break tallies instantly
     }
     breakTracker.active = false;
     
@@ -424,7 +425,6 @@ function completeFlowTask(entry, actualSeconds) {
     task.completedAt = Date.now();
     task.completedAtIso = new Date().toISOString();
     
-    // Push final segment time
     if(task.startedAtIso) {
         task.timeSegments.push({ start: task.startedAtIso, end: task.completedAtIso });
     }
@@ -432,13 +432,17 @@ function completeFlowTask(entry, actualSeconds) {
     const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     task._historyId = historyId;
     
+    // Store breaks for the log
+    const totalBreaks = task.breaks.reduce((acc, b) => acc + (b.durationMinutes || 0), 0);
     let breaksStr = task.breaks.length ? `[Breaks: ${task.breaks.map(b=>b.reason).join(', ')}] ` : '';
+    
     historyData.unshift({
         _id: historyId,
         client: entry.col.title,
         task: task.text,
         estimateMinutes: task.estimateMinutes,
         actualMinutes: Math.round(actualSeconds / 60),
+        breakMinutes: totalBreaks,
         notes: breaksStr + (task.notes || 'Completed via Flow'),
         completedAt: task.completedAtIso
     });
@@ -471,8 +475,6 @@ function skipFlowSegment() {
     if (seg && seg.type === 'work') {
         const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
         seg.entry.actualSecondsSoFar += elapsed;
-        
-        // Force completion since user skipped
         completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
     }
     flowSegIndex++;
@@ -567,9 +569,9 @@ function renderClockCard() {
 let mandatoryNotes = storageGet('focus_mandatory_notes', false);
 
 const defaultColumns = [
-    { id: 1, title: 'Client A / Priority 1', googleLink: '', tasks: [] },
-    { id: 2, title: 'Client B / Priority 2', googleLink: '', tasks: [] },
-    { id: 3, title: 'Admin & Content', googleLink: '', tasks: [] }
+    { id: 1, title: 'Client A / Priority 1', tasks: [] },
+    { id: 2, title: 'Client B / Priority 2', tasks: [] },
+    { id: 3, title: 'Admin & Content', tasks: [] }
 ];
 
 let boardData = storageGet('focus_board_data', defaultColumns);
@@ -609,6 +611,7 @@ boardData.forEach(col => {
         if (t.deadlineTime === undefined) t.deadlineTime = null;
         if (t.startedAtIso === undefined) t.startedAtIso = null;
         if (t.completedAtIso === undefined) t.completedAtIso = null;
+        if (t.googleLink === undefined) t.googleLink = '';
     });
 });
 saveBoardData();
@@ -642,8 +645,8 @@ function formatMinSec(totalSeconds) {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-// Collapsing logic: Everything older than yesterday is collapsed by default.
-let _toggledDateGroups = {}; // store explicit manual toggles so they persist during session
+// Collapsing logic
+let _toggledDateGroups = {}; 
 
 function groupTasksByDate(tasks) {
     const groups = {};
@@ -680,6 +683,19 @@ function toggleDateGroup(key) {
     
     _toggledDateGroups[key] = !isCurrentlyCollapsed;
     renderBoard();
+}
+
+function promptDeadline(ci, ti) {
+    const input = $(`deadline-input-${ci}-${ti}`);
+    const btn = $(`deadline-btn-${ci}-${ti}`);
+    if(input && btn) {
+        btn.style.display = 'none';
+        input.style.display = 'inline-block';
+        input.focus();
+        if(typeof input.showPicker === 'function') {
+            try { input.showPicker(); } catch(e){}
+        }
+    }
 }
 
 function renderBoard() {
@@ -723,6 +739,12 @@ function renderBoard() {
 
             <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
             
+            <div class="ai-batch-actions">
+                <button onclick="suggestColumnTimesAI(${colIndex})">Suggest Times (AI)</button>
+                <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow & Gaps (AI)</button>
+                <button onclick="generateColumnCheckIn(${colIndex})">Client Check-In (AI)</button>
+            </div>
+
             ${suggestionsHtml}
 
             <ul class="task-list" ondragover="allowDrop(event)" ondrop="dropTask(event, ${colIndex})">
@@ -736,10 +758,16 @@ function renderBoard() {
                                     <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
                                 </div>
                                 <div class="task-actions">
-                                    <input type="datetime-local" class="task-deadline-input" value="${task.deadlineTime || ''}" onchange="updateTaskDeadline(${colIndex}, ${taskIndex}, this.value)" title="Deadline">
+                                    ${task.deadlineTime ? 
+                                        `<input type="datetime-local" class="task-deadline-input" value="${task.deadlineTime}" onchange="updateTaskDeadline(${colIndex}, ${taskIndex}, this.value)">` 
+                                        : 
+                                        `<button id="deadline-btn-${colIndex}-${taskIndex}" class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${taskIndex})">+ Deadline</button>
+                                         <input type="datetime-local" id="deadline-input-${colIndex}-${taskIndex}" class="task-deadline-input" style="display:none;" onchange="updateTaskDeadline(${colIndex}, ${taskIndex}, this.value)">`
+                                    }
                                     ${getDeadlineBadge(task)}
                                     <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
                                     <button class="track-btn ${task.isTracking ? 'tracking' : ''}" id="track-btn-${colIndex}-${taskIndex}" onclick="toggleTrack(${colIndex}, ${taskIndex})">${task.isTracking ? '⏸' : '▶'} ${formatMinSec(task.trackedSeconds)}</button>
+                                    ${task.googleLink ? `<a href="${task.googleLink}" target="_blank" class="icon-btn" title="Open Link">🔗</a>` : ''}
                                     ${!task.completed ? `
                                     <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">▲</button>
                                     <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">▼</button>
@@ -764,21 +792,11 @@ function renderBoard() {
                 <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
             </div>
 
-            <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here..."></textarea>
+            <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (e.g. 'write script 25 mins')..."></textarea>
             <button class="add-task-btn" style="width:100%;margin-bottom:0.6rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
-
-            <div class="google-link-container">
-                <input type="url" class="google-link-input" value="${escapeHTML(col.googleLink || '')}" oninput="updateGoogleLink(${colIndex}, this.value)" placeholder="Google Doc/Sheet Link...">
-                <a href="${col.googleLink || '#'}" target="_blank" class="google-link-btn">Open</a>
-            </div>
-            
-            <div class="ai-batch-actions">
-                <button onclick="suggestColumnTimesAI(${colIndex})">Suggest Times (AI)</button>
-                <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow & Gaps (AI)</button>
-            </div>
             
             ${col.tasks.some(t=>t.stagedEstimate) ? `
-            <div class="ai-batch-actions">
+            <div class="ai-batch-actions" style="margin-top:10px;">
                 <button onclick="applyAllEstimates(${colIndex})" style="background:var(--cherry-red);color:white;">Apply All Times</button>
                 <button onclick="dismissAllEstimates(${colIndex})">Dismiss All</button>
             </div>` : ''}
@@ -807,7 +825,6 @@ function dropTask(e, targetColIndex) {
     const { ci, ti } = dragContext;
     const task = boardData[ci].tasks[ti];
     
-    // Find drop target index
     const list = e.currentTarget;
     const y = e.clientY;
     let afterElement = null;
@@ -832,7 +849,6 @@ function dropTask(e, targetColIndex) {
 }
 
 function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
-function updateGoogleLink(ci, v) { boardData[ci].googleLink = v; saveBoardData(); }
 function toggleColumnCollapse(ci) { boardData[ci].collapsed = !boardData[ci].collapsed; saveBoardData(); renderBoard(); }
 function moveColumn(ci, dir) {
     const target = ci + dir;
@@ -842,7 +858,7 @@ function moveColumn(ci, dir) {
 }
 function addColumn() {
     if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
-    boardData.push({ id: Date.now(), title: `New Project`, googleLink: '', collapsed: false, tasks: [] });
+    boardData.push({ id: Date.now(), title: `New Project`, collapsed: false, tasks: [] });
     saveBoardData(); renderBoard();
 }
 function deleteColumn(ci) {
@@ -864,25 +880,47 @@ function addTask(ci) {
         estimateMinutes: parseInt(estInput.value) || 15,
         trackedSeconds: 0, isTracking: false, notes: '',
         completed: false, completedAt: null, dateAdded: getTodayKey(),
-        breaks: [], timeSegments: [], deadlineTime: null
+        breaks: [], timeSegments: [], deadlineTime: null, googleLink: ''
     });
     input.value = '';
     saveBoardData(); renderBoard();
+}
+
+// Bulk Paste Engine & Smart Parser
+function parseTimeFromLine(line) {
+    const re = /(\d+(?:\.\d+)?)\s*(hours|hour|hrs|hr|minutes|minute|mins|min|seconds|second|secs|sec)\b/i;
+    const match = line.match(re);
+    if (!match) return { text: line.trim(), minutes: null };
+    
+    const value = parseFloat(match[1]);
+    const unit = match[2].toLowerCase();
+    let minutes;
+    if (unit.startsWith('h')) minutes = Math.round(value * 60);
+    else if (unit.startsWith('s')) minutes = Math.max(1, Math.round(value / 60));
+    else minutes = Math.round(value);
+
+    const cleanText = (line.slice(0, match.index) + line.slice(match.index + match[0].length))
+        .replace(/[\s,.:-]+$/, '')
+        .trim();
+    return { text: cleanText || line.trim(), minutes };
 }
 
 function addPastedTasks(ci) {
     const textarea = $(`paste-box-${ci}`);
     const lines = textarea.value.split('\n').map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return;
+    
     const newTasks = lines.map((line) => {
-        let mins = parseInt(line.match(/\d+/) || 15);
+        const { text, minutes } = parseTimeFromLine(line);
+        let finalMins = minutes || 15;
         return {
             id: 't_' + Math.random().toString(36).substr(2,9),
-            text: line, estimateMinutes: mins, trackedSeconds: 0,
+            text: text, estimateMinutes: finalMins, trackedSeconds: 0,
             isTracking: false, notes: '', completed: false, completedAt: null,
-            dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null
+            dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null, googleLink: ''
         };
     });
+    
     boardData[ci].tasks.push(...newTasks);
     textarea.value = ''; saveBoardData(); renderBoard();
 }
@@ -902,7 +940,7 @@ function moveTask(ci, ti, dir) {
     const task = tasks[ti];
     if (task.completed) return;
     const listEl = $(`task-${ci}-${ti}`).closest('.task-list');
-    const scrollPos = listEl ? listEl.scrollTop : 0; // save scroll
+    const scrollPos = listEl ? listEl.scrollTop : 0; 
 
     let target = ti + dir;
     while (target >= 0 && target < tasks.length) {
@@ -910,8 +948,6 @@ function moveTask(ci, ti, dir) {
             [tasks[ti], tasks[target]] = [tasks[target], tasks[ti]];
             saveBoardData(); 
             renderBoard();
-            
-            // Restore scroll
             setTimeout(() => {
                 const newList = $(`task-${ci}-${target}`).closest('.task-list');
                 if(newList) newList.scrollTop = scrollPos;
@@ -922,7 +958,7 @@ function moveTask(ci, ti, dir) {
     }
 }
 
-// AI Batch Estimates
+// AI Batch Estimates & Optimizations
 async function suggestColumnTimesAI(ci) {
     const apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add API Key in settings footer first.'); return; }
@@ -964,7 +1000,6 @@ function dismissAllEstimates(ci) {
     saveBoardData(); renderBoard();
 }
 
-// AI Flow Optimization & Gap Finding
 async function optimizeColumnFlowAI(ci) {
     const apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add API Key in settings footer first.'); return; }
@@ -987,7 +1022,6 @@ Tasks: ` + openTasks.map(t=>`[id:${t.id}] ${t.text}`).join('; ');
         const cleaned = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
         const result = JSON.parse(cleaned);
 
-        // Apply Ordering
         if(result.orderedIds && result.orderedIds.length === openTasks.length) {
             let sortedOpen = [];
             result.orderedIds.forEach(id => {
@@ -998,7 +1032,6 @@ Tasks: ` + openTasks.map(t=>`[id:${t.id}] ${t.text}`).join('; ');
             boardData[ci].tasks = [...sortedOpen, ...comp];
         }
 
-        // Apply Suggestions
         if(result.missingTasks && result.missingTasks.length > 0) {
             boardData[ci].aiSuggestions = result.missingTasks;
         }
@@ -1013,7 +1046,7 @@ function acceptAISuggestion(ci, sIdx) {
         id: 't_' + Math.random().toString(36).substr(2,9),
         text: s.task, estimateMinutes: s.minutes, trackedSeconds: 0,
         isTracking: false, notes: 'Suggested by AI', completed: false, completedAt: null,
-        dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null
+        dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null, googleLink: ''
     });
     boardData[ci].aiSuggestions.splice(sIdx, 1);
     if(boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
@@ -1024,7 +1057,6 @@ function dismissAISuggestion(ci, sIdx) {
     if(boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
     saveBoardData(); renderBoard();
 }
-
 
 function toggleTrack(ci, ti) {
     boardData[ci].tasks[ti].isTracking = !boardData[ci].tasks[ti].isTracking;
@@ -1060,6 +1092,7 @@ function toggleTask(ci, ti) {
     }
     finalizeTaskCompletion(ci, ti, task.trackedSeconds);
 }
+
 function confirmCompletion() {
     if (!pendingCompletion) return;
     const { colIndex, taskIndex } = pendingCompletion;
@@ -1080,10 +1113,14 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
 
     const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     task._historyId = historyId;
+    
+    const totalBreaks = task.breaks.reduce((acc, b) => acc + (b.durationMinutes || 0), 0);
     let breaksStr = task.breaks.length ? `[Breaks: ${task.breaks.map(b=>b.reason).join(', ')}] ` : '';
+    
     historyData.unshift({
         _id: historyId, client: boardData[ci].title, task: task.text,
         estimateMinutes: task.estimateMinutes, actualMinutes: Math.round(actualSeconds / 60),
+        breakMinutes: totalBreaks,
         notes: breaksStr + (task.notes || 'No notes'), completedAt: task.completedAtIso
     });
     if (historyData.length > 500) historyData.pop();
@@ -1091,20 +1128,23 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
 }
 function deleteTask(ci, ti) { boardData[ci].tasks.splice(ti, 1); saveBoardData(); renderBoard(); renderInternalQueue(); }
 
-// ---------- Details Popup ----------
+// ---------- Task Details Popup ----------
 let openDetailsRef = null;
 function openDetailsModal(ci, ti) {
     openDetailsRef = { ci, ti };
     const task = boardData[ci].tasks[ti];
     $('details-task-name').textContent = task.text;
     $('details-notes-textarea').value = task.notes || '';
+    $('details-link-input').value = task.googleLink || '';
     $('details-estimate-label').textContent = `Est: ${task.estimateMinutes} min`;
     $('details-overlay').style.display = 'flex';
 }
 function closeDetailsModal() {
     if (openDetailsRef) {
         boardData[openDetailsRef.ci].tasks[openDetailsRef.ti].notes = $('details-notes-textarea').value;
+        boardData[openDetailsRef.ci].tasks[openDetailsRef.ti].googleLink = $('details-link-input').value;
         saveBoardData();
+        renderBoard(); // refresh link icons
     }
     openDetailsRef = null;
     $('details-overlay').style.display = 'none';
@@ -1206,10 +1246,22 @@ function updateAdaptiveHacks() {
 function renderDailyRecap() {
     const box = $('daily-recap-box');
     const todayKey = getTodayKey();
+    
     const todaysHistory = historyData.filter((h) => dateKeyFromISO(h.completedAt) === todayKey);
     const totalActualMinutes = todaysHistory.reduce((a, h) => a + (h.actualMinutes || 0), 0);
+    
+    // Sum Break Time
+    let breakMinutesToday = todaysHistory.reduce((a, h) => a + (h.breakMinutes || 0), 0);
     let openFromToday = 0;
-    boardData.forEach((col) => col.tasks.forEach((t) => { if (t.dateAdded === todayKey && !t.completed) openFromToday++; }));
+    
+    boardData.forEach((col) => col.tasks.forEach((t) => { 
+        if (t.dateAdded === todayKey && !t.completed) openFromToday++;
+        t.breaks.forEach(b => {
+            if (b.resumedAt && dateKeyFromISO(b.resumedAt) === todayKey) {
+                breakMinutesToday += b.durationMinutes;
+            }
+        });
+    }));
     
     let clocked = clockLog.filter(c => c.date === new Date().toLocaleDateString()).reduce((a, c) => a + c.durationMinutes, 0);
     if(clockState.clockedIn) clocked += Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
@@ -1217,8 +1269,9 @@ function renderDailyRecap() {
     box.innerHTML = `<ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
         <li><strong>${todaysHistory.length}</strong> finished today</li>
         <li><strong>${openFromToday}</strong> still open</li>
-        <li><strong>${totalActualMinutes} min</strong> logged</li>
-        <li><strong>${clocked} min</strong> clocked in</li>
+        <li><strong>${totalActualMinutes} min</strong> logged work</li>
+        <li><strong>${breakMinutesToday} min</strong> breaks/away</li>
+        <li><strong>${clocked} min</strong> total clocked</li>
     </ul>`;
 }
 
@@ -1228,8 +1281,8 @@ function exportAllDataJSON() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `focus-flow-export.json`; a.click();
 }
 function exportHistoryCSV() {
-    const rows = [['Date', 'Client', 'Task', 'Estimate (min)', 'Actual (min)', 'Notes']];
-    historyData.forEach((h) => rows.push([dateKeyFromISO(h.completedAt), h.client, h.task, h.estimateMinutes, h.actualMinutes, (h.notes || '').replace(/"/g, '""')]));
+    const rows = [['Date', 'Client', 'Task', 'Estimate (min)', 'Actual (min)', 'Breaks (min)', 'Notes']];
+    historyData.forEach((h) => rows.push([dateKeyFromISO(h.completedAt), h.client, h.task, h.estimateMinutes, h.actualMinutes, (h.breakMinutes || 0), (h.notes || '').replace(/"/g, '""')]));
     const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `focus-flow-history.csv`; a.click();
@@ -1268,16 +1321,21 @@ async function callGeminiClean(promptText) {
         const data = await response.json();
         let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No summary returned.";
         
-        // Strip em-dashes and replace with structural punctuation as requested
         return text.replace(/[\u2014\u2013]|--/g, ', ');
     } catch(e) { return "Error executing AI command."; }
 }
 
-async function generateDailyCheckIn() {
-    $('summary-content').textContent = "Generating Check-In Brief...";
-    let openTasks = getPrioritizedOpenTasks().map(e => e.task.text);
-    const prompt = `Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today based on this list: ${JSON.stringify(openTasks)}. Use formal language. Do not use em-dashes.`;
-    $('summary-content').textContent = await callGeminiClean(prompt);
+async function generateColumnCheckIn(ci) {
+    $('summary-content').textContent = `Generating Check-In Brief for ${boardData[ci].title}...`;
+    let openTasks = boardData[ci].tasks.filter(t => !t.completed).map(t => t.text);
+    if(openTasks.length === 0) {
+        $('summary-content').textContent = `No open tasks for ${boardData[ci].title} today.`;
+        return;
+    }
+    const prompt = `Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today for the project/client "${boardData[ci].title}" based on this task list: ${JSON.stringify(openTasks)}. Use formal language. Do not use em-dashes.`;
+    const result = await callGeminiClean(prompt);
+    $('summary-content').textContent = result;
+    $('summary-content').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function generateDailyCheckOut() {
@@ -1285,7 +1343,9 @@ async function generateDailyCheckOut() {
     const todayKey = getTodayKey();
     const todaysHistory = historyData.filter(h => dateKeyFromISO(h.completedAt) === todayKey);
     const prompt = `Act as a world-class formal assistant. Write a short, warm, professional daily check-out brief summarizing accomplishments today based on this data: ${JSON.stringify(todaysHistory)}. Use formal language. End on an encouraging note for tomorrow. Do not use em-dashes.`;
-    $('summary-content').textContent = await callGeminiClean(prompt);
+    const result = await callGeminiClean(prompt);
+    $('summary-content').textContent = result;
+    $('summary-content').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function generateAISummary(silent) {
@@ -1293,7 +1353,10 @@ async function generateAISummary(silent) {
     const thisMonthData = historyData.filter(h => new Date(h.completedAt).getMonth() === new Date().getMonth());
     const prompt = `Write a polished, professional monthly client report grouping accomplishments by client based on: ${JSON.stringify(thisMonthData)}. Do not use em-dashes.`;
     const result = await callGeminiClean(prompt);
-    if(!silent) $('summary-content').textContent = result;
+    if(!silent) {
+        $('summary-content').textContent = result;
+        $('summary-content').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 }
 
 function initApp() {

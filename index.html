@@ -75,7 +75,6 @@
         <div class="stats-card" style="flex:1 1 220px;">
             <h3>Daily Recap</h3>
             <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
-            <button class="ai-btn" style="width:100%;margin-top:10px;font-size:0.8rem;" onclick="generateDailyCheckIn()">Generate Daily Check-In Brief</button>
         </div>
 
         <div class="hacks-card" style="flex:1 1 220px;">
@@ -165,10 +164,15 @@
         </div>
     </div>
 
+    <!-- Task Details Modal -->
     <div class="modal-overlay" id="details-overlay">
         <div class="modal-box" style="text-align:left;">
             <p style="text-align:center;"><strong id="details-task-name"></strong></p>
             <textarea id="details-notes-textarea" class="task-notes-textarea" rows="4" placeholder="Add extra task information/notes..." style="width:100%;margin-bottom:8px;"></textarea>
+            
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-color);">Google Doc / Reference Link:</label>
+            <input type="url" id="details-link-input" class="task-notes-textarea" placeholder="Paste link here..." style="width:100%; margin-bottom:8px;">
+            
             <p id="details-estimate-label" style="font-size:0.8rem;color:#888;margin:0 0 8px;"></p>
             <button class="btn-primary" style="width:100%;" onclick="closeDetailsModal()">Save & Close</button>
         </div>

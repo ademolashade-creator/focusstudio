@@ -123,12 +123,8 @@ button:active { transform: scale(0.96); }
 .column-header-actions { display: flex; gap: 2px; flex-shrink: 0; }
 .column-header-input { font-family: Georgia, serif; font-size: 1.05rem; font-weight: 700; color: var(--cherry-red); border: none; border-bottom: 2px dashed var(--cherry-red); background: transparent; width: 100%; padding-bottom: 0.3rem; outline: none; }
 
-.google-link-container { display: flex; gap: 5px; margin-bottom: 0.4rem; }
-.google-link-input { font-family: Georgia, serif; font-size: 0.75rem; padding: 0.3rem; border: 1px solid var(--border-color); border-radius: 6px; flex: 1; background-color: var(--input-bg); color: var(--text-color); outline: none; }
-.google-link-btn { background-color: var(--input-bg); color: var(--cherry-red); padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 6px; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; border: 1px solid var(--border-color); }
-
-.ai-batch-actions { display: flex; gap: 4px; margin-bottom: 1rem; }
-.ai-batch-actions button { font-size: 0.7rem; padding: 0.3rem 0.5rem; flex: 1; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--cherry-red); }
+.ai-batch-actions { display: flex; gap: 4px; margin-bottom: 1rem; flex-wrap: wrap; }
+.ai-batch-actions button { font-size: 0.65rem; padding: 0.4rem 0.5rem; flex: 1; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--cherry-red); }
 
 .task-input-group { display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap; }
 .task-input { flex: 1; padding: 0.4rem; font-family: Georgia, serif; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px; outline: none; background-color: var(--input-bg); color: var(--text-color); min-width: 120px; }
@@ -152,10 +148,12 @@ button:active { transform: scale(0.96); }
 
 .task-name-input { flex: 1; background: transparent; border: none; font-family: Georgia, serif; font-weight: 600; color: var(--text-color); font-size: 0.85rem; outline: none; min-width: 60px; }
 .task-estimate-input { width: 42px; padding: 2px; font-family: Georgia, serif; font-weight: 700; text-align: center; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-color); font-size: 0.75rem; }
-.task-deadline-input { font-size: 0.65rem; padding: 2px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color); font-family: sans-serif;}
+
+.task-deadline-input { font-size: 0.65rem; padding: 2px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color); font-family: sans-serif; display: inline-block;}
+.deadline-trigger-btn { font-size: 0.65rem; padding: 2px 6px; border: 1px solid var(--amber); border-radius: 6px; background: var(--input-bg); color: var(--amber); font-weight: 700; cursor: pointer; white-space: nowrap; }
 
 .task-actions { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
-.icon-btn, .delete-btn, .track-btn { background: none; border: none; cursor: pointer; font-size: 0.8rem; padding: 2px 4px; color: #888; }
+.icon-btn, .delete-btn, .track-btn { background: none; border: none; cursor: pointer; font-size: 0.8rem; padding: 2px 4px; color: #888; text-decoration: none;}
 .icon-btn:hover { color: var(--cherry-red); }
 .delete-btn { color: #ccc; font-size: 1rem; }
 .delete-btn:hover { color: var(--cherry-red); }
