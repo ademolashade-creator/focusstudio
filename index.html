@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Focus & Flow Studio Enterprise</title>
-    <link rel="manifest" href="manifest.json?v=2">
+    <title>Focus & Flow Studio</title>
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff3366">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -42,16 +42,17 @@
                     <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
                     <button id="reset-btn" onclick="resetTimer()">Restart</button>
                     <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
-                    <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes">+5 min</button>
+                    <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes to the current segment">+5 min</button>
                 </div>
 
+                <!-- Internal Flow Queue (drag‑and‑drop) -->
                 <div class="internal-queue-container">
                     <div class="queue-header">Internal Flow Sequence <span style="font-weight:400;font-size:0.65rem;color:#888;">(drag to reorder)</span></div>
                     <ul class="internal-queue" id="internal-flow-queue"></ul>
                 </div>
 
                 <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
-                <button class="btn-secondary" id="skip-flow-btn" onclick="skipFlowSegment()" style="width:100%;margin-top:6px;">Skip & Complete Segment</button>
+                <button class="btn-secondary" id="skip-flow-btn" onclick="skipFlowSegment()" style="width:100%;margin-top:6px;">Skip Segment (Flow only)</button>
 
                 <div class="settings">
                     <div class="setting-row">
@@ -80,6 +81,7 @@
         <div class="hacks-card" style="flex:1 1 220px;">
             <h3>Adaptive Brain Engine</h3>
             <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
+            <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
         </div>
 
         <div class="hacks-card" style="flex:1 1 220px;">
@@ -97,31 +99,32 @@
     </div>
 
     <div class="summary-container">
-        <div class="monthly-alert-banner" id="monthly-alert">It's the 30th — your monthly client report is ready to generate.</div>
+        <div class="monthly-alert-banner" id="monthly-alert">It's the 30th — your monthly client report is ready to generate (or already ran automatically if your API key is saved).</div>
         <div class="summary-header">
-            <h2>AI Reports & Briefs</h2>
-            <button class="ai-btn" onclick="generateAISummary(false)">Generate Monthly Report</button>
+            <h2>Monthly Summary & Client Report</h2>
+            <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
         </div>
-        <div class="summary-content" id="summary-content">Your generated reports and briefs will appear here. Formatted, clean, and professional.</div>
+        <details style="margin-bottom:1rem;">
+            <summary style="font-size:0.75rem;color:#888;cursor:pointer;">AI settings (Gemini API key)</summary>
+            <div class="api-key-box" style="margin-top:6px;">
+                <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+            </div>
+        </details>
+        <div class="summary-content" id="summary-content">Click "Generate AI Client Report," or it'll run automatically on the 30th if your key is saved.</div>
     </div>
 
     <div class="discreet-card">
         <h4>Backup & Restore Your Data</h4>
+        <p>Everything lives only in this browser. Export a copy, and import to restore.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn-secondary" style="flex:1;" onclick="exportAllDataJSON()">📥 Export JSON</button>
-            <button class="btn-secondary" style="flex:1;" onclick="exportHistoryCSV()">📥 Export CSV</button>
+            <button class="btn-secondary" style="flex:1;" onclick="exportAllDataJSON()">📥 Export All (JSON)</button>
+            <button class="btn-secondary" style="flex:1;" onclick="exportHistoryCSV()">📥 Export History (CSV)</button>
             <button class="btn-secondary" style="flex:1;background:var(--cherry-red);color:white;" onclick="document.getElementById('import-file-input').click()">📤 Import JSON</button>
             <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importAllDataJSON(event)">
         </div>
-        <p style="margin-top:8px;font-size:0.7rem;color:#888;">Import replaces all board data and history. Export a backup first.</p>
     </div>
 
-    <!-- API Config (Discreet Footer) -->
-    <div style="text-align:center; padding: 20px; opacity: 0.3;">
-        <button onclick="document.getElementById('api-modal').style.display='flex'" style="background:none;border:none;cursor:pointer;font-size:1.2rem;">⚙️</button>
-    </div>
-
-    <!-- Break Overlay -->
+    <!-- Break Overlay (paused/away) -->
     <div class="modal-overlay" id="break-overlay">
         <div class="modal-box">
             <h2 style="color:var(--cherry-red);margin-top:0;">Session Paused</h2>
@@ -137,25 +140,19 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="api-modal">
-        <div class="modal-box">
-            <p>System Configuration</p>
-            <input type="password" id="gemini-api-key" style="width:100%;padding:8px;margin-bottom:10px;" placeholder="API Key" oninput="saveApiKey(this.value)">
-            <button class="btn-primary" style="width:100%;" onclick="document.getElementById('api-modal').style.display='none'">Save & Close</button>
-        </div>
-    </div>
-
+    <!-- End Session Modal -->
     <div class="modal-overlay" id="end-session-overlay">
         <div class="modal-box">
-            <p>End this session. Log what you've done so far, or abandon?</p>
+            <p>End this session. Do you want to log what you've done so far, or throw it away with no credit?</p>
             <div class="modal-actions">
                 <button class="btn-primary" onclick="endSessionLogProgress()">Log Progress</button>
-                <button class="btn-secondary" onclick="endSessionAbandon()">Abandon</button>
+                <button class="btn-secondary" onclick="endSessionAbandon()">Abandon (No Credit)</button>
             </div>
-            <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="closeEndSessionModal()">Cancel</button>
+            <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="closeEndSessionModal()">Cancel, Keep Going</button>
         </div>
     </div>
 
+    <!-- Completion overlay (ask actual time) -->
     <div class="modal-overlay" id="completion-overlay">
         <div class="modal-box">
             <p>How long did <strong id="completion-task-name"></strong> actually take?</p>
@@ -167,32 +164,43 @@
         </div>
     </div>
 
-    <!-- Task Details Modal -->
+    <!-- Task Details Modal (includes notes, Google link, deadline) -->
     <div class="modal-overlay" id="details-overlay">
         <div class="modal-box" style="text-align:left;">
             <p style="text-align:center;"><strong id="details-task-name"></strong></p>
+            <label style="font-size:0.75rem;font-weight:700;">Notes</label>
             <textarea id="details-notes-textarea" class="task-notes-textarea" rows="4" placeholder="Add extra task information/notes..." style="width:100%;margin-bottom:8px;"></textarea>
 
-            <label style="font-size:0.75rem; font-weight:700; color:var(--text-color);">Google Doc / Reference Link:</label>
-            <input type="url" id="details-link-input" class="task-notes-textarea" placeholder="Paste link here..." style="width:100%; margin-bottom:8px;">
+            <label style="font-size:0.75rem;font-weight:700;">Google Doc / Reference Link</label>
+            <input type="url" id="details-link-input" class="task-notes-textarea" placeholder="Paste link here..." style="width:100%;margin-bottom:8px;">
+
+            <label style="font-size:0.75rem;font-weight:700;">Deadline</label>
+            <input type="datetime-local" id="details-deadline-input" style="width:100%;margin-bottom:8px;padding:4px;">
 
             <p id="details-estimate-label" style="font-size:0.8rem;color:#888;margin:0 0 8px;"></p>
+            <button class="btn-secondary" style="width:100%;margin-bottom:8px;" onclick="suggestTimeFromDetails()">Suggest Time (AI)</button>
             <button class="btn-primary" style="width:100%;" onclick="closeDetailsModal()">Save & Close</button>
         </div>
     </div>
 
-    <script src="app.js?v=2"></script>
+    <!-- API key modal (discreet gear) -->
+    <div style="text-align:center; padding: 20px; opacity: 0.3;">
+        <button onclick="document.getElementById('api-modal').style.display='flex'" style="background:none;border:none;cursor:pointer;font-size:1.2rem;">⚙️</button>
+    </div>
+    <div class="modal-overlay" id="api-modal">
+        <div class="modal-box">
+            <p>System Configuration</p>
+            <input type="password" id="gemini-api-key-modal" style="width:100%;padding:8px;margin-bottom:10px;" placeholder="Gemini API Key" oninput="saveApiKey(this.value)">
+            <button class="btn-primary" style="width:100%;" onclick="document.getElementById('api-modal').style.display='none'">Save & Close</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                // Unregister old service workers to force fresh load
-                navigator.serviceWorker.getRegistrations().then(registrations => {
-                    registrations.forEach(r => r.unregister());
-                });
-                navigator.serviceWorker.register('sw.js?v=2').catch(() => {});
-            });
+            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
         }
-        // Force reload if the app is stuck in a cached state
+        // Force reload if cached
         if (performance.navigation && performance.navigation.type === 2) {
             location.reload(true);
         }

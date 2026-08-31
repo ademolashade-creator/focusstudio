@@ -11,7 +11,7 @@ function storageSet(key, value) {
 }
 const $ = (id) => document.getElementById(id);
 
-// ---------- App settings & Init ----------
+// ---------- App settings (name + dark mode) ----------
 let appSettings = storageGet('ff-app-settings', { appName: 'Focus & Flow Studio', darkMode: false });
 
 function applySettings() {
@@ -29,7 +29,7 @@ function toggleDarkMode() {
     storageSet('ff-app-settings', appSettings);
 }
 
-// ---------- Clocks & Date ----------
+// ---------- Clocks & date ----------
 let headerClockZones = storageGet('ff-header-clock-zones', ['Africa/Lagos', 'America/New_York', 'America/Denver']);
 
 function populateHeaderClockSelects() {
@@ -64,6 +64,7 @@ function updateClocks() {
     if (now.getDate() === 30) {
         const banner = $('monthly-alert');
         if (banner) banner.style.display = 'block';
+        maybeAutoGenerateSummary();
     }
 }
 
@@ -77,7 +78,7 @@ function releaseWakeLock() {
     if (window.wakeLockRef) { try { window.wakeLockRef.release(); } catch (e) {} window.wakeLockRef = null; }
 }
 
-// ---------- Timer engine (Manual + Auto Flow + Break Tagging) ----------
+// ---------- Timer engine ----------
 let workDuration = 25 * 60;
 let breakDuration = 5 * 60;
 let timeLeft = workDuration;
@@ -93,6 +94,8 @@ let flowSegIndex = 0;
 let flowExtraSeconds = 0;
 
 let flowBlocksCompleted = parseInt(localStorage.getItem('focus_daily_sessions')) || 0;
+
+// Break tracking
 let breakTracker = { active: false, start: null, elapsedSeconds: 0, interval: null };
 
 const timeDisplay = $('time-display');
@@ -155,37 +158,35 @@ function addFiveMinutes() {
 
 function toggleTimer() {
     if (isRunning) {
+        // Pause -> trigger break overlay
         clearInterval(timerInterval);
         isRunning = false;
         releaseWakeLock();
+        startPauseBtn.textContent = 'Paused';
         updateDisplay();
-        
-        // If in flow mode and tracking work, pausing implies a break.
-        if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
-            startPauseBtn.textContent = 'Pause'; 
+
+        // If we are in a work segment, open break overlay
+        const inWork = (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') || isWorkTime;
+        if (inWork) {
             initiateBreakOverlay();
         } else {
+            // if break time, just pause without overlay
             startPauseBtn.textContent = 'Resume';
         }
     } else {
+        // Resume
+        clearInterval(breakTracker.interval);
+        $('break-overlay').style.display = 'none';
+        breakTracker.active = false;
+
         hasStartedOnce = true;
         startPauseBtn.textContent = 'Pause';
         isRunning = true;
         requestWakeLock();
         timerInterval = setInterval(runTick, 1000);
-        
-        // Log start for flow segment task
-        if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
-            let task = currentFlowSegment().entry.task;
-            if(!task.startedAtIso) {
-                task.startedAtIso = new Date().toISOString();
-                saveBoardData();
-            }
-        }
     }
 }
 
-// BREAK OVERLAY LOGIC
 function initiateBreakOverlay() {
     $('break-overlay').style.display = 'flex';
     breakTracker.active = true;
@@ -201,9 +202,9 @@ function resumeFromBreak() {
     clearInterval(breakTracker.interval);
     $('break-overlay').style.display = 'none';
     const reason = $('break-reason-select').value;
-    
+
     const seg = currentFlowSegment();
-    if(seg && seg.type === 'work') {
+    if (seg && seg.type === 'work') {
         const task = seg.entry.task;
         task.breaks.push({
             reason: reason,
@@ -215,7 +216,8 @@ function resumeFromBreak() {
         renderDailyRecap();
     }
     breakTracker.active = false;
-    
+
+    // Resume timer
     hasStartedOnce = true;
     startPauseBtn.textContent = 'Pause';
     isRunning = true;
@@ -270,7 +272,7 @@ function setupMode() {
 function resetTimer() { hasStartedOnce = false; timerMode = 'manual'; setFlowControlsVisible(false); isWorkTime = true; setupMode(); }
 function updateSettings() { if (!isRunning) { setupMode(); updateAdaptiveHacks(); } }
 
-// ---------- Auto Flow: Engine & Internal Queue ----------
+// ---------- Auto Flow: Internal Queue with manual reorder ----------
 let customQueueOrder = storageGet('ff-custom-queue', []);
 
 function setFlowControlsVisible(active) {
@@ -306,29 +308,30 @@ function getPrioritizedOpenTasks() {
             if (!task.completed) openEntries.push({ col, task, ci, ti, actualSecondsSoFar: task.trackedSeconds || 0 });
         });
     });
-    
-    // Sort logic overriding with manual drag-and-drop order
+
+    // Sort by custom order if exists, else by deadline, then column order
     openEntries.sort((a, b) => {
         const idxA = customQueueOrder.indexOf(a.task.id);
         const idxB = customQueueOrder.indexOf(b.task.id);
-
         if (idxA !== -1 && idxB !== -1) return idxA - idxB;
         if (idxA !== -1) return -1;
         if (idxB !== -1) return 1;
 
-        if(a.task.deadlineTime && !b.task.deadlineTime) return -1;
-        if(!a.task.deadlineTime && b.task.deadlineTime) return 1;
-        if(a.task.deadlineTime && b.task.deadlineTime) {
+        // Deadline priority
+        if (a.task.deadlineTime && !b.task.deadlineTime) return -1;
+        if (!a.task.deadlineTime && b.task.deadlineTime) return 1;
+        if (a.task.deadlineTime && b.task.deadlineTime) {
             return new Date(a.task.deadlineTime) - new Date(b.task.deadlineTime);
         }
-        if(a.ci !== b.ci) return a.ci - b.ci;
+        if (a.ci !== b.ci) return a.ci - b.ci;
         return a.ti - b.ti;
     });
     return openEntries;
 }
 
-// Queue Drag and Drop Methods
+// Drag-and-drop for internal queue
 let queueDragTaskId = null;
+
 function queueDragStart(e, taskId) {
     queueDragTaskId = taskId;
     e.dataTransfer.effectAllowed = "move";
@@ -345,7 +348,7 @@ function queueDrop(e, targetTaskId) {
     e.preventDefault();
     e.currentTarget.style.backgroundColor = '';
     document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-    
+
     if (!queueDragTaskId || queueDragTaskId === targetTaskId) return;
 
     const tasks = getPrioritizedOpenTasks();
@@ -367,9 +370,9 @@ function queueDrop(e, targetTaskId) {
 
 function renderInternalQueue() {
     const q = $('internal-flow-queue');
-    if(!q) return;
+    if (!q) return;
     const tasks = getPrioritizedOpenTasks();
-    if(tasks.length === 0) {
+    if (tasks.length === 0) {
         q.innerHTML = '<li style="color:#888;">No open tasks. Add some below.</li>';
         return;
     }
@@ -412,7 +415,7 @@ function buildFlowSegments() {
 function startFlow() {
     flowSegments = buildFlowSegments();
     if (flowSegments.length === 0) {
-        alert("No open tasks to flow through.");
+        alert("No open tasks to flow through — add a task with a time estimate first.");
         return;
     }
 
@@ -440,7 +443,7 @@ function beginFlowSegment() {
     if (seg.type === 'work') {
         modeIndicator.textContent = `Flow: ${seg.entry.task.text}`;
         progressBar.style.backgroundColor = 'var(--cherry-red)';
-        if(!seg.entry.task.startedAtIso) seg.entry.task.startedAtIso = new Date().toISOString();
+        if (!seg.entry.task.startedAtIso) seg.entry.task.startedAtIso = new Date().toISOString();
         announce('Work');
     } else {
         modeIndicator.textContent = 'Flow: Break';
@@ -473,17 +476,17 @@ function completeFlowTask(entry, actualSeconds) {
     task.trackedSeconds = actualSeconds;
     task.completedAt = Date.now();
     task.completedAtIso = new Date().toISOString();
-    
-    if(task.startedAtIso) {
+
+    if (task.startedAtIso) {
         task.timeSegments.push({ start: task.startedAtIso, end: task.completedAtIso });
     }
 
     const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     task._historyId = historyId;
-    
+
     const totalBreaks = task.breaks.reduce((acc, b) => acc + (b.durationMinutes || 0), 0);
     let breaksStr = task.breaks.length ? `[Breaks: ${task.breaks.map(b=>b.reason).join(', ')}] ` : '';
-    
+
     historyData.unshift({
         _id: historyId,
         client: entry.col.title,
@@ -524,12 +527,14 @@ function skipFlowSegment() {
         const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
         seg.entry.actualSecondsSoFar += elapsed;
         completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
+    } else if (seg && seg.type === 'break') {
+        // just skip
     }
     flowSegIndex++;
     beginFlowSegment();
 }
 
-// ---------- Stop / End Session (Modal) ----------
+// ---------- Stop / End Session ----------
 function openEndSessionModal() {
     if (!hasStartedOnce && !isRunning) return;
     $('end-session-overlay').style.display = 'flex';
@@ -588,8 +593,8 @@ function toggleClock() {
         if (clockLog.length > 30) clockLog.pop();
         clockState = { clockedIn: false, startedAt: null };
         storageSet('ff-clock-log', clockLog);
-        
-        if(confirm("Clocked Out. Generate a Daily Check-Out Brief based on today's logs?")) {
+        // Ask for daily check-out brief
+        if (confirm("Clocked Out. Generate a Daily Check-Out Brief based on today's logs?")) {
             generateDailyCheckOut();
         }
     } else {
@@ -643,6 +648,7 @@ function formatDateKey(dateKey) {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+// Migration to Enterprise Schema
 boardData.forEach(col => {
     if (col.collapsed === undefined) col.collapsed = false;
     col.tasks.forEach(t => {
@@ -676,12 +682,12 @@ function urgencyClassFor(task) {
 }
 
 function getDeadlineBadge(task) {
-    if(!task.deadlineTime) return '';
+    if (!task.deadlineTime) return '';
     const ms = new Date(task.deadlineTime).getTime() - Date.now();
     const hrs = ms / 3600000;
-    if(hrs < 0) return `<span class="deadline-badge red">Overdue</span>`;
-    if(hrs <= 1) return `<span class="deadline-badge red">< 1h</span>`;
-    if(hrs <= 3) return `<span class="deadline-badge amber">< 3h</span>`;
+    if (hrs < 0) return `<span class="deadline-badge red">Overdue</span>`;
+    if (hrs <= 1) return `<span class="deadline-badge red">< 1h</span>`;
+    if (hrs <= 3) return `<span class="deadline-badge amber">< 3h</span>`;
     return '';
 }
 
@@ -691,7 +697,8 @@ function formatMinSec(totalSeconds) {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-let _toggledDateGroups = {}; 
+// Collapsible date groups
+let _toggledDateGroups = {};
 
 function groupTasksByDate(tasks) {
     const groups = {};
@@ -701,15 +708,14 @@ function groupTasksByDate(tasks) {
         if (task.completed) groups[key].completed.push({ task, originalIndex });
         else groups[key].incomplete.push({ task, originalIndex });
     });
-    
     Object.values(groups).forEach((g) => g.completed.sort((a, b) => (a.task.completedAt || 0) - (b.task.completedAt || 0)));
-    
+
     const today = getTodayKey();
     const yesterday = getYesterdayKey();
 
     return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map((key) => {
         let isCollapsed = (key !== today && key !== yesterday);
-        if(_toggledDateGroups[key] !== undefined) isCollapsed = _toggledDateGroups[key];
+        if (_toggledDateGroups[key] !== undefined) isCollapsed = _toggledDateGroups[key];
 
         return {
             dateKey: key,
@@ -724,23 +730,10 @@ function toggleDateGroup(key) {
     const today = getTodayKey();
     const yesterday = getYesterdayKey();
     let isCurrentlyCollapsed = (key !== today && key !== yesterday);
-    if(_toggledDateGroups[key] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[key];
-    
+    if (_toggledDateGroups[key] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[key];
+
     _toggledDateGroups[key] = !isCurrentlyCollapsed;
     renderBoard();
-}
-
-function promptDeadline(ci, ti) {
-    const input = $(`deadline-input-${ci}-${ti}`);
-    const btn = $(`deadline-btn-${ci}-${ti}`);
-    if(input && btn) {
-        btn.style.display = 'none';
-        input.style.display = 'inline-block';
-        input.focus();
-        if(typeof input.showPicker === 'function') {
-            try { input.showPicker(); } catch(e){}
-        }
-    }
 }
 
 function renderBoard() {
@@ -758,7 +751,7 @@ function renderBoard() {
         const openCount = col.tasks.filter((t) => !t.completed).length;
 
         let suggestionsHtml = '';
-        if(col.aiSuggestions) {
+        if (col.aiSuggestions) {
             suggestionsHtml = col.aiSuggestions.map((s, idx) => `
                 <div class="ai-suggestion-banner">
                     <div><strong>AI Suggests:</strong> ${escapeHTML(s.task)} (${s.minutes}m)</div>
@@ -783,11 +776,11 @@ function renderBoard() {
             </div>
 
             <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
-            
+
             <div class="ai-batch-actions">
                 <button onclick="suggestColumnTimesAI(${colIndex})">Suggest Times (AI)</button>
                 <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow & Gaps (AI)</button>
-                <button onclick="generateColumnCheckIn(${colIndex})">Client Check-In (AI)</button>
+                <button onclick="generateColumnCheckIn(${colIndex})">Generate Daily Check-In (AI)</button>
             </div>
 
             ${suggestionsHtml}
@@ -804,15 +797,13 @@ function renderBoard() {
                                 </div>
                                 <div class="task-actions">
                                     ${task.deadlineTime ? 
-                                        `<input type="datetime-local" class="task-deadline-input" value="${task.deadlineTime}" onchange="updateTaskDeadline(${colIndex}, ${taskIndex}, this.value)">` 
+                                        `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${taskIndex})">📅 ${new Date(task.deadlineTime).toLocaleString()}</span>` 
                                         : 
-                                        `<button id="deadline-btn-${colIndex}-${taskIndex}" class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${taskIndex})">+ Deadline</button>
-                                         <input type="datetime-local" id="deadline-input-${colIndex}-${taskIndex}" class="task-deadline-input" style="display:none;" onchange="updateTaskDeadline(${colIndex}, ${taskIndex}, this.value)">`
+                                        `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${taskIndex})">+ Deadline</button>`
                                     }
                                     ${getDeadlineBadge(task)}
                                     <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
                                     <button class="track-btn ${task.isTracking ? 'tracking' : ''}" id="track-btn-${colIndex}-${taskIndex}" onclick="toggleTrack(${colIndex}, ${taskIndex})">${task.isTracking ? '⏸' : '▶'} ${formatMinSec(task.trackedSeconds)}</button>
-                                    ${task.googleLink ? `<a href="${task.googleLink}" target="_blank" class="icon-btn" title="Open Link">🔗</a>` : ''}
                                     ${!task.completed ? `
                                     <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">▲</button>
                                     <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">▼</button>
@@ -839,7 +830,7 @@ function renderBoard() {
 
             <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (e.g. 'write script 25 mins')..."></textarea>
             <button class="add-task-btn" style="width:100%;margin-bottom:0.6rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
-            
+
             ${col.tasks.some(t=>t.stagedEstimate) ? `
             <div class="ai-batch-actions" style="margin-top:10px;">
                 <button onclick="applyAllEstimates(${colIndex})" style="background:var(--cherry-red);color:white;">Apply All Times</button>
@@ -855,7 +846,7 @@ function renderBoard() {
     renderInternalQueue();
 }
 
-// Column Task Drag & Drop
+// Drag & Drop for tasks
 let dragContext = null;
 function dragStart(e, ci, ti) {
     dragContext = { ci, ti };
@@ -869,12 +860,12 @@ function dropTask(e, targetColIndex) {
     if(!dragContext) return;
     const { ci, ti } = dragContext;
     const task = boardData[ci].tasks[ti];
-    
+
     const list = e.currentTarget;
     const y = e.clientY;
     let afterElement = null;
     let targetIndex = boardData[targetColIndex].tasks.length;
-    
+
     const draggableElements = [...list.querySelectorAll('.task-item:not(.dragging)')];
     draggableElements.forEach(child => {
         const box = child.getBoundingClientRect();
@@ -912,6 +903,26 @@ function deleteColumn(ci) {
     boardData.splice(ci, 1); saveBoardData(); renderBoard();
 }
 
+// Deadline prompt
+function promptDeadline(ci, ti) {
+    const task = boardData[ci].tasks[ti];
+    const input = document.createElement('input');
+    input.type = 'datetime-local';
+    input.value = task.deadlineTime || '';
+    input.style.width = '100%';
+    input.style.padding = '4px';
+    input.style.marginTop = '4px';
+    input.addEventListener('change', function() {
+        task.deadlineTime = this.value || null;
+        saveBoardData();
+        renderBoard();
+    });
+    // Replace the button with input
+    const btn = document.querySelector(`[onclick="promptDeadline(${ci}, ${ti})"]`);
+    if (btn) btn.replaceWith(input);
+    input.focus();
+}
+
 function addTask(ci) {
     const input = $(`task-input-${ci}`);
     const estInput = $(`task-est-${ci}`);
@@ -925,17 +936,19 @@ function addTask(ci) {
         estimateMinutes: parseInt(estInput.value) || 15,
         trackedSeconds: 0, isTracking: false, notes: '',
         completed: false, completedAt: null, dateAdded: getTodayKey(),
-        breaks: [], timeSegments: [], deadlineTime: null, googleLink: ''
+        breaks: [], timeSegments: [], deadlineTime: null, googleLink: '',
+        startedAtIso: null, completedAtIso: null
     });
     input.value = '';
     saveBoardData(); renderBoard();
 }
 
+// Bulk paste parser (removes time from task name)
 function parseTimeFromLine(line) {
     const re = /(\d+(?:\.\d+)?)\s*(hours|hour|hrs|hr|minutes|minute|mins|min|seconds|second|secs|sec)\b/i;
     const match = line.match(re);
     if (!match) return { text: line.trim(), minutes: null };
-    
+
     const value = parseFloat(match[1]);
     const unit = match[2].toLowerCase();
     let minutes;
@@ -953,7 +966,7 @@ function addPastedTasks(ci) {
     const textarea = $(`paste-box-${ci}`);
     const lines = textarea.value.split('\n').map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return;
-    
+
     const newTasks = lines.map((line) => {
         const { text, minutes } = parseTimeFromLine(line);
         let finalMins = minutes || 15;
@@ -961,36 +974,34 @@ function addPastedTasks(ci) {
             id: 't_' + Math.random().toString(36).substr(2,9),
             text: text, estimateMinutes: finalMins, trackedSeconds: 0,
             isTracking: false, notes: '', completed: false, completedAt: null,
-            dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null, googleLink: ''
+            dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null, googleLink: '',
+            startedAtIso: null, completedAtIso: null
         };
     });
-    
+
     boardData[ci].tasks.push(...newTasks);
     textarea.value = ''; saveBoardData(); renderBoard();
 }
 
 function updateTaskText(ci, ti, v) { boardData[ci].tasks[ti].text = v.trim() || 'Untitled task'; saveBoardData(); }
-function updateTaskEstimate(ci, ti, v) { 
-    if(isNaN(v) || v<1) v=1; 
-    boardData[ci].tasks[ti].estimateMinutes = v; 
-    saveBoardData(); renderBoard(); 
-}
-function updateTaskDeadline(ci, ti, v) {
-    boardData[ci].tasks[ti].deadlineTime = v || null;
+function updateTaskEstimate(ci, ti, v) {
+    if(isNaN(v) || v<1) v=1;
+    boardData[ci].tasks[ti].estimateMinutes = v;
     saveBoardData(); renderBoard();
 }
+
 function moveTask(ci, ti, dir) {
     const tasks = boardData[ci].tasks;
     const task = tasks[ti];
     if (task.completed) return;
     const listEl = $(`task-${ci}-${ti}`).closest('.task-list');
-    const scrollPos = listEl ? listEl.scrollTop : 0; 
+    const scrollPos = listEl ? listEl.scrollTop : 0;
 
     let target = ti + dir;
     while (target >= 0 && target < tasks.length) {
         if (tasks[target].dateAdded === task.dateAdded && !tasks[target].completed) {
             [tasks[ti], tasks[target]] = [tasks[target], tasks[ti]];
-            saveBoardData(); 
+            saveBoardData();
             renderBoard();
             setTimeout(() => {
                 const newList = $(`task-${ci}-${target}`).closest('.task-list');
@@ -1002,15 +1013,33 @@ function moveTask(ci, ti, dir) {
     }
 }
 
-// ---------- AI Batch Estimates (stub) ----------
+// AI functions (with em-dash cleanup)
+function cleanEmDashes(text) {
+    return text.replace(/[\u2014\u2013]|--/g, ', ');
+}
+
+async function callGemini(promptText) {
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) throw new Error('API key missing');
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return cleanEmDashes(text);
+}
+
 async function suggestColumnTimesAI(ci) {
     const apiKey = storageGet('gemini_api_key', null);
-    if (!apiKey) { alert('Add API Key in settings footer first.'); return; }
-    
+    if (!apiKey) { alert('Add Gemini API key in settings.'); return; }
+
     let openTasks = boardData[ci].tasks.filter(t=>!t.completed);
     if(openTasks.length===0) return;
 
-    const prompt = `Estimate realistic minutes for these tasks as JSON array: [{"id":"<task.id>","minutes":<num>}]. Tasks: ` + 
+    const prompt = `Estimate realistic minutes for these tasks as JSON array: [{"id":"<task.id>","minutes":<num>}]. Tasks: ` +
         openTasks.map(t=>`[id:${t.id}] ${t.text}`).join('; ');
 
     try {
@@ -1022,61 +1051,412 @@ async function suggestColumnTimesAI(ci) {
         const raw = data.candidates[0].content.parts[0].text;
         const cleaned = raw.replace(/```json|```/g, '').trim();
         const estimates = JSON.parse(cleaned);
-        // apply staged estimates to tasks
         estimates.forEach(e => {
             const task = openTasks.find(t => t.id === e.id);
-            if(task) task.stagedEstimate = e.minutes;
+            if(task) task.stagedEstimate = Math.max(1, e.minutes);
         });
         saveBoardData();
         renderBoard();
     } catch(e) { alert('AI error: '+e.message); }
 }
-// placeholder for other AI functions
-function optimizeColumnFlowAI(ci) { alert('Flow optimization stub'); }
-function generateColumnCheckIn(ci) { alert('Check-in stub'); }
-function generateAISummary(monthly) { alert('Summary stub'); }
-function generateDailyCheckOut() { alert('Daily check-out stub'); }
-function acceptAISuggestion(ci, idx) { /* stub */ }
-function dismissAISuggestion(ci, idx) { /* stub */ }
-function applyTaskEstimate(ci, ti) { /* stub */ }
-function dismissTaskEstimate(ci, ti) { /* stub */ }
-function applyAllEstimates(ci) { /* stub */ }
-function dismissAllEstimates(ci) { /* stub */ }
-function toggleMandatorySetting() { mandatoryNotes = !mandatoryNotes; storageSet('focus_mandatory_notes', mandatoryNotes); }
-function handleKeyPress(e, ci) { if(e.key==='Enter') addTask(ci); }
-function toggleTask(ci, ti) { const task = boardData[ci].tasks[ti]; task.completed = !task.completed; if(task.completed) { task.completedAt = Date.now(); task.completedAtIso = new Date().toISOString(); } else { task.completedAt = null; task.completedAtIso = null; } saveBoardData(); renderBoard(); }
-function toggleTrack(ci, ti) { /* stub */ }
-function deleteTask(ci, ti) { if(!confirm('Delete task?')) return; boardData[ci].tasks.splice(ti,1); saveBoardData(); renderBoard(); }
-function openDetailsModal(ci, ti) { /* stub */ }
-function closeDetailsModal() { /* stub */ }
-function renderDailyRecap() { /* stub */ }
-function renderEstimateLog() { /* stub */ }
-function renderTimeCounter() { /* stub */ }
-function updateAdaptiveHacks() { /* stub */ }
-function updateTimezone(tz) { /* stub */ }
-function rememberTaskTime(text, mins) { /* stub */ }
-function escapeHTML(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ---------- EXPORT / IMPORT ----------
-function exportAllDataJSON() {
-    const data = {
-        board: boardData,
-        history: historyData,
-        clockLog: clockLog,
-        customQueue: customQueueOrder,
-        settings: appSettings,
-        headerClockZones: headerClockZones,
-        flowBlocksCompleted: flowBlocksCompleted
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `FocusFlow_Backup_${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+function applyTaskEstimate(ci, ti) {
+    const task = boardData[ci].tasks[ti];
+    if (task.stagedEstimate) { task.estimateMinutes = task.stagedEstimate; task.stagedEstimate = null; }
+    saveBoardData(); renderBoard();
+}
+function dismissTaskEstimate(ci, ti) { boardData[ci].tasks[ti].stagedEstimate = null; saveBoardData(); renderBoard(); }
+function applyAllEstimates(ci) {
+    boardData[ci].tasks.forEach(t => { if(t.stagedEstimate) { t.estimateMinutes = t.stagedEstimate; t.stagedEstimate = null; } });
+    saveBoardData(); renderBoard();
+}
+function dismissAllEstimates(ci) {
+    boardData[ci].tasks.forEach(t => t.stagedEstimate = null);
+    saveBoardData(); renderBoard();
 }
 
+async function optimizeColumnFlowAI(ci) {
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) { alert('Add Gemini API key.'); return; }
+
+    let openTasks = boardData[ci].tasks.filter(t=>!t.completed);
+    if(openTasks.length===0) return;
+
+    const prompt = `Review these tasks for a project. 
+1. Reorder them into the most logical execution sequence.
+2. If critical intermediate steps are missing based on standard project workflows, suggest them.
+Return ONLY JSON format: {"orderedIds": ["id1", "id2"], "missingTasks": [{"task":"Name", "minutes": 15}]}
+Tasks: ` + openTasks.map(t=>`[id:${t.id}] ${t.text}`).join('; ');
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        const cleaned = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+        const result = JSON.parse(cleaned);
+
+        if(result.orderedIds && result.orderedIds.length === openTasks.length) {
+            let sortedOpen = [];
+            result.orderedIds.forEach(id => {
+                const found = openTasks.find(t=>t.id === id);
+                if(found) sortedOpen.push(found);
+            });
+            let comp = boardData[ci].tasks.filter(t=>t.completed);
+            boardData[ci].tasks = [...sortedOpen, ...comp];
+        }
+
+        if(result.missingTasks && result.missingTasks.length > 0) {
+            boardData[ci].aiSuggestions = result.missingTasks;
+        }
+
+        saveBoardData(); renderBoard();
+    } catch(e) { alert('AI optimization error: '+e.message); }
+}
+
+function acceptAISuggestion(ci, sIdx) {
+    const s = boardData[ci].aiSuggestions[sIdx];
+    boardData[ci].tasks.unshift({
+        id: 't_' + Math.random().toString(36).substr(2,9),
+        text: s.task, estimateMinutes: s.minutes, trackedSeconds: 0,
+        isTracking: false, notes: 'Suggested by AI', completed: false, completedAt: null,
+        dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null, googleLink: '',
+        startedAtIso: null, completedAtIso: null
+    });
+    boardData[ci].aiSuggestions.splice(sIdx, 1);
+    if(boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
+    saveBoardData(); renderBoard();
+}
+function dismissAISuggestion(ci, sIdx) {
+    boardData[ci].aiSuggestions.splice(sIdx, 1);
+    if(boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
+    saveBoardData(); renderBoard();
+}
+
+// Generate Daily Check-In per column
+async function generateColumnCheckIn(ci) {
+    const summaryBox = $('summary-content');
+    summaryBox.textContent = `Generating daily check-in for ${boardData[ci].title}...`;
+    let openTasks = boardData[ci].tasks.filter(t => !t.completed).map(t => t.text);
+    if(openTasks.length === 0) {
+        summaryBox.textContent = `No open tasks for ${boardData[ci].title} today.`;
+        return;
+    }
+    const prompt = `Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today for the project/client "${boardData[ci].title}" based on this task list: ${JSON.stringify(openTasks)}. Use formal language. Do not use em-dashes.`;
+    try {
+        const result = await callGemini(prompt);
+        summaryBox.textContent = result;
+    } catch(e) {
+        summaryBox.textContent = 'Error: ' + e.message;
+    }
+}
+
+// Generate Daily Check-Out (after clock out)
+async function generateDailyCheckOut() {
+    const summaryBox = $('summary-content');
+    summaryBox.textContent = 'Generating check-out brief...';
+    const todayKey = getTodayKey();
+    const todaysHistory = historyData.filter(h => dateKeyFromISO(h.completedAt) === todayKey);
+    const prompt = `Act as a world-class formal assistant. Write a short, warm, professional daily check-out brief summarizing accomplishments today based on this data: ${JSON.stringify(todaysHistory)}. Use formal language. End on an encouraging note for tomorrow. Do not use em-dashes.`;
+    try {
+        const result = await callGemini(prompt);
+        summaryBox.textContent = result;
+    } catch(e) {
+        summaryBox.textContent = 'Error: ' + e.message;
+    }
+}
+
+// Monthly report
+async function generateAISummary(silent) {
+    const summaryBox = $('summary-content');
+    if (!silent) summaryBox.textContent = 'Generating monthly report...';
+    const thisMonthData = historyData.filter(h => new Date(h.completedAt).getMonth() === new Date().getMonth());
+    const prompt = `Write a polished, professional monthly client report grouping accomplishments by client based on: ${JSON.stringify(thisMonthData)}. Do not use em-dashes.`;
+    try {
+        const result = await callGemini(prompt);
+        if (!silent) summaryBox.textContent = result;
+    } catch(e) {
+        if (!silent) summaryBox.textContent = 'Error: ' + e.message;
+    }
+}
+
+function maybeAutoGenerateSummary() {
+    const now = new Date();
+    const marker = `${now.getFullYear()}-${now.getMonth()}`;
+    if (storageGet('ff-last-summary-month', null) === marker) return;
+    const apiKey = storageGet('gemini_api_key', null);
+    if (apiKey) generateAISummary(true);
+}
+
+// ---------- Task Details Modal ----------
+let openDetailsRef = null;
+function openDetailsModal(ci, ti) {
+    openDetailsRef = { ci, ti };
+    const task = boardData[ci].tasks[ti];
+    $('details-task-name').textContent = task.text;
+    $('details-notes-textarea').value = task.notes || '';
+    $('details-link-input').value = task.googleLink || '';
+    $('details-deadline-input').value = task.deadlineTime || '';
+    $('details-estimate-label').textContent = `Est: ${task.estimateMinutes} min`;
+    $('details-overlay').style.display = 'flex';
+}
+function closeDetailsModal() {
+    if (openDetailsRef) {
+        const { ci, ti } = openDetailsRef;
+        const task = boardData[ci].tasks[ti];
+        task.notes = $('details-notes-textarea').value;
+        task.googleLink = $('details-link-input').value;
+        task.deadlineTime = $('details-deadline-input').value || null;
+        saveBoardData();
+        renderBoard();
+    }
+    openDetailsRef = null;
+    $('details-overlay').style.display = 'none';
+}
+async function suggestTimeFromDetails() {
+    if (!openDetailsRef) return;
+    const { ci, ti } = openDetailsRef;
+    const task = boardData[ci].tasks[ti];
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) { alert('Add Gemini API key.'); return; }
+    const prompt = `Estimate realistic minutes for this task: "${task.text}" Notes: "${task.notes || 'none'}" Respond with ONLY a number.`;
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        const raw = data.candidates[0].content.parts[0].text;
+        const num = parseInt(raw.match(/\d+/)[0]);
+        if (num) { task.estimateMinutes = Math.max(1, num); saveBoardData(); renderBoard(); $('details-estimate-label').textContent = `Est: ${task.estimateMinutes} min`; }
+    } catch(e) { alert('AI error'); }
+}
+
+function toggleTrack(ci, ti) {
+    boardData[ci].tasks[ti].isTracking = !boardData[ci].tasks[ti].isTracking;
+    if (boardData[ci].tasks[ti].isTracking && !boardData[ci].tasks[ti].startedAtIso) {
+        boardData[ci].tasks[ti].startedAtIso = new Date().toISOString();
+    }
+    saveBoardData(); renderBoard();
+}
+
+let pendingCompletion = null;
+function toggleTask(ci, ti) {
+    const task = boardData[ci].tasks[ti];
+    if (task.completed) {
+        task.completed = false; task.completedAt = null; task.completedAtIso = null;
+        if (task._historyId) {
+            const idx = historyData.findIndex((h) => h._id === task._historyId);
+            if (idx !== -1) historyData.splice(idx, 1);
+            task._historyId = null;
+        }
+        saveBoardData(); renderBoard(); renderEstimateLog();
+        return;
+    }
+    if (mandatoryNotes && (!task.notes || task.notes.trim() === '')) {
+        alert("Mandatory Extra Info is ON! Add notes via Details first.");
+        renderBoard(); return;
+    }
+    if (task.trackedSeconds === 0) {
+        pendingCompletion = { colIndex: ci, taskIndex: ti };
+        $('completion-task-name').textContent = task.text;
+        $('completion-actual-input').value = task.estimateMinutes;
+        $('completion-overlay').style.display = 'flex';
+        return;
+    }
+    finalizeTaskCompletion(ci, ti, task.trackedSeconds);
+}
+
+function confirmCompletion() {
+    if (!pendingCompletion) return;
+    const { colIndex, taskIndex } = pendingCompletion;
+    const task = boardData[colIndex].tasks[taskIndex];
+    const minutes = Math.max(1, parseInt($('completion-actual-input').value) || task.estimateMinutes);
+    finalizeTaskCompletion(colIndex, taskIndex, minutes * 60);
+    pendingCompletion = null;
+    $('completion-overlay').style.display = 'none';
+}
+function cancelCompletion() { pendingCompletion = null; $('completion-overlay').style.display = 'none'; renderBoard(); }
+
+function finalizeTaskCompletion(ci, ti, actualSeconds) {
+    const task = boardData[ci].tasks[ti];
+    task.completed = true; task.isTracking = false; task.trackedSeconds = actualSeconds;
+    task.completedAt = Date.now(); task.completedAtIso = new Date().toISOString();
+    if(task.startedAtIso) task.timeSegments.push({start: task.startedAtIso, end: task.completedAtIso});
+
+    const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    task._historyId = historyId;
+    const totalBreaks = task.breaks.reduce((acc, b) => acc + (b.durationMinutes || 0), 0);
+    let breaksStr = task.breaks.length ? `[Breaks: ${task.breaks.map(b=>b.reason).join(', ')}] ` : '';
+    historyData.unshift({
+        _id: historyId, client: boardData[ci].title, task: task.text,
+        estimateMinutes: task.estimateMinutes, actualMinutes: Math.round(actualSeconds / 60),
+        breakMinutes: totalBreaks,
+        notes: breaksStr + (task.notes || 'No notes'), completedAt: task.completedAtIso
+    });
+    if (historyData.length > 500) historyData.pop();
+    saveBoardData(); renderBoard(); renderEstimateLog(); renderDailyRecap(); renderInternalQueue();
+}
+
+function deleteTask(ci, ti) { boardData[ci].tasks.splice(ti, 1); saveBoardData(); renderBoard(); renderInternalQueue(); }
+
+// ---------- Estimate Log, Daily Recap, Time Counter ----------
+function renderEstimateLog() {
+    const logBox = $('estimate-log');
+    if (!logBox) return;
+    const recent = historyData.slice(0, 40);
+    if (recent.length === 0) { logBox.innerHTML = '<p style="font-size:0.85rem;color:#888;">Complete a tracked task to start your log.</p>'; return; }
+    const groups = {};
+    recent.forEach((h) => { const key = dateKeyFromISO(h.completedAt); if (!groups[key]) groups[key] = []; groups[key].push(h); });
+    const orderedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+    logBox.innerHTML = `<ul class="log-list">${orderedKeys.map((key) => `
+        <li class="date-group-header">${formatDateKey(key)}</li>
+        ${groups[key].map((h) => {
+            const diff = (h.actualMinutes || 0) - (h.estimateMinutes || 0);
+            let cls = 'under', label = `${diff <= 0 ? diff : '+' + diff}m`;
+            if (diff > (h.estimateMinutes * 0.2)) cls = 'over';
+            else if (diff > 0) cls = 'near';
+            return `<li class="log-item"><span>${escapeHTML(h.task)}</span><span class="log-variance ${cls}">Est ${h.estimateMinutes}m / Act ${h.actualMinutes}m (${label})</span></li>`;
+        }).join('')}
+    `).join('')}</ul>`;
+}
+
+function renderDailyRecap() {
+    const box = $('daily-recap-box');
+    if (!box) return;
+    const todayKey = getTodayKey();
+    const todayDateStr = new Date().toLocaleDateString();
+    const todaysHistory = historyData.filter((h) => dateKeyFromISO(h.completedAt) === todayKey);
+    const totalActual = todaysHistory.reduce((a, h) => a + (h.actualMinutes || 0), 0);
+    let openFromToday = 0;
+    boardData.forEach((col) => col.tasks.forEach((t) => { if (t.dateAdded === todayKey && !t.completed) openFromToday++; }));
+    let clockedMinutesToday = clockLog.filter((c) => c.date === todayDateStr).reduce((a, c) => a + c.durationMinutes, 0);
+    if (clockState.clockedIn) clockedMinutesToday += Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
+
+    // Count break minutes from tasks completed today
+    let breakMinutesToday = todaysHistory.reduce((a, h) => a + (h.breakMinutes || 0), 0);
+
+    box.innerHTML = `<ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
+        <li><strong>${todaysHistory.length}</strong> task(s) finished</li>
+        <li><strong>${openFromToday}</strong> still open</li>
+        <li><strong>${totalActual} min</strong> logged work</li>
+        <li><strong>${breakMinutesToday} min</strong> breaks/away</li>
+        <li><strong>${clockedMinutesToday} min</strong> clocked in</li>
+    </ul>`;
+}
+
+function computeColumnTimeline(standardBreakMinutes) {
+    let grandWork = 0;
+    const perColumn = boardData.map((col) => {
+        let colWork = 0, colTotalWithBreaks = 0;
+        const openTasks = col.tasks.filter((t) => !t.completed);
+        openTasks.forEach((task, i) => {
+            const { chunks, bonusBreakMinutes } = buildChunks(Math.max(1, task.estimateMinutes || 15));
+            const taskWork = chunks.reduce((a, b) => a + b, 0);
+            colWork += taskWork;
+            colTotalWithBreaks += taskWork + (chunks.length - 1) * standardBreakMinutes;
+            if (i < openTasks.length - 1) colTotalWithBreaks += standardBreakMinutes + bonusBreakMinutes;
+        });
+        grandWork += colWork;
+        return { title: col.title, workMinutes: colWork, totalWithBreaksMinutes: colTotalWithBreaks, taskCount: openTasks.length };
+    });
+    let grandTotal = 0;
+    perColumn.forEach((c, idx) => {
+        grandTotal += c.totalWithBreaksMinutes;
+        if (idx < perColumn.length - 1 && c.taskCount > 0) grandTotal += standardBreakMinutes;
+    });
+    return { perColumn, grandWorkMinutes: grandWork, grandTotalMinutes: grandTotal };
+}
+
+function getSelectedTimezone() { return storageGet('ff-timezone', Intl.DateTimeFormat().resolvedOptions().timeZone); }
+function updateTimezone(tz) { storageSet('ff-timezone', tz); renderTimeCounter(); }
+function populateTimezoneSelect() {
+    const sel = $('timezone-select');
+    if (!sel) return;
+    let zones; try { zones = Intl.supportedValuesOf('timeZone'); } catch(e){ zones = ['UTC','Africa/Lagos','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Europe/Paris','Asia/Dubai','Asia/Kolkata','Asia/Shanghai','Australia/Sydney']; }
+    const current = getSelectedTimezone();
+    sel.innerHTML = zones.map((z) => `<option value="${z}" ${z === current ? 'selected' : ''}>${z}</option>`).join('');
+}
+function formatTimeInZone(date, tz) { return date.toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); }
+function renderTimeCounter() {
+    const box = $('time-counter-box');
+    if (!box) return;
+    const breakMin = parseInt(breakInput.value) || 5;
+    const { perColumn, grandWorkMinutes, grandTotalMinutes } = computeColumnTimeline(breakMin);
+    const tz = getSelectedTimezone();
+    const now = new Date();
+    let cursor = new Date(now);
+    let rows = '';
+    perColumn.forEach((c, idx) => {
+        if (c.taskCount === 0) { rows += `<div class="log-item"><span>${escapeHTML(c.title)}</span><span style="color:#999;">No open tasks</span></div>`; return; }
+        cursor = new Date(cursor.getTime() + c.totalWithBreaksMinutes * 60000);
+        rows += `<div class="log-item"><span>${escapeHTML(c.title)} (${c.workMinutes} min work)</span><span class="log-variance under">Done by ${formatTimeInZone(cursor, tz)}</span></div>`;
+        if (idx < perColumn.length - 1 && c.taskCount > 0) cursor = new Date(cursor.getTime() + breakMin * 60000);
+    });
+    const grandDone = new Date(now.getTime() + grandTotalMinutes * 60000);
+    box.innerHTML = `<ul class="log-list">${rows}</ul>
+        <p style="margin-top:8px;font-size:0.85rem;"><strong>${grandWorkMinutes} min</strong> total work.</p>
+        <p style="font-weight:700;">All done by ${formatTimeInZone(grandDone, tz)} (${tz})</p>`;
+}
+
+// ---------- Tick tracking (for stopwatch) ----------
+let trackTickCount = 0;
+function tickTracking() {
+    let anyTracking = false;
+    boardData.forEach((col, ci) => {
+        col.tasks.forEach((task, ti) => {
+            if (task.isTracking && !task.completed) {
+                anyTracking = true;
+                task.trackedSeconds++;
+                const btn = $(`track-btn-${ci}-${ti}`);
+                if (btn) btn.textContent = `⏸ ${formatMinSec(task.trackedSeconds)}`;
+                const li = $(`task-${ci}-${ti}`);
+                if (li) {
+                    li.classList.remove('time-ok', 'time-warn', 'time-over');
+                    const cls = urgencyClassFor(task);
+                    if (cls) li.classList.add(cls);
+                }
+            }
+        });
+    });
+    if (anyTracking) {
+        trackTickCount++;
+        if (trackTickCount % 10 === 0) saveBoardData();
+    }
+}
+
+// ---------- Adaptive Brain ----------
+function updateAdaptiveHacks() {
+    const box = $('adaptive-hacks');
+    if (!box) return;
+    let totalEstimate = 0, openTasks = 0;
+    boardData.forEach(col => col.tasks.forEach(t => { if (!t.completed) { totalEstimate += (t.estimateMinutes || 0); openTasks++; } }));
+    const workMin = Math.round((workDuration || 1500) / 60);
+    const sessions = openTasks > 0 ? Math.ceil(totalEstimate / workMin) : 0;
+    box.innerHTML = `<ul>
+        <li><strong>Active Load:</strong> ${totalEstimate} min across ${openTasks} task(s)${sessions ? ` — roughly ${sessions} focus session(s).` : '.'}</li>
+        <li><strong>Timer Flash:</strong> 3 min left warning.</li>
+    </ul>`;
+}
+
+// ---------- Export/Import ----------
+function exportAllDataJSON() {
+    const data = {
+        appSettings, boardData, historyData, clockLog, clockState,
+        flowBlocksCompleted, taskTimeMemory: storageGet('ff-task-time-memory', {}),
+        customQueueOrder, headerClockZones
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `focus-flow-backup-${getTodayKey()}.json`; a.click();
+}
+function exportHistoryCSV() {
+    const rows = [['Date','Client','Task','Estimate (min)','Actual (min)','Breaks (min)','Notes']];
+    historyData.forEach(h => rows.push([dateKeyFromISO(h.completedAt), h.client, h.task, h.estimateMinutes, h.actualMinutes, (h.breakMinutes||0), (h.notes||'').replace(/"/g,'""')]));
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `focus-flow-history-${getTodayKey()}.csv`; a.click();
+}
 function importAllDataJSON(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1084,95 +1464,66 @@ function importAllDataJSON(event) {
     reader.onload = (e) => {
         try {
             const data = JSON.parse(e.target.result);
-            if (data.board) {
-                boardData = data.board;
-                // ensure schema migration
-                boardData.forEach(col => {
-                    if (col.collapsed === undefined) col.collapsed = false;
-                    col.tasks.forEach(t => {
-                        if (!t.id) t.id = 't_' + Math.random().toString(36).substr(2,9);
-                        if (t.breaks === undefined) t.breaks = [];
-                        if (t.timeSegments === undefined) t.timeSegments = [];
-                        if (t.deadlineTime === undefined) t.deadlineTime = null;
-                        if (t.googleLink === undefined) t.googleLink = '';
-                        if (t.startedAtIso === undefined) t.startedAtIso = null;
-                        if (t.completedAtIso === undefined) t.completedAtIso = null;
-                        if (t.dateAdded === undefined) t.dateAdded = getTodayKey();
-                    });
-                });
-                storageSet('focus_board_data', boardData);
-            }
-            if (data.history) {
-                historyData = data.history;
-                storageSet('focus_history_data', historyData);
-            }
-            if (data.clockLog) {
-                clockLog = data.clockLog;
-                storageSet('ff-clock-log', clockLog);
-            }
-            if (data.customQueue) {
-                customQueueOrder = data.customQueue;
-                storageSet('ff-custom-queue', customQueueOrder);
-            }
-            if (data.settings) {
-                appSettings = data.settings;
-                storageSet('ff-app-settings', appSettings);
-                applySettings();
-            }
-            if (data.headerClockZones) {
-                headerClockZones = data.headerClockZones;
-                storageSet('ff-header-clock-zones', headerClockZones);
-                populateHeaderClockSelects();
-            }
-            if (data.flowBlocksCompleted !== undefined) {
-                flowBlocksCompleted = data.flowBlocksCompleted;
-                localStorage.setItem('focus_daily_sessions', flowBlocksCompleted);
-            }
-            renderBoard();
-            renderDailyRecap();
-            renderEstimateLog();
-            renderClockCard();
+            if (data.boardData) { boardData = data.boardData; storageSet('focus_board_data', boardData); }
+            if (data.historyData) { historyData = data.historyData; storageSet('focus_history_data', historyData); }
+            if (data.clockLog) { clockLog = data.clockLog; storageSet('ff-clock-log', clockLog); }
+            if (data.clockState) { clockState = data.clockState; storageSet('ff-clock-state', clockState); }
+            if (data.customQueueOrder) { customQueueOrder = data.customQueueOrder; storageSet('ff-custom-queue', customQueueOrder); }
+            if (data.headerClockZones) { headerClockZones = data.headerClockZones; storageSet('ff-header-clock-zones', headerClockZones); populateHeaderClockSelects(); }
+            if (data.flowBlocksCompleted !== undefined) { flowBlocksCompleted = data.flowBlocksCompleted; localStorage.setItem('focus_daily_sessions', flowBlocksCompleted); }
+            if (data.appSettings) { appSettings = data.appSettings; storageSet('ff-app-settings', appSettings); applySettings(); }
+            if (data.taskTimeMemory) { storageSet('ff-task-time-memory', data.taskTimeMemory); }
+            renderBoard(); renderDailyRecap(); renderEstimateLog(); renderClockCard();
             alert('Import successful!');
-        } catch(err) {
-            alert('Invalid JSON file: ' + err.message);
-        }
+        } catch(err) { alert('Invalid JSON: '+err.message); }
     };
     reader.readAsText(file);
-    event.target.value = ''; // allow re-import same file
+    event.target.value = '';
 }
 
-function exportHistoryCSV() {
-    if (!historyData.length) { alert('No history to export.'); return; }
-    const headers = ['client','task','estimateMinutes','actualMinutes','breakMinutes','notes','completedAt'];
-    const rows = historyData.map(h => headers.map(key => `"${(h[key]||'').toString().replace(/"/g,'""')}"`).join(','));
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], {type: 'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `FocusFlow_History_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+// ---------- Re-estimate all tasks (AI) ----------
+async function reEstimateAllTasks() {
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) { alert('Add Gemini API key.'); return; }
+    const allOpenTasks = [];
+    boardData.forEach(col => col.tasks.forEach(t => { if (!t.completed) allOpenTasks.push(t); }));
+    if (allOpenTasks.length === 0) return;
+    if (!confirm(`Re-estimate ${allOpenTasks.length} task(s)?`)) return;
+    const prompt = `Estimate realistic minutes for these tasks as JSON array: [{"task":"<task text>","minutes":<num>}]. Tasks: ` + allOpenTasks.map(t=>`"${t.text}"`).join('; ');
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        const raw = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+        const estimates = JSON.parse(raw);
+        estimates.forEach(e => {
+            const task = allOpenTasks.find(t => t.text === e.task);
+            if (task) task.estimateMinutes = Math.max(1, e.minutes);
+        });
+        saveBoardData(); renderBoard();
+    } catch(e) { alert('AI error'); }
 }
 
-// ---------- Initialization ----------
-document.addEventListener('DOMContentLoaded', () => {
-    applySettings();
-    populateHeaderClockSelects();
-    updateClocks();
-    renderBoard();
-    renderDailyRecap();
-    renderEstimateLog();
-    renderClockCard();
-    setupMode();
-    // load API key if stored
+// ---------- Init ----------
+function initApp() {
+    applySettings(); updateClocks(); setInterval(updateClocks, 1000); setInterval(tickTracking, 1000);
+    $('mandatory-notes-toggle').checked = mandatoryNotes;
+    // Sync API key modal with footer
     const key = storageGet('gemini_api_key', '');
-    if (key && $('gemini-api-key')) $('gemini-api-key').value = key;
-    // set mandatory notes toggle
-    if ($('mandatory-notes-toggle')) $('mandatory-notes-toggle').checked = mandatoryNotes;
-    // set work/break inputs
-    if (workInput) workInput.value = Math.round(workDuration / 60);
-    if (breakInput) breakInput.value = Math.round(breakDuration / 60);
-    // start clock updates
-    setInterval(updateClocks, 1000);
-});
+    if ($('gemini-api-key')) $('gemini-api-key').value = key;
+    if ($('gemini-api-key-modal')) $('gemini-api-key-modal').value = key;
+    setFlowControlsVisible(false);
+    renderClockCard();
+    populateHeaderClockSelects(); populateTimezoneSelect();
+    renderBoard(); renderEstimateLog(); updateDisplay();
+    // Import stored queue
+    customQueueOrder = storageGet('ff-custom-queue', []);
+}
+function toggleMandatorySetting() { mandatoryNotes = $('mandatory-notes-toggle').checked; storageSet('focus_mandatory_notes', mandatoryNotes); }
+function saveApiKey(key) { storageSet('gemini_api_key', key); }
+function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
+function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, tag => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[tag]||tag)); }
+
+document.addEventListener('DOMContentLoaded', initApp);

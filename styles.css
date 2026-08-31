@@ -204,3 +204,105 @@ button:active { transform: scale(0.96); }
 .modal-box p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.2rem; }
 .modal-actions { display: flex; gap: 10px; }
 .modal-actions button { flex: 1; }
+/* --- Additional styles for new features --- */
+.internal-queue-container {
+    margin-top:1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--input-bg);
+    overflow: hidden;
+    text-align:left;
+}
+.queue-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--cherry-red);
+    background: var(--card-bg);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-color);
+    text-transform: uppercase;
+}
+.internal-queue {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 120px;
+    overflow-y: auto;
+}
+.internal-queue li {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: grab;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.internal-queue li:last-child { border-bottom: none; }
+.internal-queue li.dragging { opacity: 0.5; }
+
+.deadline-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 2px 4px;
+    border-radius: 4px;
+    color: white;
+    text-transform: uppercase;
+}
+.deadline-badge.red { background: var(--cherry-red); }
+.deadline-badge.amber { background: var(--amber); }
+
+.deadline-trigger-btn {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border: 1px solid var(--amber);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--amber);
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.deadline-label {
+    font-size: 0.7rem;
+    color: var(--text-color);
+    cursor: pointer;
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.ai-suggestion-banner {
+    font-size: 0.75rem;
+    background: var(--input-bg);
+    border: 1px dashed var(--cherry-red);
+    margin-bottom: 5px;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ai-suggestion-banner button {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+}
+.ai-batch-actions {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.ai-batch-actions button {
+    font-size: 0.65rem;
+    padding: 0.4rem 0.5rem;
+    flex: 1;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--cherry-red);
+}
+
+/* Break overlay enhancements */
+#break-away-time {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color);
+}
