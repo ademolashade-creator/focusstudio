@@ -34,7 +34,6 @@ function toggleFocusMode() {
     appSettings.focusMode = !appSettings.focusMode;
     storageSet('ff-app-settings', appSettings);
     if (appSettings.focusMode) {
-        // Request fullscreen and wake lock if not already
         if (document.documentElement.requestFullscreen) {
             document.documentElement.requestFullscreen().catch(() => {});
         }
@@ -79,7 +78,6 @@ function updateClocks() {
     if (estEl) estEl.textContent = now.toLocaleTimeString('en-US', { timeZone: headerClockZones[1], hour12: true });
     if (mstEl) mstEl.textContent = now.toLocaleTimeString('en-US', { timeZone: headerClockZones[2], hour12: true });
 
-    // Check if last day of month
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     if (now.getDate() === lastDay) {
         const banner = $('monthly-alert');
@@ -141,7 +139,7 @@ function rotateQuote() {
 function startQuoteRotation() {
     rotateQuote();
     if (quoteInterval) clearInterval(quoteInterval);
-    quoteInterval = setInterval(rotateQuote, 60 * 60 * 1000); // every hour
+    quoteInterval = setInterval(rotateQuote, 60 * 60 * 1000);
 }
 
 // ---------- Wake Lock ----------
@@ -164,14 +162,13 @@ let isWorkTime = true;
 let hasStartedOnce = false;
 let timerInterval = null;
 
-let timerMode = 'manual'; // 'manual' | 'flow'
+let timerMode = 'manual';
 let flowSegments = [];
 let flowSegIndex = 0;
 let flowExtraSeconds = 0;
 
 let flowBlocksCompleted = parseInt(localStorage.getItem('focus_daily_sessions')) || 0;
 
-// Break tracking (for actual break button)
 let breakTracker = { active: false, start: null, elapsedSeconds: 0, interval: null, isFlowBreak: false };
 
 const timeDisplay = $('time-display');
@@ -235,15 +232,12 @@ function addFiveMinutes() {
 // ---------- Actual Break Button ----------
 function toggleBreak() {
     if (breakTracker.active) {
-        // Resume from break
         resumeFromBreak();
     } else {
-        // Start break
         clearInterval(timerInterval);
         isRunning = false;
         releaseWakeLock();
         startPauseBtn.textContent = 'Paused';
-        // Store current timer state
         breakTracker.active = true;
         breakTracker.start = Date.now();
         breakTracker.elapsedSeconds = 0;
@@ -254,11 +248,6 @@ function toggleBreak() {
             breakTracker.elapsedSeconds = Math.floor((Date.now() - breakTracker.start) / 1000);
             $('break-away-time').textContent = formatMinSec(breakTracker.elapsedSeconds);
         }, 1000);
-        // Also pause any ongoing flow segment? We'll let the user resume later.
-        // If in flow, we pause it but don't log break as flow break.
-        if (timerMode === 'flow') {
-            // We'll treat this as a manual pause, not a flow break.
-        }
     }
 }
 
@@ -267,7 +256,6 @@ function resumeFromBreak() {
     $('break-overlay').style.display = 'none';
     const reason = $('break-reason-select').value;
     const durationMinutes = Math.max(1, Math.round(breakTracker.elapsedSeconds / 60));
-    // Log break to history? We'll store in a separate break log.
     const breakLog = storageGet('ff-break-log', []);
     breakLog.unshift({
         date: new Date().toISOString(),
@@ -278,7 +266,6 @@ function resumeFromBreak() {
     if (breakLog.length > 100) breakLog.pop();
     storageSet('ff-break-log', breakLog);
     breakTracker.active = false;
-    // Resume timer
     if (!isRunning) {
         hasStartedOnce = true;
         startPauseBtn.textContent = 'Pause';
@@ -290,7 +277,6 @@ function resumeFromBreak() {
     renderDailyRecap();
 }
 
-// Flow break (pause during flow work segment)
 function initiateFlowBreakOverlay() {
     clearInterval(timerInterval);
     isRunning = false;
@@ -313,7 +299,6 @@ function resumeFromFlowBreak() {
     $('flow-break-overlay').style.display = 'none';
     const reason = $('flow-break-reason-select').value;
     const durationMinutes = Math.max(1, Math.round(breakTracker.elapsedSeconds / 60));
-    // Log to task breaks
     const seg = currentFlowSegment();
     if (seg && seg.type === 'work') {
         const task = seg.entry.task;
@@ -327,7 +312,6 @@ function resumeFromFlowBreak() {
         renderDailyRecap();
     }
     breakTracker.active = false;
-    // Resume
     hasStartedOnce = true;
     startPauseBtn.textContent = 'Pause';
     isRunning = true;
@@ -338,11 +322,9 @@ function resumeFromFlowBreak() {
 // ---------- Timer core ----------
 function toggleTimer() {
     if (isRunning) {
-        // Pause -> if in flow work, trigger flow break overlay
         if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
             initiateFlowBreakOverlay();
         } else {
-            // Normal pause
             clearInterval(timerInterval);
             isRunning = false;
             releaseWakeLock();
@@ -350,13 +332,11 @@ function toggleTimer() {
             updateDisplay();
         }
     } else {
-        // Resume
         hasStartedOnce = true;
         startPauseBtn.textContent = 'Pause';
         isRunning = true;
         requestWakeLock();
         timerInterval = setInterval(runTick, 1000);
-        // If flow and work, log start
         if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
             let task = currentFlowSegment().entry.task;
             if (!task.startedAtIso) {
@@ -414,7 +394,7 @@ function setupMode() {
 function resetTimer() { hasStartedOnce = false; timerMode = 'manual'; setFlowControlsVisible(false); isWorkTime = true; setupMode(); }
 function updateSettings() { if (!isRunning) { setupMode(); updateAdaptiveHacks(); } }
 
-// ---------- Auto Flow: Internal Queue with manual reorder ----------
+// ---------- Auto Flow: Internal Queue ----------
 let customQueueOrder = storageGet('ff-custom-queue', []);
 
 function setFlowControlsVisible(active) {
@@ -451,7 +431,6 @@ function getPrioritizedOpenTasks() {
         });
     });
 
-    // Sort by custom order if exists, else by deadline, then column order
     openEntries.sort((a, b) => {
         const idxA = customQueueOrder.indexOf(a.task.id);
         const idxB = customQueueOrder.indexOf(b.task.id);
@@ -459,7 +438,6 @@ function getPrioritizedOpenTasks() {
         if (idxA !== -1) return -1;
         if (idxB !== -1) return 1;
 
-        // Deadline priority
         if (a.task.deadlineTime && !b.task.deadlineTime) return -1;
         if (!a.task.deadlineTime && b.task.deadlineTime) return 1;
         if (a.task.deadlineTime && b.task.deadlineTime) {
@@ -471,9 +449,7 @@ function getPrioritizedOpenTasks() {
     return openEntries;
 }
 
-// Drag-and-drop for internal queue
 let queueDragTaskId = null;
-
 function queueDragStart(e, taskId) {
     queueDragTaskId = taskId;
     e.dataTransfer.effectAllowed = "move";
@@ -556,7 +532,6 @@ function buildFlowSegments() {
 
 function startFlow() {
     if (appSettings.focusMode) {
-        // Request fullscreen and wake lock
         if (document.documentElement.requestFullscreen) {
             document.documentElement.requestFullscreen().catch(() => {});
         }
@@ -744,7 +719,6 @@ function toggleClock() {
         if (clockLog.length > 30) clockLog.pop();
         clockState = { clockedIn: false, startedAt: null };
         storageSet('ff-clock-log', clockLog);
-        // Ask for daily check-out brief
         if (confirm("Clocked Out. Generate a Daily Check-Out Brief based on today's logs?")) {
             generateDailyCheckOut();
         }
@@ -768,9 +742,8 @@ function renderClockCard() {
     renderDailyRecap();
 }
 
-// ---------- Task board & Schema Migration ----------
+// ---------- Task board & Schema ----------
 let mandatoryNotes = storageGet('focus_mandatory_notes', false);
-
 const defaultColumns = [
     { id: 1, title: 'Client A / Priority 1', tasks: [] },
     { id: 2, title: 'Client B / Priority 2', tasks: [] },
@@ -779,6 +752,7 @@ const defaultColumns = [
 
 let boardData = storageGet('focus_board_data', defaultColumns);
 let historyData = storageGet('focus_history_data', []);
+let taskTimeMemory = storageGet('ff-task-time-memory', {});
 
 function getTodayKey() {
     const d = new Date();
@@ -799,14 +773,12 @@ function formatDateKey(dateKey) {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// Midnight adjustment: move incomplete tasks to new day
 function adjustTasksForMidnight() {
     const today = getTodayKey();
     let changed = false;
     boardData.forEach(col => {
         col.tasks.forEach(task => {
             if (!task.completed && task.dateAdded !== today) {
-                // If task is from previous day, update dateAdded to today
                 task.dateAdded = today;
                 changed = true;
             }
@@ -818,7 +790,6 @@ function adjustTasksForMidnight() {
     }
 }
 
-// Migration to Enterprise Schema
 boardData.forEach(col => {
     if (col.collapsed === undefined) col.collapsed = false;
     col.tasks.forEach(t => {
@@ -834,8 +805,8 @@ boardData.forEach(col => {
         if (t.startedAtIso === undefined) t.startedAtIso = null;
         if (t.completedAtIso === undefined) t.completedAtIso = null;
         if (t.googleLink === undefined) t.googleLink = '';
-        if (t.parentId === undefined) t.parentId = null; // for subtasks
-        if (t.subtasks === undefined) t.subtasks = []; // child task ids
+        if (t.parentId === undefined) t.parentId = null;
+        if (t.subtasks === undefined) t.subtasks = [];
     });
 });
 saveBoardData();
@@ -869,9 +840,7 @@ function formatMinSec(totalSeconds) {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-// Collapsible date groups
 let _toggledDateGroups = {};
-
 function groupTasksByDate(tasks) {
     const groups = {};
     tasks.forEach((task, originalIndex) => {
@@ -888,7 +857,6 @@ function groupTasksByDate(tasks) {
     return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map((key) => {
         let isCollapsed = (key !== today && key !== yesterday);
         if (_toggledDateGroups[key] !== undefined) isCollapsed = _toggledDateGroups[key];
-
         return {
             dateKey: key,
             dateLabel: formatDateKey(key),
@@ -903,26 +871,21 @@ function toggleDateGroup(key) {
     const yesterday = getYesterdayKey();
     let isCurrentlyCollapsed = (key !== today && key !== yesterday);
     if (_toggledDateGroups[key] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[key];
-
     _toggledDateGroups[key] = !isCurrentlyCollapsed;
     renderBoard();
 }
 
-// Autosuggest for task input
-let autosuggestTimeout = null;
+// Autosuggest
 function setupAutosuggest(inputElement) {
     if (!inputElement) return;
     inputElement.addEventListener('input', function(e) {
         clearTimeout(autosuggestTimeout);
         const val = this.value.trim();
         if (val.length < 2) return;
-        // Find matching task names from all columns
         const allTaskNames = [];
         boardData.forEach(col => col.tasks.forEach(t => allTaskNames.push(t.text)));
         const matches = allTaskNames.filter(name => name.toLowerCase().startsWith(val.toLowerCase()) && name !== val);
         if (matches.length > 0) {
-            // Show suggestion in a small dropdown or simply fill on space?
-            // We'll use datalist approach: create datalist and set list attribute
             let datalist = document.getElementById('autosuggest-datalist');
             if (!datalist) {
                 datalist = document.createElement('datalist');
@@ -935,14 +898,8 @@ function setupAutosuggest(inputElement) {
             inputElement.removeAttribute('list');
         }
     });
-    // On space bar, if suggestion exists, fill
-    inputElement.addEventListener('keydown', function(e) {
-        if (e.key === ' ' && this.getAttribute('list')) {
-            // We'll allow default behavior but we could fill the first suggestion
-            // Actually we rely on datalist's autocomplete; user can press Enter to select.
-        }
-    });
 }
+let autosuggestTimeout;
 
 // ---------- Render Board ----------
 function renderBoard() {
@@ -1050,7 +1007,6 @@ function renderBoard() {
             </div>
         `;
         container.appendChild(columnEl);
-        // Setup autosuggest on the task input
         const input = $(`task-input-${colIndex}`);
         if (input) setupAutosuggest(input);
     });
@@ -1060,7 +1016,6 @@ function renderBoard() {
     updateStreaksAndBadges();
 }
 
-// Drag & Drop for tasks
 let dragContext = null;
 function dragStart(e, ci, ti) {
     dragContext = { ci, ti };
@@ -1117,7 +1072,6 @@ function deleteColumn(ci) {
     boardData.splice(ci, 1); saveBoardData(); renderBoard();
 }
 
-// Deadline prompt
 function promptDeadline(ci, ti) {
     const task = boardData[ci].tasks[ti];
     const input = document.createElement('input');
@@ -1136,6 +1090,49 @@ function promptDeadline(ci, ti) {
     input.focus();
 }
 
+// ---------- Estimate helpers (memory + AI) ----------
+function normalizeTaskName(text) {
+    return text.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+function getTaskEstimateFromMemory(taskText) {
+    const key = normalizeTaskName(taskText);
+    const entry = taskTimeMemory[key];
+    return entry ? Math.round(entry.total / entry.count) : null;
+}
+async function getTaskEstimateFromAI(taskText, notes) {
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) return null;
+    const prompt = `Estimate realistic minutes for this task: "${taskText}" Notes: "${notes || 'none'}" Respond with ONLY a number.`;
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const num = parseInt(raw.match(/\d+/)?.[0]);
+        return num ? Math.max(1, num) : null;
+    } catch(e) { return null; }
+}
+async function estimateTask(task) {
+    let est = getTaskEstimateFromMemory(task.text);
+    if (est) {
+        task.estimateMinutes = est;
+        saveBoardData();
+        renderBoard();
+        return;
+    }
+    est = await getTaskEstimateFromAI(task.text, task.notes);
+    if (est) {
+        task.estimateMinutes = est;
+        saveBoardData();
+        renderBoard();
+    }
+}
+
+// ---------- Add task (single) ----------
 function addTask(ci) {
     const input = $(`task-input-${ci}`);
     const estInput = $(`task-est-${ci}`);
@@ -1143,21 +1140,28 @@ function addTask(ci) {
     if (!text) return;
     if (mandatoryNotes) alert("Mandatory Extra Info is enabled. Please add notes via Details.");
 
-    boardData[ci].tasks.push({
+    const estimate = parseInt(estInput.value) || 15;
+    const task = {
         id: 't_' + Math.random().toString(36).substr(2,9),
         text: text,
-        estimateMinutes: parseInt(estInput.value) || 15,
+        estimateMinutes: estimate,
         trackedSeconds: 0, isTracking: false, notes: '',
         completed: false, completedAt: null, dateAdded: getTodayKey(),
         breaks: [], timeSegments: [], deadlineTime: null, googleLink: '',
         startedAtIso: null, completedAtIso: null,
         parentId: null, subtasks: []
-    });
+    };
+    boardData[ci].tasks.push(task);
     input.value = '';
-    saveBoardData(); renderBoard();
+    saveBoardData();
+    renderBoard();
+
+    if (estimate <= 15) {
+        estimateTask(task);
+    }
 }
 
-// Bulk paste parser (removes time from task name)
+// ---------- Bulk paste ----------
 function parseTimeFromLine(line) {
     const re = /(\d+(?:\.\d+)?)\s*(hours|hour|hrs|hr|minutes|minute|mins|min|seconds|second|secs|sec)\b/i;
     const match = line.match(re);
@@ -1175,7 +1179,6 @@ function parseTimeFromLine(line) {
         .trim();
     return { text: cleanText || line.trim(), minutes };
 }
-
 function addPastedTasks(ci) {
     const textarea = $(`paste-box-${ci}`);
     const lines = textarea.value.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -1195,7 +1198,15 @@ function addPastedTasks(ci) {
     });
 
     boardData[ci].tasks.push(...newTasks);
-    textarea.value = ''; saveBoardData(); renderBoard();
+    textarea.value = '';
+    saveBoardData();
+    renderBoard();
+
+    newTasks.forEach(task => {
+        if (task.estimateMinutes <= 15) {
+            estimateTask(task);
+        }
+    });
 }
 
 function updateTaskText(ci, ti, v) { boardData[ci].tasks[ti].text = v.trim() || 'Untitled task'; saveBoardData(); }
@@ -1228,11 +1239,10 @@ function moveTask(ci, ti, dir) {
     }
 }
 
-// ---------- AI functions (with em-dash cleanup) ----------
+// ---------- AI Functions (with em-dash cleanup) ----------
 function cleanEmDashes(text) {
     return text.replace(/[\u2014\u2013]|--/g, ', ');
 }
-
 async function callGemini(promptText) {
     const apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) throw new Error('API key missing');
@@ -1350,7 +1360,6 @@ function dismissAISuggestion(ci, sIdx) {
     saveBoardData(); renderBoard();
 }
 
-// Generate Daily Check-In per column
 async function generateColumnCheckIn(ci) {
     const summaryBox = $('summary-content');
     summaryBox.textContent = `Generating daily check-in for ${boardData[ci].title}...`;
@@ -1368,7 +1377,6 @@ async function generateColumnCheckIn(ci) {
     }
 }
 
-// Generate Daily Check-Out (after clock out)
 async function generateDailyCheckOut() {
     const summaryBox = $('summary-content');
     summaryBox.textContent = 'Generating check-out brief...';
@@ -1383,7 +1391,6 @@ async function generateDailyCheckOut() {
     }
 }
 
-// Monthly report
 async function generateAISummary(silent) {
     const summaryBox = $('summary-content');
     if (!silent) summaryBox.textContent = 'Generating monthly report...';
@@ -1396,7 +1403,6 @@ async function generateAISummary(silent) {
         if (!silent) summaryBox.textContent = 'Error: ' + e.message;
     }
 }
-
 function maybeAutoGenerateSummary() {
     const now = new Date();
     const marker = `${now.getFullYear()}-${now.getMonth()}`;
@@ -1449,7 +1455,6 @@ async function suggestTimeFromDetails() {
     } catch(e) { alert('AI error'); }
 }
 
-// Task Breakdown (AI)
 async function breakdownTask() {
     if (!openDetailsRef) return;
     const { ci, ti } = openDetailsRef;
@@ -1466,7 +1471,6 @@ async function breakdownTask() {
         const raw = data.candidates[0].content.parts[0].text;
         const cleaned = raw.replace(/```json|```/g, '').trim();
         const subtasks = JSON.parse(cleaned);
-        // Create subtasks in the same column
         subtasks.forEach(st => {
             boardData[ci].tasks.push({
                 id: 't_' + Math.random().toString(36).substr(2,9),
@@ -1480,8 +1484,6 @@ async function breakdownTask() {
                 parentId: task.id, subtasks: []
             });
         });
-        // Mark original task as completed? Optionally we can keep it as parent.
-        // We'll leave it but you can delete it manually.
         saveBoardData();
         renderBoard();
         closeDetailsModal();
@@ -1495,27 +1497,22 @@ function updateStreaksAndBadges() {
     const badgesEl = document.getElementById('badges-display');
     if (!streakEl || !badgesEl) return;
 
-    // Calculate streak
     let streak = 0;
     const today = new Date();
     let checkDate = new Date(today);
-    // Get completed tasks per day from historyData
     const completionDays = new Set();
     historyData.forEach(h => {
         const d = new Date(h.completedAt);
         const key = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
         completionDays.add(key);
     });
-    // Count consecutive days (skip weekends)
     while (true) {
         const year = checkDate.getFullYear();
         const month = checkDate.getMonth() + 1;
         const day = checkDate.getDate();
         const key = `${year}-${month}-${day}`;
-        // Skip weekends
         const dow = checkDate.getDay();
         if (dow === 0 || dow === 6) {
-            // Weekend: move to previous day and continue without breaking streak
             checkDate.setDate(checkDate.getDate() - 1);
             continue;
         }
@@ -1526,28 +1523,20 @@ function updateStreaksAndBadges() {
             break;
         }
     }
-    // If today has no tasks yet, but yesterday had, streak is 0? Actually we want to count consecutive days with at least one task.
-    // We started from today; if today has task, good. If not, we check yesterday and so on.
-    // Our logic above already handles: it checks today, if not, breaks, so streak is 0 if no task today.
-    // However, we want to allow today's tasks to count, so we already check.
 
-    // Badges
     const totalCompleted = historyData.length;
     let badges = [];
     if (totalCompleted >= 1) badges.push('🌟 First Task');
     if (totalCompleted >= 10) badges.push('🚀 10 Tasks');
     if (totalCompleted >= 50) badges.push('💪 50 Tasks');
     if (totalCompleted >= 100) badges.push('🏆 100 Tasks');
-    // Estimate accuracy badge
     const withBoth = historyData.filter(h => h.estimateMinutes && h.actualMinutes);
     if (withBoth.length >= 10) {
         const totalDiff = withBoth.reduce((a, h) => a + (h.actualMinutes - h.estimateMinutes), 0);
         const avgDiff = totalDiff / withBoth.length;
         if (Math.abs(avgDiff) < 2) badges.push('🎯 Accuracy Pro');
     }
-    // Flow sessions
     if (flowBlocksCompleted >= 5) badges.push('⚡ Flow Master');
-    // Streak badge
     if (streak >= 7) badges.push('🔥 Streak 7+');
     if (streak >= 30) badges.push('🌟 Streak 30+');
 
@@ -1610,7 +1599,6 @@ function toggleAmbientSound() {
     }
     createAmbientSound(type);
 }
-
 function changeAmbientSound(value) {
     ambientType = value;
     if (value === 'off') {
@@ -1619,6 +1607,7 @@ function changeAmbientSound(value) {
     } else {
         createAmbientSound(value);
     }
+    storageSet('ff-ambient-sound', value);
 }
 
 // ---------- Keyboard Shortcuts ----------
@@ -1629,7 +1618,6 @@ document.addEventListener('keydown', function(e) {
             case 'r': resetTimer(); e.preventDefault(); break;
             case 'f': startFlow(); e.preventDefault(); break;
             case 'a': {
-                // Add task in first visible column? We'll focus the input of the first column
                 const firstInput = document.querySelector('.task-input');
                 if (firstInput) firstInput.focus();
                 e.preventDefault();
@@ -1641,6 +1629,76 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+
+// ---------- Start AI Flow ----------
+async function startAIFlow() {
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) { alert('Add Gemini API key first.'); return; }
+
+    // Gather all open tasks
+    const openTasks = [];
+    boardData.forEach((col, ci) => {
+        col.tasks.forEach((task, ti) => {
+            if (!task.completed) {
+                openTasks.push({
+                    id: task.id,
+                    text: task.text,
+                    estimate: task.estimateMinutes,
+                    deadline: task.deadlineTime,
+                    column: col.title,
+                    notes: task.notes || ''
+                });
+            }
+        });
+    });
+    if (openTasks.length === 0) { alert('No open tasks to order.'); return; }
+
+    // First, ensure all tasks have reasonable estimates (if missing)
+    let needsEstimate = openTasks.filter(t => t.estimate <= 5);
+    for (let t of needsEstimate) {
+        const found = boardData.flatMap(col => col.tasks).find(task => task.id === t.id);
+        if (found) await estimateTask(found);
+    }
+
+    // Re-fetch open tasks after estimate updates
+    const updatedOpen = [];
+    boardData.forEach(col => {
+        col.tasks.forEach(task => {
+            if (!task.completed) {
+                updatedOpen.push({
+                    id: task.id,
+                    text: task.text,
+                    estimate: task.estimateMinutes,
+                    deadline: task.deadlineTime,
+                    column: col.title
+                });
+            }
+        });
+    });
+
+    // Build prompt for ordering
+    const prompt = `You are a productivity expert. Given these tasks, suggest the most efficient order to work on them. Consider deadlines (if any), task type, logical dependencies, and typical energy patterns. Return ONLY a JSON array of task IDs in the order they should be done. Tasks: ${JSON.stringify(updatedOpen)}`;
+
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await res.json();
+        const raw = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+        const orderedIds = JSON.parse(raw);
+
+        // Update customQueueOrder
+        customQueueOrder = orderedIds;
+        storageSet('ff-custom-queue', customQueueOrder);
+
+        // Start the flow
+        startFlow();
+    } catch(e) {
+        alert('AI Flow error: ' + e.message);
+    }
+}
 
 // ---------- Re-estimate all tasks (AI) ----------
 async function reEstimateAllTasks() {
@@ -1699,9 +1757,7 @@ function renderDailyRecap() {
     boardData.forEach((col) => col.tasks.forEach((t) => { if (t.dateAdded === todayKey && !t.completed) openFromToday++; }));
     let clockedMinutesToday = clockLog.filter((c) => c.date === todayDateStr).reduce((a, c) => a + c.durationMinutes, 0);
     if (clockState.clockedIn) clockedMinutesToday += Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
-
     let breakMinutesToday = todaysHistory.reduce((a, h) => a + (h.breakMinutes || 0), 0);
-    // Also add breaks from break log
     const breakLog = storageGet('ff-break-log', []);
     const todayBreaks = breakLog.filter(b => new Date(b.date).toLocaleDateString() === todayDateStr);
     breakMinutesToday += todayBreaks.reduce((a, b) => a + b.durationMinutes, 0);
@@ -1769,7 +1825,6 @@ function renderTimeCounter() {
         <p style="font-weight:700;">All done by ${formatTimeInZone(grandDone, tz)} (${tz})</p>`;
 }
 
-// Tick tracking for stopwatch
 let trackTickCount = 0;
 function tickTracking() {
     let anyTracking = false;
@@ -1812,8 +1867,7 @@ function updateAdaptiveHacks() {
 function exportAllDataJSON() {
     const data = {
         appSettings, boardData, historyData, clockLog, clockState,
-        flowBlocksCompleted, taskTimeMemory: storageGet('ff-task-time-memory', {}),
-        customQueueOrder, headerClockZones
+        flowBlocksCompleted, taskTimeMemory, customQueueOrder, headerClockZones
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `focus-flow-backup-${getTodayKey()}.json`; a.click();
@@ -1840,7 +1894,7 @@ function importAllDataJSON(event) {
             if (data.headerClockZones) { headerClockZones = data.headerClockZones; storageSet('ff-header-clock-zones', headerClockZones); populateHeaderClockSelects(); }
             if (data.flowBlocksCompleted !== undefined) { flowBlocksCompleted = data.flowBlocksCompleted; localStorage.setItem('focus_daily_sessions', flowBlocksCompleted); }
             if (data.appSettings) { appSettings = data.appSettings; storageSet('ff-app-settings', appSettings); applySettings(); }
-            if (data.taskTimeMemory) { storageSet('ff-task-time-memory', data.taskTimeMemory); }
+            if (data.taskTimeMemory) { taskTimeMemory = data.taskTimeMemory; storageSet('ff-task-time-memory', taskTimeMemory); }
             renderBoard(); renderDailyRecap(); renderEstimateLog(); renderClockCard();
             alert('Import successful!');
         } catch(err) { alert('Invalid JSON: '+err.message); }
@@ -1855,7 +1909,6 @@ function initApp() {
     updateClocks();
     setInterval(updateClocks, 1000);
     setInterval(tickTracking, 1000);
-    // Check for midnight adjustment every minute
     setInterval(() => {
         const now = new Date();
         if (now.getHours() === 0 && now.getMinutes() === 0) {
@@ -1863,12 +1916,10 @@ function initApp() {
         }
     }, 60000);
 
-    // Load settings
     $('mandatory-notes-toggle').checked = mandatoryNotes;
     const key = storageGet('gemini_api_key', '');
     if ($('gemini-api-key')) $('gemini-api-key').value = key;
     if ($('gemini-api-key-modal')) $('gemini-api-key-modal').value = key;
-    // Focus mode toggle
     const fm = $('focus-mode-toggle');
     if (fm) fm.checked = !!appSettings.focusMode;
 
@@ -1881,15 +1932,12 @@ function initApp() {
     updateDisplay();
     startQuoteRotation();
 
-    // Load ambient sound preference
     const soundSel = $('ambient-sound-select');
     if (soundSel) {
         const saved = storageGet('ff-ambient-sound', 'off');
         soundSel.value = saved;
         if (saved !== 'off') createAmbientSound(saved);
     }
-
-    // Load break log for recap
     renderDailyRecap();
 }
 
@@ -1897,5 +1945,82 @@ function toggleMandatorySetting() { mandatoryNotes = $('mandatory-notes-toggle')
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, tag => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[tag]||tag)); }
+
+// ---------- Task callbacks ----------
+function toggleTrack(ci, ti) {
+    boardData[ci].tasks[ti].isTracking = !boardData[ci].tasks[ti].isTracking;
+    if (boardData[ci].tasks[ti].isTracking && !boardData[ci].tasks[ti].startedAtIso) {
+        boardData[ci].tasks[ti].startedAtIso = new Date().toISOString();
+    }
+    saveBoardData(); renderBoard();
+}
+
+let pendingCompletion = null;
+function toggleTask(ci, ti) {
+    const task = boardData[ci].tasks[ti];
+    if (task.completed) {
+        task.completed = false; task.completedAt = null; task.completedAtIso = null;
+        if (task._historyId) {
+            const idx = historyData.findIndex((h) => h._id === task._historyId);
+            if (idx !== -1) historyData.splice(idx, 1);
+            task._historyId = null;
+        }
+        saveBoardData(); renderBoard(); renderEstimateLog();
+        return;
+    }
+    if (mandatoryNotes && (!task.notes || task.notes.trim() === '')) {
+        alert("Mandatory Extra Info is ON! Add notes via Details first.");
+        renderBoard(); return;
+    }
+    if (task.trackedSeconds === 0) {
+        pendingCompletion = { colIndex: ci, taskIndex: ti };
+        $('completion-task-name').textContent = task.text;
+        $('completion-actual-input').value = task.estimateMinutes;
+        $('completion-overlay').style.display = 'flex';
+        return;
+    }
+    finalizeTaskCompletion(ci, ti, task.trackedSeconds);
+}
+function confirmCompletion() {
+    if (!pendingCompletion) return;
+    const { colIndex, taskIndex } = pendingCompletion;
+    const task = boardData[colIndex].tasks[taskIndex];
+    const minutes = Math.max(1, parseInt($('completion-actual-input').value) || task.estimateMinutes);
+    finalizeTaskCompletion(colIndex, taskIndex, minutes * 60);
+    pendingCompletion = null;
+    $('completion-overlay').style.display = 'none';
+}
+function cancelCompletion() { pendingCompletion = null; $('completion-overlay').style.display = 'none'; renderBoard(); }
+function finalizeTaskCompletion(ci, ti, actualSeconds) {
+    const task = boardData[ci].tasks[ti];
+    task.completed = true; task.isTracking = false; task.trackedSeconds = actualSeconds;
+    task.completedAt = Date.now(); task.completedAtIso = new Date().toISOString();
+    if(task.startedAtIso) task.timeSegments.push({start: task.startedAtIso, end: task.completedAtIso});
+
+    const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    task._historyId = historyId;
+    const totalBreaks = task.breaks.reduce((acc, b) => acc + (b.durationMinutes || 0), 0);
+    let breaksStr = task.breaks.length ? `[Breaks: ${task.breaks.map(b=>b.reason).join(', ')}] ` : '';
+    historyData.unshift({
+        _id: historyId, client: boardData[ci].title, task: task.text,
+        estimateMinutes: task.estimateMinutes, actualMinutes: Math.round(actualSeconds / 60),
+        breakMinutes: totalBreaks,
+        notes: breaksStr + (task.notes || 'No notes'), completedAt: task.completedAtIso
+    });
+    if (historyData.length > 500) historyData.pop();
+    rememberTaskTime(task.text, Math.round(actualSeconds / 60));
+    saveBoardData(); renderBoard(); renderEstimateLog(); renderDailyRecap(); renderInternalQueue();
+}
+function deleteTask(ci, ti) { boardData[ci].tasks.splice(ti, 1); saveBoardData(); renderBoard(); renderInternalQueue(); }
+
+function rememberTaskTime(text, minutes) {
+    const key = normalizeTaskName(text);
+    if (!key) return;
+    const entry = taskTimeMemory[key] || { total: 0, count: 0 };
+    entry.total += minutes;
+    entry.count += 1;
+    taskTimeMemory[key] = entry;
+    storageSet('ff-task-time-memory', taskTimeMemory);
+}
 
 document.addEventListener('DOMContentLoaded', initApp);
