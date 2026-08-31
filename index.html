@@ -61,7 +61,7 @@
                     <button id="reset-btn" onclick="resetTimer()">Restart</button>
                     <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
                     <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes">+5 min</button>
-                    <!-- SINGLE SKIP BUTTON – visible and accessible -->
+                    <!-- SKIP BUTTON – right here -->
                     <button class="btn-secondary" onclick="skipCurrentSegment()" title="Skip current work/break segment">⏭ Skip</button>
                 </div>
 
@@ -72,7 +72,6 @@
 
                 <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
                 <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
-                <!-- Removed the duplicate skip button from here -->
 
                 <div class="settings compact">
                     <div class="setting-row">
@@ -183,7 +182,7 @@
         </details>
     </div>
 
-    <!-- Modals (unchanged) -->
+    <!-- Modals -->
     <div class="modal-overlay" id="break-overlay">
         <div class="modal-box">
             <h2 style="color:var(--cherry-red);margin-top:0;">☕ Break Time</h2>

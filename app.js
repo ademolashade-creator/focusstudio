@@ -54,13 +54,11 @@ function populateHeaderClockSelects() {
     try { zones = Intl.supportedValuesOf('timeZone'); }
     catch (e) { zones = ['UTC', 'Africa/Lagos', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Australia/Sydney']; }
 
-    // Populate datalist for search
     const datalist = document.getElementById('tz-datalist');
     if (datalist) {
         datalist.innerHTML = zones.map(z => `<option value="${z}">`).join('');
     }
 
-    // Set initial values
     ['clock-tz-search-1', 'clock-tz-search-2', 'clock-tz-search-3'].forEach((id, i) => {
         const input = $(id);
         if (input) {
@@ -654,18 +652,61 @@ function finishFlow() {
     announce('Flow complete. Nice work.');
 }
 
-function skipFlowSegment() {
-    if (timerMode !== 'flow') return;
-    const seg = currentFlowSegment();
-    if (seg && seg.type === 'work') {
-        const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
-        seg.entry.actualSecondsSoFar += elapsed;
-        completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
-    } else if (seg && seg.type === 'break') {
-        // just skip
+// ============================================================
+// SKIP SEGMENT – FIXED
+// ============================================================
+function skipCurrentSegment() {
+    console.log('Skip button clicked - timerMode:', timerMode, 'isWorkTime:', isWorkTime);
+    
+    // --- FLOW MODE ---
+    if (timerMode === 'flow') {
+        const seg = currentFlowSegment();
+        if (!seg) {
+            console.warn('No current flow segment');
+            return;
+        }
+        
+        console.log('Skipping flow segment:', seg);
+        
+        if (seg.type === 'work') {
+            // Log time spent on this work segment
+            const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
+            seg.entry.actualSecondsSoFar += elapsed;
+            console.log('Logged work time:', elapsed, 'seconds');
+            
+            // Complete the task if it's the last chunk
+            if (seg.isLastChunk) {
+                completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
+            } else {
+                seg.entry.task.trackedSeconds = seg.entry.actualSecondsSoFar;
+                saveBoardData();
+            }
+        } else {
+            // Break segment – just skip it
+            console.log('Skipping break segment');
+        }
+        
+        // Advance to next segment
+        flowSegIndex++;
+        beginFlowSegment();
+        return;
     }
-    flowSegIndex++;
-    beginFlowSegment();
+    
+    // --- MANUAL MODE (Pomodoro) ---
+    if (isWorkTime) {
+        console.log('Skipping work session');
+        recordFlowBlockCompleted();
+        playSound();
+        isWorkTime = false;
+        setupMode();
+        console.log('Switched to break mode');
+    } else {
+        console.log('Skipping break session');
+        playSound();
+        isWorkTime = true;
+        setupMode();
+        console.log('Switched to work mode');
+    }
 }
 
 // ---------- Stop / End Session ----------
@@ -1551,26 +1592,75 @@ function updateStreaksAndBadges() {
     }
 
     const totalCompleted = historyData.length;
-    let badges = [];
-    if (totalCompleted >= 1) badges.push('🌟 First Task');
-    if (totalCompleted >= 10) badges.push('🚀 10 Tasks');
-    if (totalCompleted >= 50) badges.push('💪 50 Tasks');
-    if (totalCompleted >= 100) badges.push('🏆 100 Tasks');
-    const withBoth = historyData.filter(h => h.estimateMinutes && h.actualMinutes);
-    if (withBoth.length >= 10) {
-        const totalDiff = withBoth.reduce((a, h) => a + (h.actualMinutes - h.estimateMinutes), 0);
-        const avgDiff = totalDiff / withBoth.length;
-        if (Math.abs(avgDiff) < 2) badges.push('🎯 Accuracy Pro');
+    const badges = [];
+    const badgeDefinitions = [
+        { id: 'first', label: 'First Task', icon: '🌟', condition: totalCompleted >= 1, desc: 'Completed your first task.' },
+        { id: 'ten', label: '10 Tasks', icon: '🚀', condition: totalCompleted >= 10, desc: 'Finished 10 tasks total.' },
+        { id: 'fifty', label: '50 Tasks', icon: '💪', condition: totalCompleted >= 50, desc: 'Reached 50 completed tasks.' },
+        { id: 'hundred', label: '100 Tasks', icon: '🏆', condition: totalCompleted >= 100, desc: 'A century of tasks – outstanding!' },
+        { id: 'accuracy', label: 'Accuracy Pro', icon: '🎯', condition: (() => {
+            const withBoth = historyData.filter(h => h.estimateMinutes && h.actualMinutes);
+            if (withBoth.length < 10) return false;
+            const totalDiff = withBoth.reduce((a, h) => a + (h.actualMinutes - h.estimateMinutes), 0);
+            const avgDiff = totalDiff / withBoth.length;
+            return Math.abs(avgDiff) < 2;
+        })(), desc: 'Average estimate error under 2 minutes across 10+ tasks.' },
+        { id: 'flowmaster', label: 'Flow Master', icon: '⚡', condition: flowBlocksCompleted >= 5, desc: 'Completed 5 flow sessions.' },
+        { id: 'streak7', label: '7-Day Streak', icon: '🔥', condition: streak >= 7, desc: 'Worked 7 days in a row (weekends skipped).' },
+        { id: 'streak30', label: '30-Day Streak', icon: '🌟', condition: streak >= 30, desc: 'A whole month of consistent work!' }
+    ];
+
+    const earned = badgeDefinitions.filter(b => b.condition);
+    let nextBadge = badgeDefinitions.find(b => !b.condition);
+    let progress = 0;
+    let progressMax = 0;
+    if (nextBadge) {
+        if (nextBadge.id === 'ten') { progress = totalCompleted; progressMax = 10; }
+        else if (nextBadge.id === 'fifty') { progress = totalCompleted; progressMax = 50; }
+        else if (nextBadge.id === 'hundred') { progress = totalCompleted; progressMax = 100; }
+        else if (nextBadge.id === 'accuracy') {
+            const withBoth = historyData.filter(h => h.estimateMinutes && h.actualMinutes);
+            progress = withBoth.length;
+            progressMax = 10;
+        }
+        else if (nextBadge.id === 'flowmaster') { progress = flowBlocksCompleted; progressMax = 5; }
+        else if (nextBadge.id === 'streak7') { progress = streak; progressMax = 7; }
+        else if (nextBadge.id === 'streak30') { progress = streak; progressMax = 30; }
+        else if (nextBadge.id === 'first') { progress = totalCompleted; progressMax = 1; }
+        progress = Math.min(progress, progressMax);
     }
-    if (flowBlocksCompleted >= 5) badges.push('⚡ Flow Master');
-    if (streak >= 7) badges.push('🔥 Streak 7+');
-    if (streak >= 30) badges.push('🌟 Streak 30+');
 
     streakEl.textContent = `🔥 Streak: ${streak} day${streak!==1?'s':''}`;
-    badgesEl.textContent = `🏆 Badges: ${badges.length ? badges.join(' ') : 'none'}`;
+
+    if (earned.length === 0) {
+        badgesEl.innerHTML = `<span style="color:#888;font-size:0.75rem;">No badges yet – complete your first task to get started.</span>`;
+    } else {
+        badgesEl.innerHTML = earned.map(b =>
+            `<span class="badge-pill" title="${b.desc}">${b.icon} ${b.label}</span>`
+        ).join(' ');
+    }
+
+    if (nextBadge && progressMax > 0) {
+        const pct = Math.round((progress / progressMax) * 100);
+        const progressHtml = `
+            <div style="margin-top:6px;font-size:0.7rem;color:#888;">
+                <span>Next: ${nextBadge.icon} ${nextBadge.label}</span>
+                <div style="width:100%;height:4px;background:var(--border-color);border-radius:2px;margin-top:2px;">
+                    <div style="width:${pct}%;height:100%;background:var(--cherry-red);border-radius:2px;transition:width 0.3s;"></div>
+                </div>
+                <span style="font-size:0.65rem;">${progress}/${progressMax}</span>
+            </div>
+        `;
+        const existingProgress = badgesEl.querySelector('.badge-progress');
+        if (existingProgress) existingProgress.remove();
+        const progressDiv = document.createElement('div');
+        progressDiv.className = 'badge-progress';
+        progressDiv.innerHTML = progressHtml;
+        badgesEl.appendChild(progressDiv);
+    }
 }
 
-// ---------- Ambient Sound (improved) ----------
+// ---------- Ambient Sound ----------
 let ambientContext = null;
 let ambientGain = null;
 let ambientSource = null;
@@ -1590,7 +1680,6 @@ function createAmbientSound(type) {
     ambientGain.connect(ambientContext.destination);
 
     if (type === 'rain') {
-        // Pink noise with filter
         const bufferSize = 2 * ambientContext.sampleRate;
         const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
         const data = buffer.getChannelData(0);
@@ -1619,7 +1708,6 @@ function createAmbientSound(type) {
         source.start();
         ambientNodes.source = source;
     } else if (type === 'waves') {
-        // Gentle wave: sine LFO modulating filtered noise
         const bufferSize = 2 * ambientContext.sampleRate;
         const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
         const data = buffer.getChannelData(0);
@@ -1641,7 +1729,6 @@ function createAmbientSound(type) {
         source.start();
         ambientNodes.source = source;
     } else if (type === 'forest') {
-        // Birds chirping: high frequency pings
         const source = ambientContext.createBufferSource();
         const bufferSize = 4 * ambientContext.sampleRate;
         const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
@@ -1649,7 +1736,6 @@ function createAmbientSound(type) {
         for (let i = 0; i < bufferSize; i++) {
             const t = i / ambientContext.sampleRate;
             let sample = 0;
-            // Random chirps
             const chirp = Math.floor(Math.random() * 5) === 0 ? 0.8 * Math.sin(2 * Math.PI * (600 + Math.random() * 400) * t) * Math.exp(-10 * (t % 0.1)) : 0;
             sample = chirp * 0.2 + (Math.random() * 2 - 1) * 0.02;
             data[i] = sample;
@@ -1665,7 +1751,6 @@ function createAmbientSound(type) {
         source.start();
         ambientNodes.source = source;
     } else if (type === 'coffee') {
-        // Low rumble + occasional clatter
         const source = ambientContext.createBufferSource();
         const bufferSize = 2 * ambientContext.sampleRate;
         const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
@@ -1727,11 +1812,12 @@ document.addEventListener('keydown', function(e) {
             case 'c': toggleClock(); e.preventDefault(); break;
             case 'b': toggleBreak(); e.preventDefault(); break;
             case 'q': toggleDarkMode(); e.preventDefault(); break;
+            case 'x': skipCurrentSegment(); e.preventDefault(); break;
         }
     }
 });
 
-// ---------- Start AI Flow (robust) ----------
+// ---------- Start AI Flow ----------
 async function startAIFlow() {
     const apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) {
@@ -1760,7 +1846,6 @@ async function startAIFlow() {
         return;
     }
 
-    // First, estimate any tasks that have a default or very low estimate
     for (let t of openTasks) {
         if (t.estimate <= 5) {
             const found = boardData.flatMap(col => col.tasks).find(task => task.id === t.id);
@@ -1768,7 +1853,6 @@ async function startAIFlow() {
         }
     }
 
-    // Re-fresh open tasks with updated estimates
     const updatedOpen = [];
     boardData.forEach(col => {
         col.tasks.forEach(task => {
@@ -1814,7 +1898,7 @@ async function startAIFlow() {
     }
 }
 
-// ---------- Re-estimate all tasks (AI) ----------
+// ---------- Re-estimate all tasks ----------
 async function reEstimateAllTasks() {
     const apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key.'); return; }
@@ -1839,7 +1923,7 @@ async function reEstimateAllTasks() {
     } catch(e) { alert('AI error'); }
 }
 
-// ---------- Other render functions ----------
+// ---------- Render functions ----------
 function renderEstimateLog() {
     const logBox = $('estimate-log');
     if (!logBox) return;
