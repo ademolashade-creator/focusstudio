@@ -11,7 +11,7 @@ function storageSet(key, value) {
 }
 const $ = (id) => document.getElementById(id);
 
-// ---------- App settings (name + dark mode) ----------
+// ---------- App settings ----------
 let appSettings = storageGet('ff-app-settings', { appName: 'Focus & Flow Studio', darkMode: false, focusMode: false });
 
 function applySettings() {
@@ -53,14 +53,25 @@ function populateHeaderClockSelects() {
     let zones;
     try { zones = Intl.supportedValuesOf('timeZone'); }
     catch (e) { zones = ['UTC', 'Africa/Lagos', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Australia/Sydney']; }
-    ['clock-tz-1', 'clock-tz-2', 'clock-tz-3'].forEach((id, i) => {
-        const sel = $(id);
-        if (!sel) return;
-        sel.innerHTML = zones.map((z) => `<option value="${z}" ${z === headerClockZones[i] ? 'selected' : ''}>${z}</option>`).join('');
+
+    // Populate datalist for search
+    const datalist = document.getElementById('tz-datalist');
+    if (datalist) {
+        datalist.innerHTML = zones.map(z => `<option value="${z}">`).join('');
+    }
+
+    // Set initial values
+    ['clock-tz-search-1', 'clock-tz-search-2', 'clock-tz-search-3'].forEach((id, i) => {
+        const input = $(id);
+        if (input) {
+            input.value = headerClockZones[i] || '';
+            input.setAttribute('list', 'tz-datalist');
+        }
     });
 }
 
 function updateHeaderClockZone(slot, tz) {
+    if (!tz || tz.trim() === '') return;
     headerClockZones[slot - 1] = tz;
     storageSet('ff-header-clock-zones', headerClockZones);
     updateClocks();
@@ -128,46 +139,6 @@ const quotes = [
     "Marketing is about saying 'yes' to the right people at the right time. — Unknown",
     "The words you leave out are as important as the ones you write. — Unknown",
     "Your work is the signature you leave on the world. Make it intentional. — Unknown"
-    "Focus is the art of knowing what to ignore. — James Clear",
-    "The secret of getting ahead is getting started. — Mark Twain",
-    "It's not about having time; it's about making time. — Unknown",
-    "Your mind is the most powerful tool you have. Use it wisely. — Unknown",
-    "Clarity precedes mastery. — Robin Sharma",
-    "The best way to predict the future is to create it. — Peter Drucker",
-    "Success is the sum of small efforts repeated day in and day out. — Robert Collier",
-    "You don't have to be extreme, just consistent. — Unknown",
-    "The quality of your work is a reflection of the quality of your focus. — Unknown",
-    "Do not let what you cannot do interfere with what you can do. — John Wooden",
-    "The only way to do great work is to love what you do. — Steve Jobs",
-    "The beginning is the most important part of the work. — Plato",
-    "The secret of change is to focus all of your energy not on fighting the old, but on building the new. — Socrates",
-    "Your energy is your currency. Spend it wisely. — Unknown",
-    "The quieter you become, the more you can hear. — Ram Dass",
-    "It does not matter how slowly you go as long as you do not stop. — Confucius",
-    "The more you know yourself, the more you can focus. — Unknown",
-    "The key is not to prioritize what's on your schedule, but to schedule your priorities. — Stephen Covey",
-    "The best time to start was yesterday. The next best time is now. — Unknown",
-    "Discipline is choosing between what you want now and what you want most. — Abraham Lincoln",
-    "The only limit to our realization of tomorrow is our doubts of today. — FDR",
-    "Success is not final, failure is not fatal: it is the courage to continue that counts. — Churchill",
-    "The purpose of life is not to be happy. It is to be useful, to be honorable, to be compassionate. — Emerson",
-    "The future depends on what you do today. — Mahatma Gandhi",
-    "In the middle of difficulty lies opportunity. — Einstein",
-    "It always seems impossible until it is done. — Nelson Mandela",
-    "The journey of a thousand miles begins with one step. — Lao Tzu",
-    "Your time is limited, so don't waste it living someone else's life. — Steve Jobs",
-    "The only thing we have to fear is fear itself. — FDR",
-    "I have not failed. I've just found 10,000 ways that won't work. — Edison",
-    "The best revenge is massive success. — Frank Sinatra",
-    "The only source of knowledge is experience. — Einstein",
-    "The greatest glory in living lies not in never falling, but in rising every time we fall. — Mandela",
-    "The future belongs to those who believe in the beauty of their dreams. — Eleanor Roosevelt",
-    "The only way to achieve the impossible is to believe it is possible. — Charles Kingsleigh",
-    "The mind is everything. What you think you become. — Buddha",
-    "To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment. — Emerson",
-    "Success is not how high you have climbed, but how you make a positive difference to the world. — Roy Bennett",
-    "The only person you are destined to become is the person you decide to be. — Emerson",
-    "The best way to find yourself is to lose yourself in the service of others. — Gandhi"
 ];
 let quoteInterval = null;
 function rotateQuote() {
@@ -201,14 +172,11 @@ let isRunning = false;
 let isWorkTime = true;
 let hasStartedOnce = false;
 let timerInterval = null;
-
 let timerMode = 'manual';
 let flowSegments = [];
 let flowSegIndex = 0;
 let flowExtraSeconds = 0;
-
 let flowBlocksCompleted = parseInt(localStorage.getItem('focus_daily_sessions')) || 0;
-
 let breakTracker = { active: false, start: null, elapsedSeconds: 0, interval: null, isFlowBreak: false };
 
 const timeDisplay = $('time-display');
@@ -269,7 +237,7 @@ function addFiveMinutes() {
     updateDisplay();
 }
 
-// ---------- Actual Break Button ----------
+// ---------- Break Button ----------
 function toggleBreak() {
     if (breakTracker.active) {
         resumeFromBreak();
@@ -434,7 +402,7 @@ function setupMode() {
 function resetTimer() { hasStartedOnce = false; timerMode = 'manual'; setFlowControlsVisible(false); isWorkTime = true; setupMode(); }
 function updateSettings() { if (!isRunning) { setupMode(); updateAdaptiveHacks(); } }
 
-// ---------- Auto Flow: Internal Queue ----------
+// ---------- Auto Flow ----------
 let customQueueOrder = storageGet('ff-custom-queue', []);
 
 function setFlowControlsVisible(active) {
@@ -741,7 +709,7 @@ function finishSessionCleanup(label) {
     updateAdaptiveHacks();
 }
 
-// ---------- Clock In / Clock Out ----------
+// ---------- Clock In / Out ----------
 let clockState = storageGet('ff-clock-state', { clockedIn: false, startedAt: null });
 let clockLog = storageGet('ff-clock-log', []);
 
@@ -782,12 +750,11 @@ function renderClockCard() {
     renderDailyRecap();
 }
 
-// ---------- Task board & Schema ----------
-let mandatoryNotes = storageGet('focus_mandatory_notes', false);
+// ---------- Task board ----------
 const defaultColumns = [
-    { id: 1, title: 'Client A / Priority 1', tasks: [] },
-    { id: 2, title: 'Client B / Priority 2', tasks: [] },
-    { id: 3, title: 'Admin & Content', tasks: [] }
+    { id: 1, title: 'Client A / Priority 1', tasks: [], notesRequired: false },
+    { id: 2, title: 'Client B / Priority 2', tasks: [], notesRequired: false },
+    { id: 3, title: 'Admin & Content', tasks: [], notesRequired: false }
 ];
 
 let boardData = storageGet('focus_board_data', defaultColumns);
@@ -832,6 +799,7 @@ function adjustTasksForMidnight() {
 
 boardData.forEach(col => {
     if (col.collapsed === undefined) col.collapsed = false;
+    if (col.notesRequired === undefined) col.notesRequired = false;
     col.tasks.forEach(t => {
         if (t.estimateMinutes === undefined) t.estimateMinutes = 15;
         if (t.trackedSeconds === undefined) t.trackedSeconds = 0;
@@ -918,8 +886,9 @@ function toggleDateGroup(key) {
 // Autosuggest
 function setupAutosuggest(inputElement) {
     if (!inputElement) return;
+    let timeout;
     inputElement.addEventListener('input', function(e) {
-        clearTimeout(autosuggestTimeout);
+        clearTimeout(timeout);
         const val = this.value.trim();
         if (val.length < 2) return;
         const allTaskNames = [];
@@ -939,7 +908,6 @@ function setupAutosuggest(inputElement) {
         }
     });
 }
-let autosuggestTimeout;
 
 // ---------- Render Board ----------
 function renderBoard() {
@@ -973,8 +941,11 @@ function renderBoard() {
             <div class="column-header-row">
                 <button class="icon-btn" onclick="toggleColumnCollapse(${colIndex})" title="${col.collapsed ? 'Expand' : 'Collapse'}">${col.collapsed ? '▸' : '▾'}</button>
                 <input type="text" class="column-header-input" value="${escapeHTML(col.title)}" oninput="updateColumnTitle(${colIndex}, this.value)" placeholder="Project / Client Name">
-                ${col.collapsed ? `<span style="font-size:0.75rem;color:#888;white-space:nowrap;">${openCount} open</span>` : ''}
-                <div class="column-header-actions">
+                <div class="column-header-actions" style="display:flex;align-items:center;gap:4px;">
+                    <label style="font-size:0.65rem;display:flex;align-items:center;gap:2px;color:#888;">
+                        <input type="checkbox" ${col.notesRequired ? 'checked' : ''} onchange="toggleNotesRequired(${colIndex}, this.checked)" title="Require notes for each task in this column">
+                        Notes
+                    </label>
                     <button class="icon-btn" onclick="moveColumn(${colIndex}, -1)">◀</button>
                     <button class="icon-btn" onclick="moveColumn(${colIndex}, 1)">▶</button>
                     <button class="delete-btn" onclick="deleteColumn(${colIndex})">×</button>
@@ -985,8 +956,8 @@ function renderBoard() {
 
             <div class="ai-batch-actions">
                 <button onclick="suggestColumnTimesAI(${colIndex})">Suggest Times (AI)</button>
-                <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow & Gaps (AI)</button>
-                <button onclick="generateColumnCheckIn(${colIndex})">Generate Daily Check-In (AI)</button>
+                <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow (AI)</button>
+                <button onclick="generateColumnCheckIn(${colIndex})">Daily Check-In (AI)</button>
             </div>
 
             ${suggestionsHtml}
@@ -1056,6 +1027,13 @@ function renderBoard() {
     updateStreaksAndBadges();
 }
 
+// ---------- Column operations ----------
+function toggleNotesRequired(colIndex, checked) {
+    boardData[colIndex].notesRequired = checked;
+    saveBoardData();
+    renderBoard();
+}
+
 let dragContext = null;
 function dragStart(e, ci, ti) {
     dragContext = { ci, ti };
@@ -1103,7 +1081,7 @@ function moveColumn(ci, dir) {
 }
 function addColumn() {
     if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
-    boardData.push({ id: Date.now(), title: `New Project`, collapsed: false, tasks: [] });
+    boardData.push({ id: Date.now(), title: `New Project`, collapsed: false, tasks: [], notesRequired: false });
     saveBoardData(); renderBoard();
 }
 function deleteColumn(ci) {
@@ -1130,7 +1108,7 @@ function promptDeadline(ci, ti) {
     input.focus();
 }
 
-// ---------- Estimate helpers (memory + AI) ----------
+// ---------- Task estimate helpers ----------
 function normalizeTaskName(text) {
     return text.trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -1178,7 +1156,11 @@ function addTask(ci) {
     const estInput = $(`task-est-${ci}`);
     const text = input.value.trim();
     if (!text) return;
-    if (mandatoryNotes) alert("Mandatory Extra Info is enabled. Please add notes via Details.");
+
+    const col = boardData[ci];
+    if (col.notesRequired) {
+        alert("This column requires notes. Please add notes via Details after creating the task.");
+    }
 
     const estimate = parseInt(estInput.value) || 15;
     const task = {
@@ -1191,7 +1173,7 @@ function addTask(ci) {
         startedAtIso: null, completedAtIso: null,
         parentId: null, subtasks: []
     };
-    boardData[ci].tasks.push(task);
+    col.tasks.push(task);
     input.value = '';
     saveBoardData();
     renderBoard();
@@ -1224,6 +1206,11 @@ function addPastedTasks(ci) {
     const lines = textarea.value.split('\n').map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return;
 
+    const col = boardData[ci];
+    if (col.notesRequired) {
+        alert("This column requires notes. Please add notes via Details after pasting.");
+    }
+
     const newTasks = lines.map((line) => {
         const { text, minutes } = parseTimeFromLine(line);
         let finalMins = minutes || 15;
@@ -1237,7 +1224,7 @@ function addPastedTasks(ci) {
         };
     });
 
-    boardData[ci].tasks.push(...newTasks);
+    col.tasks.push(...newTasks);
     textarea.value = '';
     saveBoardData();
     renderBoard();
@@ -1255,7 +1242,6 @@ function updateTaskEstimate(ci, ti, v) {
     boardData[ci].tasks[ti].estimateMinutes = v;
     saveBoardData(); renderBoard();
 }
-
 function moveTask(ci, ti, dir) {
     const tasks = boardData[ci].tasks;
     const task = tasks[ti];
@@ -1279,7 +1265,7 @@ function moveTask(ci, ti, dir) {
     }
 }
 
-// ---------- AI Functions (with em-dash cleanup) ----------
+// ---------- AI Functions ----------
 function cleanEmDashes(text) {
     return text.replace(/[\u2014\u2013]|--/g, ', ');
 }
@@ -1584,48 +1570,123 @@ function updateStreaksAndBadges() {
     badgesEl.textContent = `🏆 Badges: ${badges.length ? badges.join(' ') : 'none'}`;
 }
 
-// ---------- Ambient Sound ----------
+// ---------- Ambient Sound (improved) ----------
 let ambientContext = null;
 let ambientGain = null;
 let ambientSource = null;
 let ambientType = 'off';
+let ambientNodes = {};
 
 function createAmbientSound(type) {
     if (ambientContext) {
         ambientContext.close();
         ambientContext = null;
+        ambientNodes = {};
     }
     if (type === 'off' || !type) return;
     ambientContext = new (window.AudioContext || window.webkitAudioContext)();
     ambientGain = ambientContext.createGain();
-    ambientGain.gain.setValueAtTime(0.2, ambientContext.currentTime);
+    ambientGain.gain.setValueAtTime(0.15, ambientContext.currentTime);
     ambientGain.connect(ambientContext.destination);
 
-    let bufferSize = 2 * ambientContext.sampleRate;
-    let buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
-    let data = buffer.getChannelData(0);
     if (type === 'rain') {
+        // Pink noise with filter
+        const bufferSize = 2 * ambientContext.sampleRate;
+        const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
+        const data = buffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * 0.3;
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            data[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+            data[i] *= 0.11;
+            b6 = white * 0.115926;
         }
-    } else if (type === 'coffee') {
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * 0.2;
-        }
+        const source = ambientContext.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        const filter = ambientContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 800;
+        filter.Q.value = 1;
+        source.connect(filter);
+        filter.connect(ambientGain);
+        source.start();
+        ambientNodes.source = source;
     } else if (type === 'waves') {
+        // Gentle wave: sine LFO modulating filtered noise
+        const bufferSize = 2 * ambientContext.sampleRate;
+        const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
+        const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.sin(i * 0.05) * 0.3 + (Math.random() * 2 - 1) * 0.1;
+            const t = i / ambientContext.sampleRate;
+            const wave = 0.3 * Math.sin(t * 0.5) + 0.1 * Math.sin(t * 0.8 + 1.2) + 0.05 * Math.sin(t * 1.2 + 0.7);
+            const noise = (Math.random() * 2 - 1) * 0.05;
+            data[i] = wave + noise;
         }
+        const source = ambientContext.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        const filter = ambientContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 150;
+        filter.Q.value = 0.5;
+        source.connect(filter);
+        filter.connect(ambientGain);
+        source.start();
+        ambientNodes.source = source;
     } else if (type === 'forest') {
+        // Birds chirping: high frequency pings
+        const source = ambientContext.createBufferSource();
+        const bufferSize = 4 * ambientContext.sampleRate;
+        const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
+        const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * 0.15;
+            const t = i / ambientContext.sampleRate;
+            let sample = 0;
+            // Random chirps
+            const chirp = Math.floor(Math.random() * 5) === 0 ? 0.8 * Math.sin(2 * Math.PI * (600 + Math.random() * 400) * t) * Math.exp(-10 * (t % 0.1)) : 0;
+            sample = chirp * 0.2 + (Math.random() * 2 - 1) * 0.02;
+            data[i] = sample;
         }
+        source.buffer = buffer;
+        source.loop = true;
+        const filter = ambientContext.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1000;
+        filter.Q.value = 0.8;
+        source.connect(filter);
+        filter.connect(ambientGain);
+        source.start();
+        ambientNodes.source = source;
+    } else if (type === 'coffee') {
+        // Low rumble + occasional clatter
+        const source = ambientContext.createBufferSource();
+        const bufferSize = 2 * ambientContext.sampleRate;
+        const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            const t = i / ambientContext.sampleRate;
+            const rumble = 0.2 * Math.sin(t * 0.3) + 0.1 * Math.sin(t * 0.7 + 0.5);
+            const clatter = Math.random() > 0.995 ? 0.5 * (Math.random() * 2 - 1) : 0;
+            data[i] = rumble + clatter * 0.1;
+        }
+        source.buffer = buffer;
+        source.loop = true;
+        const filter = ambientContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 200;
+        filter.Q.value = 0.5;
+        source.connect(filter);
+        filter.connect(ambientGain);
+        source.start();
+        ambientNodes.source = source;
     }
-    ambientSource = ambientContext.createBufferSource();
-    ambientSource.buffer = buffer;
-    ambientSource.loop = true;
-    ambientSource.connect(ambientGain);
-    ambientSource.start();
 }
 
 function toggleAmbientSound() {
@@ -1678,7 +1739,6 @@ async function startAIFlow() {
         return;
     }
 
-    // Gather all open tasks
     const openTasks = [];
     boardData.forEach((col) => {
         col.tasks.forEach((task) => {
@@ -1728,11 +1788,9 @@ async function startAIFlow() {
 
     try {
         const responseText = await callGemini(prompt);
-        // Clean and parse
         const cleaned = responseText.replace(/```json|```/g, '').trim();
         let orderedIds = JSON.parse(cleaned);
 
-        // If the response is an object with an array property, extract it
         if (typeof orderedIds === 'object' && !Array.isArray(orderedIds)) {
             const keys = Object.keys(orderedIds);
             if (keys.length === 1 && Array.isArray(orderedIds[keys[0]])) {
@@ -1746,11 +1804,9 @@ async function startAIFlow() {
             throw new Error('AI returned an empty or invalid order.');
         }
 
-        // Update the custom queue order
         customQueueOrder = orderedIds;
         storageSet('ff-custom-queue', customQueueOrder);
 
-        // Start the flow
         startFlow();
     } catch (e) {
         alert('AI Flow error: ' + e.message);
@@ -1974,7 +2030,6 @@ function initApp() {
         }
     }, 60000);
 
-    $('mandatory-notes-toggle').checked = mandatoryNotes;
     const key = storageGet('gemini_api_key', '');
     if ($('gemini-api-key')) $('gemini-api-key').value = key;
     if ($('gemini-api-key-modal')) $('gemini-api-key-modal').value = key;
@@ -1999,7 +2054,6 @@ function initApp() {
     renderDailyRecap();
 }
 
-function toggleMandatorySetting() { mandatoryNotes = $('mandatory-notes-toggle').checked; storageSet('focus_mandatory_notes', mandatoryNotes); }
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, tag => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[tag]||tag)); }
@@ -2026,8 +2080,8 @@ function toggleTask(ci, ti) {
         saveBoardData(); renderBoard(); renderEstimateLog();
         return;
     }
-    if (mandatoryNotes && (!task.notes || task.notes.trim() === '')) {
-        alert("Mandatory Extra Info is ON! Add notes via Details first.");
+    if (boardData[ci].notesRequired && (!task.notes || task.notes.trim() === '')) {
+        alert("This column requires notes! Please add notes via Details before completing.");
         renderBoard(); return;
     }
     if (task.trackedSeconds === 0) {

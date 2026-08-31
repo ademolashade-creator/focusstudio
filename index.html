@@ -11,20 +11,36 @@
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="styles.css">
+    <!-- Datalist for timezone search (populated by JS) -->
 </head>
 <body>
 
     <header>
         <h1 class="editable-title" contenteditable="true" id="app-title" onblur="saveAppName(this.textContent)">Focus & Flow Studio</h1>
         <p class="tagline">Curate your day, honor your energy, and master your workflow.</p>
-        <!-- Motivational Quote Banner -->
         <div id="quote-banner" class="quote-banner">✨ “Focus is the art of knowing what to ignore.” — James Clear</div>
 
         <div class="clocks-bar">
             <div class="clock-item"><div class="clock-label">Date</div><div class="date-display" id="date-display">--/--/----</div></div>
-            <div class="clock-item"><select class="clock-tz-select" id="clock-tz-1" onchange="updateHeaderClockZone(1, this.value)"></select><div class="clock-time" id="clock-wat">--:--:--</div></div>
-            <div class="clock-item"><select class="clock-tz-select" id="clock-tz-2" onchange="updateHeaderClockZone(2, this.value)"></select><div class="clock-time" id="clock-est">--:--:--</div></div>
-            <div class="clock-item"><select class="clock-tz-select" id="clock-tz-3" onchange="updateHeaderClockZone(3, this.value)"></select><div class="clock-time" id="clock-mst">--:--:--</div></div>
+            <div class="clock-item">
+                <div class="clock-label">
+                    <input type="text" class="clock-tz-search" id="clock-tz-search-1" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(1, this.value)">
+                    <datalist id="tz-datalist"></datalist>
+                </div>
+                <div class="clock-time" id="clock-wat">--:--:--</div>
+            </div>
+            <div class="clock-item">
+                <div class="clock-label">
+                    <input type="text" class="clock-tz-search" id="clock-tz-search-2" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(2, this.value)">
+                </div>
+                <div class="clock-time" id="clock-est">--:--:--</div>
+            </div>
+            <div class="clock-item">
+                <div class="clock-label">
+                    <input type="text" class="clock-tz-search" id="clock-tz-search-3" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(3, this.value)">
+                </div>
+                <div class="clock-time" id="clock-mst">--:--:--</div>
+            </div>
         </div>
 
         <div class="top-controls">
@@ -45,10 +61,9 @@
                     <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
                     <button id="reset-btn" onclick="resetTimer()">Restart</button>
                     <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
-                    <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes to the current segment">+5 min</button>
+                    <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes">+5 min</button>
                 </div>
 
-                <!-- Internal Flow Queue (drag‑and‑drop) -->
                 <div class="internal-queue-container">
                     <div class="queue-header">Internal Flow Sequence <span style="font-weight:400;font-size:0.65rem;color:#888;">(drag to reorder)</span></div>
                     <ul class="internal-queue" id="internal-flow-queue"></ul>
@@ -58,39 +73,19 @@
                 <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
                 <button class="btn-secondary" id="skip-flow-btn" onclick="skipFlowSegment()" style="width:100%;margin-top:6px;">Skip Segment (Flow only)</button>
 
-                <div class="settings">
+                <!-- Compact settings -->
+                <div class="settings compact">
                     <div class="setting-row">
                         <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
                         <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
                     </div>
-                    <div class="toggle-group">
-                        <label for="mandatory-notes-toggle">Mandatory Extra Info:</label>
-                        <input type="checkbox" id="mandatory-notes-toggle" onchange="toggleMandatorySetting()">
-                    </div>
-                    <div class="toggle-group">
-                        <label for="focus-mode-toggle">Focus Mode (fullscreen + wake lock):</label>
+                    <div class="toggle-group" style="margin-top:4px;">
+                        <label for="focus-mode-toggle" style="font-size:0.75rem;">Focus Mode (fullscreen + wake lock)</label>
                         <input type="checkbox" id="focus-mode-toggle" onchange="toggleFocusMode()">
                     </div>
-                    <!-- Ambient Sound -->
-                    <div class="setting-row" style="margin-top:6px;">
-                        <div class="setting-group">
-                            <label>Ambient Sound</label>
-                            <select id="ambient-sound-select" onchange="changeAmbientSound(this.value)" style="width:100%;padding:0.3rem;background:var(--input-bg);color:var(--text-color);border:1px solid var(--border-color);border-radius:6px;">
-                                <option value="off">Off</option>
-                                <option value="rain">Rain</option>
-                                <option value="coffee">Coffee Shop</option>
-                                <option value="waves">Waves</option>
-                                <option value="forest">Forest</option>
-                            </select>
-                        </div>
-                        <div class="setting-group" style="flex:0 0 auto;display:flex;align-items:flex-end;">
-                            <button class="btn-secondary" onclick="toggleAmbientSound()" style="width:100%;">Play/Pause</button>
-                        </div>
-                    </div>
-                    <!-- Keyboard Shortcuts (collapsible) -->
-                    <details style="margin-top:6px;">
+                    <details style="margin-top:4px;">
                         <summary style="font-size:0.7rem;color:#888;cursor:pointer;">Keyboard Shortcuts</summary>
-                        <div style="font-size:0.7rem;padding:6px;background:var(--input-bg);border-radius:6px;border:1px solid var(--border-color);">
+                        <div style="font-size:0.7rem;padding:4px;background:var(--input-bg);border-radius:6px;border:1px solid var(--border-color);">
                             <div>Alt+Shift+S – Start/Pause Timer</div>
                             <div>Alt+Shift+R – Reset Timer</div>
                             <div>Alt+Shift+F – Start Flow</div>
@@ -100,6 +95,22 @@
                             <div>Alt+Shift+Q – Toggle Dark Mode</div>
                         </div>
                     </details>
+                    <!-- Ambient Sound (moved here) -->
+                    <div class="setting-row" style="margin-top:4px;">
+                        <div class="setting-group">
+                            <label style="font-size:0.7rem;">Ambient Sound</label>
+                            <select id="ambient-sound-select" onchange="changeAmbientSound(this.value)" style="width:100%;padding:0.2rem;font-size:0.75rem;background:var(--input-bg);color:var(--text-color);border:1px solid var(--border-color);border-radius:6px;">
+                                <option value="off">Off</option>
+                                <option value="rain">Rain</option>
+                                <option value="coffee">Coffee Shop</option>
+                                <option value="waves">Waves</option>
+                                <option value="forest">Forest</option>
+                            </select>
+                        </div>
+                        <div class="setting-group" style="flex:0 0 auto;display:flex;align-items:flex-end;">
+                            <button class="btn-secondary" onclick="toggleAmbientSound()" style="font-size:0.7rem;padding:0.2rem 0.6rem;">▶</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -113,7 +124,6 @@
         <div class="stats-card" style="flex:1 1 220px;">
             <h3>Daily Recap</h3>
             <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
-            <!-- Streaks & Badges -->
             <div id="streaks-badges" style="margin-top:8px;font-size:0.8rem;border-top:1px dashed var(--border-color);padding-top:6px;">
                 <span id="streak-display">🔥 Streak: 0 days</span>
                 <span id="badges-display" style="margin-left:10px;">🏆 Badges: none</span>
@@ -173,7 +183,7 @@
         </details>
     </div>
 
-    <!-- Break Overlay (actual break) -->
+    <!-- Modals -->
     <div class="modal-overlay" id="break-overlay">
         <div class="modal-box">
             <h2 style="color:var(--cherry-red);margin-top:0;">☕ Break Time</h2>
@@ -190,7 +200,6 @@
         </div>
     </div>
 
-    <!-- Flow Break Overlay (pause during flow) -->
     <div class="modal-overlay" id="flow-break-overlay">
         <div class="modal-box">
             <h2 style="color:var(--cherry-red);margin-top:0;">Session Paused</h2>
@@ -206,7 +215,6 @@
         </div>
     </div>
 
-    <!-- End Session Modal -->
     <div class="modal-overlay" id="end-session-overlay">
         <div class="modal-box">
             <p>End this session. Do you want to log what you've done so far, or throw it away with no credit?</p>
@@ -218,7 +226,6 @@
         </div>
     </div>
 
-    <!-- Completion overlay (ask actual time) -->
     <div class="modal-overlay" id="completion-overlay">
         <div class="modal-box">
             <p>How long did <strong id="completion-task-name"></strong> actually take?</p>
@@ -230,19 +237,15 @@
         </div>
     </div>
 
-    <!-- Task Details Modal (includes notes, Google link, deadline, breakdown) -->
     <div class="modal-overlay" id="details-overlay">
         <div class="modal-box" style="text-align:left;">
             <p style="text-align:center;"><strong id="details-task-name"></strong></p>
             <label style="font-size:0.75rem;font-weight:700;">Notes</label>
             <textarea id="details-notes-textarea" class="task-notes-textarea" rows="4" placeholder="Add extra task information/notes..." style="width:100%;margin-bottom:8px;"></textarea>
-
             <label style="font-size:0.75rem;font-weight:700;">Google Doc / Reference Link</label>
             <input type="url" id="details-link-input" class="task-notes-textarea" placeholder="Paste link here..." style="width:100%;margin-bottom:8px;">
-
             <label style="font-size:0.75rem;font-weight:700;">Deadline</label>
             <input type="datetime-local" id="details-deadline-input" style="width:100%;margin-bottom:8px;padding:4px;">
-
             <p id="details-estimate-label" style="font-size:0.8rem;color:#888;margin:0 0 8px;"></p>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button class="btn-secondary" style="flex:1;" onclick="suggestTimeFromDetails()">Suggest Time (AI)</button>
@@ -252,7 +255,6 @@
         </div>
     </div>
 
-    <!-- API key modal (discreet gear) -->
     <div style="text-align:center; padding: 20px; opacity: 0.3;">
         <button onclick="document.getElementById('api-modal').style.display='flex'" style="background:none;border:none;cursor:pointer;font-size:1.2rem;">⚙️</button>
     </div>
@@ -269,7 +271,6 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
         }
-        // Force reload if cached
         if (performance.navigation && performance.navigation.type === 2) {
             location.reload(true);
         }
