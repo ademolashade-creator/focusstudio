@@ -306,3 +306,88 @@ button:active { transform: scale(0.96); }
     font-weight: 700;
     color: var(--text-color);
 }
+/* --- New styles for added features --- */
+
+/* Quote banner */
+.quote-banner {
+    font-size: 0.95rem;
+    color: var(--text-color);
+    opacity: 0.7;
+    font-style: italic;
+    text-align: center;
+    margin: 0.2rem 0 1rem 0;
+    transition: opacity 0.3s ease;
+    padding: 0 1rem;
+}
+.quote-banner:hover {
+    opacity: 1;
+}
+
+/* Subtask styling */
+.task-item.subtask {
+    border-left-color: var(--amber);
+    background-color: var(--input-bg);
+    opacity: 0.9;
+}
+.subtask-badge {
+    color: var(--amber);
+    font-weight: 700;
+    margin-left: 2px;
+}
+
+/* Break button styling */
+#break-btn {
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+#break-btn.active {
+    background-color: var(--cherry-red);
+    color: white;
+}
+
+/* Streaks & Badges */
+#streaks-badges {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+}
+#streak-display, #badges-display {
+    display: inline-block;
+}
+
+/* Ambient sound controls */
+#ambient-sound-select {
+    font-family: Georgia, serif;
+    font-size: 0.8rem;
+    padding: 0.2rem;
+}
+
+/* Collapsible sections */
+details summary {
+    font-weight: 700;
+    color: var(--cherry-red);
+    cursor: pointer;
+    outline: none;
+    padding: 0.2rem 0;
+}
+details summary:hover {
+    color: var(--cherry-hover);
+}
+details summary::-webkit-details-marker {
+    color: var(--cherry-red);
+}
+
+/* Subtle improvements */
+.task-item .task-left .subtask-badge {
+    font-size: 0.8rem;
+    margin-right: 2px;
+}
+
+/* Overlay consistency */
+.modal-box select {
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
