@@ -1670,15 +1670,18 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// ---------- Start AI Flow (fixed) ----------
+// ---------- Start AI Flow (robust) ----------
 async function startAIFlow() {
     const apiKey = storageGet('gemini_api_key', null);
-    if (!apiKey) { alert('Add Gemini API key first.'); return; }
+    if (!apiKey) {
+        alert('Please add your Gemini API key in the AI settings (gear icon or footer).');
+        return;
+    }
 
     // Gather all open tasks
     const openTasks = [];
-    boardData.forEach((col, ci) => {
-        col.tasks.forEach((task, ti) => {
+    boardData.forEach((col) => {
+        col.tasks.forEach((task) => {
             if (!task.completed) {
                 openTasks.push({
                     id: task.id,
@@ -1691,16 +1694,21 @@ async function startAIFlow() {
             }
         });
     });
-    if (openTasks.length === 0) { alert('No open tasks to order.'); return; }
 
-    // First, ensure all tasks have reasonable estimates (if missing)
-    let needsEstimate = openTasks.filter(t => t.estimate <= 5);
-    for (let t of needsEstimate) {
-        const found = boardData.flatMap(col => col.tasks).find(task => task.id === t.id);
-        if (found) await estimateTask(found);
+    if (openTasks.length === 0) {
+        alert('No open tasks to order.');
+        return;
     }
 
-    // Re-fetch open tasks after estimate updates
+    // First, estimate any tasks that have a default or very low estimate
+    for (let t of openTasks) {
+        if (t.estimate <= 5) {
+            const found = boardData.flatMap(col => col.tasks).find(task => task.id === t.id);
+            if (found) await estimateTask(found);
+        }
+    }
+
+    // Re-fresh open tasks with updated estimates
     const updatedOpen = [];
     boardData.forEach(col => {
         col.tasks.forEach(task => {
@@ -1716,44 +1724,37 @@ async function startAIFlow() {
         });
     });
 
-    // Build prompt for ordering
     const prompt = `You are a productivity expert. Given these tasks, suggest the most efficient order to work on them. Consider deadlines (if any), task type, logical dependencies, and typical energy patterns. Return ONLY a JSON array of task IDs in the order they should be done. Tasks: ${JSON.stringify(updatedOpen)}`;
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-        const data = await res.json();
-        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
-            throw new Error('Invalid response structure from AI');
-        }
-        const raw = data.candidates[0].content.parts[0].text;
-        const cleaned = raw.replace(/```json|```/g, '').trim();
+        const responseText = await callGemini(prompt);
+        // Clean and parse
+        const cleaned = responseText.replace(/```json|```/g, '').trim();
         let orderedIds = JSON.parse(cleaned);
-        // If it's an object with an array property, extract
+
+        // If the response is an object with an array property, extract it
         if (typeof orderedIds === 'object' && !Array.isArray(orderedIds)) {
-            const firstKey = Object.keys(orderedIds)[0];
-            if (firstKey && Array.isArray(orderedIds[firstKey])) {
-                orderedIds = orderedIds[firstKey];
+            const keys = Object.keys(orderedIds);
+            if (keys.length === 1 && Array.isArray(orderedIds[keys[0]])) {
+                orderedIds = orderedIds[keys[0]];
             } else {
-                throw new Error('AI response is not a JSON array');
+                throw new Error('AI response is not a JSON array.');
             }
         }
+
         if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
-            throw new Error('AI returned an empty or invalid order');
+            throw new Error('AI returned an empty or invalid order.');
         }
 
-        // Update customQueueOrder
+        // Update the custom queue order
         customQueueOrder = orderedIds;
         storageSet('ff-custom-queue', customQueueOrder);
 
         // Start the flow
         startFlow();
-    } catch(e) {
+    } catch (e) {
         alert('AI Flow error: ' + e.message);
+        console.error('AI Flow error details:', e);
     }
 }
 
