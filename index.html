@@ -10,7 +10,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=20250901">
+    <script>
+        // Force service worker unregister to clear cache
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                    console.log('Service Worker unregistered');
+                }
+            });
+        }
+    </script>
 </head>
 <body>
 
@@ -290,10 +301,12 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=20250901"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+            window.addEventListener('load', () => { 
+                navigator.serviceWorker.register('sw.js?v=20250901').catch(() => {}); 
+            });
         }
         if (performance.navigation && performance.navigation.type === 2) {
             location.reload(true);
