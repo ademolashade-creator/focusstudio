@@ -923,6 +923,21 @@ function updateAttendanceDisplay() {
     }
 }
 
+// ---------- Render Clock Card ----------
+function renderClockCard() {
+    var btn = document.getElementById('clock-btn');
+    if (!btn) return;
+    if (clockState.clockedIn) {
+        btn.textContent = 'Clock Out';
+        btn.classList.add('active');
+        btn.classList.remove('clocking-out');
+    } else {
+        btn.textContent = 'Clock In';
+        btn.classList.remove('active', 'clocking-out');
+    }
+    renderDailyRecap();
+}
+
 // ---------- Task board ----------
 var defaultColumns = [
     { id: 1, title: 'Client A / Priority 1', tasks: [], notesRequired: false },
