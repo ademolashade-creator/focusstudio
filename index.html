@@ -81,33 +81,32 @@
         </div>
     </div>
 
-    <!-- Clocks (searchable inputs) -->
-    <div class="clocks-bar">
-        <div class="clock-item">
-            <div class="clock-label">Date</div>
-            <div class="date-display" id="date-display">--/--/----</div>
-        </div>
-        <div class="clock-item">
-            <div class="clock-label">
-                <input type="text" class="clock-tz-input" id="clock-tz-1" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(1, this.value)">
-            </div>
-            <div class="clock-time" id="clock-wat">--:--:--</div>
-        </div>
-        <div class="clock-item">
-            <div class="clock-label">
-                <input type="text" class="clock-tz-input" id="clock-tz-2" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(2, this.value)">
-            </div>
-            <div class="clock-time" id="clock-est">--:--:--</div>
-        </div>
-        <div class="clock-item">
-            <div class="clock-label">
-                <input type="text" class="clock-tz-input" id="clock-tz-3" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(3, this.value)">
-            </div>
-            <div class="clock-time" id="clock-mst">--:--:--</div>
-        </div>
+   <!-- Clocks (dropdowns) -->
+<div class="clocks-bar">
+    <div class="clock-item">
+        <div class="clock-label">Date</div>
+        <div class="date-display" id="date-display">--/--/----</div>
     </div>
-    <datalist id="tz-datalist"></datalist>
-</header>
+    <div class="clock-item">
+        <div class="clock-label">
+            <select class="clock-tz-select" id="clock-tz-1" onchange="updateHeaderClockZone(1, this.value)"></select>
+        </div>
+        <div class="clock-time" id="clock-wat">--:--:--</div>
+    </div>
+    <div class="clock-item">
+        <div class="clock-label">
+            <select class="clock-tz-select" id="clock-tz-2" onchange="updateHeaderClockZone(2, this.value)"></select>
+        </div>
+        <div class="clock-time" id="clock-est">--:--:--</div>
+    </div>
+    <div class="clock-item">
+        <div class="clock-label">
+            <select class="clock-tz-select" id="clock-tz-3" onchange="updateHeaderClockZone(3, this.value)"></select>
+        </div>
+        <div class="clock-time" id="clock-mst">--:--:--</div>
+    </div>
+</div>
+   </header>
 
 <div class="board-area">
     <div class="board-container" id="board-container">
@@ -179,7 +178,7 @@
     <div class="hacks-card" style="flex:1 1 220px;">
         <h3>Time Counter</h3>
         <div style="font-size:0.8rem;margin-bottom:6px;">
-            <label>Timezone <input type="text" id="timezone-select" class="clock-tz-input" placeholder="Search timezone..." list="tz-datalist" onchange="updateTimezone(this.value)"></label>
+            <label>Timezone <select id="timezone-select" onchange="updateTimezone(this.value)"></select></label>
         </div>
         <div class="hacks-content" id="time-counter-box">Add tasks to see your projected completion times.</div>
     </div>

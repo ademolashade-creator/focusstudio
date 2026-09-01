@@ -40,25 +40,14 @@ function populateHeaderClockSelects() {
     var zones;
     try { zones = Intl.supportedValuesOf('timeZone'); }
     catch (e) { zones = ['UTC', 'Africa/Lagos', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Australia/Sydney']; }
-
     zones.sort();
 
-    // Populate the datalist
-    var datalist = document.getElementById('tz-datalist');
-    if (datalist) {
-        datalist.innerHTML = zones.map(function(z) {
-            return '<option value="' + z + '">';
+    ['clock-tz-1', 'clock-tz-2', 'clock-tz-3'].forEach(function(id, i) {
+        var sel = document.getElementById(id);
+        if (!sel) return;
+        sel.innerHTML = zones.map(function(z) {
+            return '<option value="' + z + '" ' + (z === headerClockZones[i] ? 'selected' : '') + '>' + z + '</option>';
         }).join('');
-    }
-
-    // Set initial values for the three clock inputs
-    var inputs = ['clock-tz-1', 'clock-tz-2', 'clock-tz-3'];
-    inputs.forEach(function(id, i) {
-        var input = document.getElementById(id);
-        if (input) {
-            input.value = headerClockZones[i] || '';
-            input.setAttribute('list', 'tz-datalist');
-        }
     });
 }
 
@@ -67,9 +56,6 @@ function updateHeaderClockZone(slot, tz) {
     headerClockZones[slot - 1] = tz;
     storageSet('ff-header-clock-zones', headerClockZones);
     updateClocks();
-    // Also update the input value if it was cleared or changed
-    var input = document.getElementById('clock-tz-' + slot);
-    if (input) input.value = tz;
 }
 
 function updateClocks() {
@@ -2615,6 +2601,19 @@ function updateTimezone(tz) {
     renderTimeCounter();
 }
 function formatTimeInZone(date, tz) { return date.toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); }
+
+function populateTimezoneSelect() {
+    var sel = document.getElementById('timezone-select');
+    if (!sel) return;
+    var zones;
+    try { zones = Intl.supportedValuesOf('timeZone'); }
+    catch (e) { zones = ['UTC','Africa/Lagos','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Europe/Paris','Asia/Dubai','Asia/Kolkata','Asia/Shanghai','Australia/Sydney']; }
+    var current = getSelectedTimezone();
+    sel.innerHTML = zones.map(function(z) {
+        return '<option value="' + z + '" ' + (z === current ? 'selected' : '') + '>' + z + '</option>';
+    }).join('');
+}
+
 function renderTimeCounter() {
     var box = $('time-counter-box');
     if (!box) return;
@@ -2798,12 +2797,12 @@ function initApp() {
     }, 1000);
 
     setInterval(function() {
-    var now = new Date();
-    if (now.getHours() === 0 && now.getMinutes() === 0) {
-        adjustTasksForMidnight();
-        setupRecurringTasks();
-    }
-}, 60000);
+        var now = new Date();
+        if (now.getHours() === 0 && now.getMinutes() === 0) {
+            adjustTasksForMidnight();
+            setupRecurringTasks();
+        }
+    }, 60000);
 
     setInterval(checkForNotifications, 300000);
 
