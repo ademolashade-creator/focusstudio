@@ -835,45 +835,46 @@ function updateAttendanceDisplay() {
     var todayEntry = todayLog.length > 0 ? todayLog[0] : null;
 
     if (clockState.clockedIn) {
-    statusEl.textContent = 'On Duty';
-    statusEl.className = 'attendance-status on-duty';
+        statusEl.textContent = 'On Duty';
+        statusEl.className = 'attendance-status on-duty';
 
-    if (actualInEl) {
-        var clockInTime = todayEntry ? todayEntry.clockIn : new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        actualInEl.textContent = clockInTime || '--:--';
-    }
-    if (actualOutEl) actualOutEl.textContent = 'In progress';
-
-    // Elapsed time so far
-    var diffMs = Date.now() - clockState.startedAt;
-    var minutes = Math.round(diffMs / 60000);
-    var hours = Math.floor(minutes / 60);
-    var mins = minutes % 60;
-    if (todayHoursEl) todayHoursEl.textContent = hours + 'h ' + mins + 'm (in progress)';
-
-    // Countdown to scheduled out
-    if (summaryEl) {
-        var scheduledOut = clockState.scheduledOut || '17:00';
-        var scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
-        var nowMinutes = now.getHours() * 60 + now.getMinutes();
-        var remainingMinutes = scheduledOutMinutes - nowMinutes;
-        if (remainingMinutes > 0) {
-            var remHours = Math.floor(remainingMinutes / 60);
-            var remMins = remainingMinutes % 60;
-            summaryEl.textContent = 'Clock out in ' + remHours + 'h ' + remMins + 'm';
-            summaryEl.className = 'attendance-time-display';
-        } else if (remainingMinutes === 0) {
-            summaryEl.textContent = '⏰ Time to clock out!';
-            summaryEl.className = 'attendance-time-display late-text';
-        } else {
-            var overdue = Math.abs(remainingMinutes);
-            var overHours = Math.floor(overdue / 60);
-            var overMins = overdue % 60;
-            summaryEl.textContent = '⚠️ Overdue by ' + overHours + 'h ' + overMins + 'm';
-            summaryEl.className = 'attendance-time-display late-text';
+        if (actualInEl) {
+            var clockInTime = todayEntry ? todayEntry.clockIn : new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            actualInEl.textContent = clockInTime || '--:--';
         }
-    }
-} else if (todayEntry && todayEntry.clockOut) {
+        if (actualOutEl) actualOutEl.textContent = 'In progress';
+
+        // Elapsed time so far
+        var diffMs = Date.now() - clockState.startedAt;
+        var minutes = Math.round(diffMs / 60000);
+        var hours = Math.floor(minutes / 60);
+        var mins = minutes % 60;
+        if (todayHoursEl) todayHoursEl.textContent = hours + 'h ' + mins + 'm (in progress)';
+
+        // Countdown to scheduled out
+        if (summaryEl) {
+            var scheduledOut = clockState.scheduledOut || '17:00';
+            var scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
+            var nowMinutes = now.getHours() * 60 + now.getMinutes();
+            var remainingMinutes = scheduledOutMinutes - nowMinutes;
+            if (remainingMinutes > 0) {
+                var remHours = Math.floor(remainingMinutes / 60);
+                var remMins = remainingMinutes % 60;
+                summaryEl.textContent = 'Clock out in ' + remHours + 'h ' + remMins + 'm';
+                summaryEl.className = 'attendance-time-display';
+            } else if (remainingMinutes === 0) {
+                summaryEl.textContent = '⏰ Time to clock out!';
+                summaryEl.className = 'attendance-time-display late-text';
+            } else {
+                var overdue = Math.abs(remainingMinutes);
+                var overHours = Math.floor(overdue / 60);
+                var overMins = overdue % 60;
+                summaryEl.textContent = '⚠️ Overdue by ' + overHours + 'h ' + overMins + 'm';
+                summaryEl.className = 'attendance-time-display late-text';
+            }
+        }
+
+    } else if (todayEntry && todayEntry.clockOut) {
         // Clocked out
         statusEl.textContent = 'Clocked Out';
         statusEl.className = 'attendance-status off-duty';
@@ -908,8 +909,6 @@ function updateAttendanceDisplay() {
         }
 
     } else if (todayEntry && todayEntry.clockIn) {
-        // Clocked in earlier but clocked out now? This case is covered above.
-        // But if for some reason the entry exists but not clocked out, we handle it.
         statusEl.textContent = 'Clocked In';
         statusEl.className = 'attendance-status on-duty';
         if (actualInEl) actualInEl.textContent = todayEntry.clockIn || '--:--';
@@ -926,7 +925,7 @@ function updateAttendanceDisplay() {
         if (summaryEl) summaryEl.textContent = 'Not clocked in today';
     }
 
-    var btn = $('clock-btn');
+    var btn = document.getElementById('clock-btn');
     if (btn) {
         if (clockState.clockedIn) {
             btn.textContent = 'Clock Out';
