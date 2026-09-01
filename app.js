@@ -15,8 +15,7 @@ const $ = (id) => document.getElementById(id);
 let appSettings = storageGet('ff-app-settings', { 
     appName: 'Focus & Flow Studio', 
     darkMode: false,
-    notificationsEnabled: true,
-    voiceEnabled: true
+    notificationsEnabled: true
 });
 
 function applySettings() {
@@ -94,37 +93,7 @@ const quotes = [
     "Success is the sum of small efforts repeated day in and day out. — Robert Collier",
     "You don't have to be extreme, just consistent. — Unknown",
     "The quality of your work is a reflection of the quality of your focus. — Unknown",
-    "Do not let what you cannot do interfere with what you can do. — John Wooden",
-    "The only way to do great work is to love what you do. — Steve Jobs",
-    "The beginning is the most important part of the work. — Plato",
-    "The secret of change is to focus all of your energy not on fighting the old, but on building the new. — Socrates",
-    "Your energy is your currency. Spend it wisely. — Unknown",
-    "The quieter you become, the more you can hear. — Ram Dass",
-    "It does not matter how slowly you go as long as you do not stop. — Confucius",
-    "The more you know yourself, the more you can focus. — Unknown",
-    "The key is not to prioritize what's on your schedule, but to schedule your priorities. — Stephen Covey",
-    "The best time to start was yesterday. The next best time is now. — Unknown",
-    "Discipline is choosing between what you want now and what you want most. — Abraham Lincoln",
-    "The only limit to our realization of tomorrow is our doubts of today. — FDR",
-    "Success is not final, failure is not fatal: it is the courage to continue that counts. — Churchill",
-    "The purpose of life is not to be happy. It is to be useful, to be honorable, to be compassionate. — Emerson",
-    "The future depends on what you do today. — Mahatma Gandhi",
-    "In the middle of difficulty lies opportunity. — Einstein",
-    "It always seems impossible until it is done. — Nelson Mandela",
-    "The journey of a thousand miles begins with one step. — Lao Tzu",
-    "Your time is limited, so don't waste it living someone else's life. — Steve Jobs",
-    "The only thing we have to fear is fear itself. — FDR",
-    "I have not failed. I've just found 10,000 ways that won't work. — Edison",
-    "The best revenge is massive success. — Frank Sinatra",
-    "The only source of knowledge is experience. — Einstein",
-    "The greatest glory in living lies not in never falling, but in rising every time we fall. — Mandela",
-    "The future belongs to those who believe in the beauty of their dreams. — Eleanor Roosevelt",
-    "The only way to achieve the impossible is to believe it is possible. — Charles Kingsleigh",
-    "The mind is everything. What you think you become. — Buddha",
-    "To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment. — Emerson",
-    "Success is not how high you have climbed, but how you make a positive difference to the world. — Roy Bennett",
-    "The only person you are destined to become is the person you decide to be. — Emerson",
-    "The best way to find yourself is to lose yourself in the service of others. — Gandhi"
+    "Do not let what you cannot do interfere with what you can do. — John Wooden"
 ];
 let quoteInterval = null;
 function rotateQuote() {
@@ -238,7 +207,7 @@ function toggleBreak() {
         breakTracker.isFlowBreak = false;
         $('break-away-time').textContent = '00:00';
         $('break-overlay').style.display = 'flex';
-        breakTracker.interval = setInterval(() => {
+        breakTracker.interval = setInterval(function() {
             breakTracker.elapsedSeconds = Math.floor((Date.now() - breakTracker.start) / 1000);
             $('break-away-time').textContent = formatMinSec(breakTracker.elapsedSeconds);
         }, 1000);
@@ -253,8 +222,8 @@ function resumeFromBreak() {
     const breakLog = storageGet('ff-break-log', []);
     breakLog.unshift({
         date: new Date().toISOString(),
-        durationMinutes,
-        reason,
+        durationMinutes: durationMinutes,
+        reason: reason,
         type: breakTracker.isFlowBreak ? 'Flow Break' : 'Break'
     });
     if (breakLog.length > 100) breakLog.pop();
@@ -282,7 +251,7 @@ function initiateFlowBreakOverlay() {
     breakTracker.isFlowBreak = true;
     $('flow-break-away-time').textContent = '00:00';
     $('flow-break-overlay').style.display = 'flex';
-    breakTracker.interval = setInterval(() => {
+    breakTracker.interval = setInterval(function() {
         breakTracker.elapsedSeconds = Math.floor((Date.now() - breakTracker.start) / 1000);
         $('flow-break-away-time').textContent = formatMinSec(breakTracker.elapsedSeconds);
     }, 1000);
@@ -414,20 +383,22 @@ function buildChunks(totalMinutes) {
             remaining -= CHUNK;
         }
     }
-    return { chunks, bonusBreakMinutes };
+    return { chunks: chunks, bonusBreakMinutes: bonusBreakMinutes };
 }
 
 function getPrioritizedOpenTasks() {
     let openEntries = [];
-    boardData.forEach((col, ci) => {
-        col.tasks.forEach((task, ti) => {
-            if (!task.completed) openEntries.push({ col, task, ci, ti, actualSecondsSoFar: task.trackedSeconds || 0 });
+    boardData.forEach(function(col, ci) {
+        col.tasks.forEach(function(task, ti) {
+            if (!task.completed) {
+                openEntries.push({ col: col, task: task, ci: ci, ti: ti, actualSecondsSoFar: task.trackedSeconds || 0 });
+            }
         });
     });
 
-    openEntries.sort((a, b) => {
-        const idxA = customQueueOrder.indexOf(a.task.id);
-        const idxB = customQueueOrder.indexOf(b.task.id);
+    openEntries.sort(function(a, b) {
+        var idxA = customQueueOrder.indexOf(a.task.id);
+        var idxB = customQueueOrder.indexOf(b.task.id);
         if (idxA !== -1 && idxB !== -1) return idxA - idxB;
         if (idxA !== -1) return -1;
         if (idxB !== -1) return 1;
@@ -443,11 +414,11 @@ function getPrioritizedOpenTasks() {
     return openEntries;
 }
 
-let queueDragTaskId = null;
+var queueDragTaskId = null;
 function queueDragStart(e, taskId) {
     queueDragTaskId = taskId;
     e.dataTransfer.effectAllowed = "move";
-    setTimeout(() => e.target.classList.add('dragging'), 0);
+    setTimeout(function() { e.target.classList.add('dragging'); }, 0);
 }
 function queueDragOver(e) {
     e.preventDefault();
@@ -459,15 +430,15 @@ function queueDragLeave(e) {
 function queueDrop(e, targetTaskId) {
     e.preventDefault();
     e.currentTarget.style.backgroundColor = '';
-    document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+    document.querySelectorAll('.dragging').forEach(function(el) { el.classList.remove('dragging'); });
 
     if (!queueDragTaskId || queueDragTaskId === targetTaskId) return;
 
-    const tasks = getPrioritizedOpenTasks();
-    const currentOrder = tasks.map(t => t.task.id);
+    var tasks = getPrioritizedOpenTasks();
+    var currentOrder = tasks.map(function(t) { return t.task.id; });
 
-    const fromIdx = currentOrder.indexOf(queueDragTaskId);
-    const toIdx = currentOrder.indexOf(targetTaskId);
+    var fromIdx = currentOrder.indexOf(queueDragTaskId);
+    var toIdx = currentOrder.indexOf(targetTaskId);
 
     if (fromIdx === -1 || toIdx === -1) return;
 
@@ -481,42 +452,44 @@ function queueDrop(e, targetTaskId) {
 }
 
 function renderInternalQueue() {
-    const q = $('internal-flow-queue');
+    var q = $('internal-flow-queue');
     if (!q) return;
-    const tasks = getPrioritizedOpenTasks();
+    var tasks = getPrioritizedOpenTasks();
     if (tasks.length === 0) {
         q.innerHTML = '<li style="color:#888;">No open tasks. Add some below.</li>';
         return;
     }
-    q.innerHTML = tasks.map((entry, idx) => `
-        <li draggable="true" 
-            ondragstart="queueDragStart(event, '${entry.task.id}')" 
-            ondragover="queueDragOver(event)" 
-            ondragleave="queueDragLeave(event)" 
-            ondrop="queueDrop(event, '${entry.task.id}')">
-            <div style="display:flex;align-items:center;gap:6px;">
-                <span style="color:var(--cherry-red);font-size:1.1rem;cursor:grab;padding-right:4px;" title="Drag to reorder sequence">≡</span>
-                <span style="color:#888;font-size:0.7rem;">${idx+1}.</span> 
-                ${escapeHTML(entry.task.text)}
-            </div>
-            ${getDeadlineBadge(entry.task)}
-        </li>
-    `).join('');
+    q.innerHTML = tasks.map(function(entry, idx) {
+        return '<li draggable="true" ' +
+            'ondragstart="queueDragStart(event, \'' + entry.task.id + '\')" ' +
+            'ondragover="queueDragOver(event)" ' +
+            'ondragleave="queueDragLeave(event)" ' +
+            'ondrop="queueDrop(event, \'' + entry.task.id + '\')">' +
+            '<div style="display:flex;align-items:center;gap:6px;">' +
+            '<span style="color:var(--cherry-red);font-size:1.1rem;cursor:grab;padding-right:4px;" title="Drag to reorder sequence">≡</span>' +
+            '<span style="color:#888;font-size:0.7rem;">' + (idx+1) + '.</span> ' +
+            escapeHTML(entry.task.text) +
+            '</div>' +
+            getDeadlineBadge(entry.task) +
+            '</li>';
+    }).join('');
 }
 
 function buildFlowSegments() {
-    const segments = [];
-    const openEntries = getPrioritizedOpenTasks();
-    const standardBreak = parseInt(breakInput.value) || 5;
+    var segments = [];
+    var openEntries = getPrioritizedOpenTasks();
+    var standardBreak = parseInt(breakInput.value) || 5;
 
-    openEntries.forEach((entry, entryIdx) => {
-        const { chunks, bonusBreakMinutes } = buildChunks(Math.max(1, entry.task.estimateMinutes || 15));
-        chunks.forEach((chunkMin, i) => {
-            const isLastChunk = i === chunks.length - 1;
-            segments.push({ type: 'work', entry, minutes: chunkMin, isLastChunk });
-            const isVeryLastSegment = (entryIdx === openEntries.length - 1) && isLastChunk;
+    openEntries.forEach(function(entry, entryIdx) {
+        var chunkData = buildChunks(Math.max(1, entry.task.estimateMinutes || 15));
+        var chunks = chunkData.chunks;
+        var bonusBreakMinutes = chunkData.bonusBreakMinutes;
+        chunks.forEach(function(chunkMin, i) {
+            var isLastChunk = (i === chunks.length - 1);
+            segments.push({ type: 'work', entry: entry, minutes: chunkMin, isLastChunk: isLastChunk });
+            var isVeryLastSegment = (entryIdx === openEntries.length - 1) && isLastChunk;
             if (!isVeryLastSegment) {
-                const breakMin = isLastChunk ? standardBreak + bonusBreakMinutes : standardBreak;
+                var breakMin = isLastChunk ? standardBreak + bonusBreakMinutes : standardBreak;
                 segments.push({ type: 'break', minutes: breakMin });
             }
         });
@@ -547,13 +520,13 @@ function startFlow() {
 function currentFlowSegment() { return flowSegments[flowSegIndex]; }
 
 function beginFlowSegment() {
-    const seg = currentFlowSegment();
+    var seg = currentFlowSegment();
     if (!seg) { finishFlow(); return; }
     flowExtraSeconds = 0;
     totalTime = timeLeft = seg.minutes * 60;
 
     if (seg.type === 'work') {
-        modeIndicator.textContent = `Flow: ${seg.entry.task.text}`;
+        modeIndicator.textContent = 'Flow: ' + seg.entry.task.text;
         progressBar.style.backgroundColor = 'var(--cherry-red)';
         if (!seg.entry.task.startedAtIso) seg.entry.task.startedAtIso = new Date().toISOString();
         announce('Work');
@@ -567,12 +540,13 @@ function beginFlowSegment() {
 
 function advanceFlow() {
     playSound();
-    const seg = currentFlowSegment();
+    var seg = currentFlowSegment();
     if (seg && seg.type === 'work') {
         seg.entry.actualSecondsSoFar += seg.minutes * 60 + flowExtraSeconds;
         recordFlowBlockCompleted();
-        if (seg.isLastChunk) completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
-        else {
+        if (seg.isLastChunk) {
+            completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
+        } else {
             seg.entry.task.trackedSeconds = seg.entry.actualSecondsSoFar;
             saveBoardData();
         }
@@ -582,7 +556,7 @@ function advanceFlow() {
 }
 
 function completeFlowTask(entry, actualSeconds) {
-    const task = entry.task;
+    var task = entry.task;
     task.completed = true;
     task.isTracking = false;
     task.trackedSeconds = actualSeconds;
@@ -593,11 +567,11 @@ function completeFlowTask(entry, actualSeconds) {
         task.timeSegments.push({ start: task.startedAtIso, end: task.completedAtIso });
     }
 
-    const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    var historyId = 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     task._historyId = historyId;
 
-    const totalBreaks = task.breaks.reduce((acc, b) => acc + (b.durationMinutes || 0), 0);
-    let breaksStr = task.breaks.length ? `[Breaks: ${task.breaks.map(b=>b.reason).join(', ')}] ` : '';
+    var totalBreaks = task.breaks.reduce(function(acc, b) { return acc + (b.durationMinutes || 0); }, 0);
+    var breaksStr = task.breaks.length ? '[Breaks: ' + task.breaks.map(function(b) { return b.reason; }).join(', ') + '] ' : '';
 
     historyData.unshift({
         _id: historyId,
@@ -632,13 +606,12 @@ function finishFlow() {
     announce('Flow complete. Nice work.');
 }
 
-// ---------- SKIP SEGMENT ----------
 function skipCurrentSegment() {
     if (timerMode === 'flow') {
-        const seg = currentFlowSegment();
+        var seg = currentFlowSegment();
         if (!seg) return;
         if (seg.type === 'work') {
-            const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
+            var elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
             seg.entry.actualSecondsSoFar += elapsed;
             if (seg.isLastChunk) {
                 completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
@@ -651,7 +624,7 @@ function skipCurrentSegment() {
         beginFlowSegment();
         return;
     }
-    
+
     if (isWorkTime) {
         recordFlowBlockCompleted();
         playSound();
@@ -681,9 +654,9 @@ function endSessionAbandon() {
 }
 function creditCurrentSegment() {
     if (timerMode === 'flow') {
-        const seg = currentFlowSegment();
+        var seg = currentFlowSegment();
         if (seg && seg.type === 'work') {
-            const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
+            var elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
             seg.entry.actualSecondsSoFar += elapsed;
             recordFlowBlockCompleted();
             if (seg.isLastChunk) completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
@@ -706,7 +679,7 @@ function finishSessionCleanup(label) {
 }
 
 // ---------- Clock In / Out (with Attendance System) ----------
-let clockState = storageGet('ff-clock-state', { 
+var clockState = storageGet('ff-clock-state', { 
     clockedIn: false, 
     startedAt: null,
     scheduledIn: '09:00',
@@ -714,30 +687,30 @@ let clockState = storageGet('ff-clock-state', {
     attendanceLog: []
 });
 
-let clockLog = storageGet('ff-clock-log', []);
+var clockLog = storageGet('ff-clock-log', []);
 
 function toggleClock() {
-    const btn = $('clock-btn');
-    const now = new Date();
-    const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const dateString = now.toLocaleDateString();
-    
+    var btn = $('clock-btn');
+    var now = new Date();
+    var timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    var dateString = now.toLocaleDateString();
+
     if (clockState.clockedIn) {
-        const durationMs = Date.now() - clockState.startedAt;
-        const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
-        const hours = Math.floor(durationMinutes / 60);
-        const mins = durationMinutes % 60;
-        
-        const scheduledIn = clockState.scheduledIn || '09:00';
-        const scheduledOut = clockState.scheduledOut || '17:00';
-        
-        const nowMinutes = now.getHours() * 60 + now.getMinutes();
-        const scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
-        
-        const isLate = nowMinutes > scheduledOutMinutes + 5;
-        const isEarly = nowMinutes < scheduledOutMinutes - 5;
-        
-        const logEntry = {
+        var durationMs = Date.now() - clockState.startedAt;
+        var durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+        var hours = Math.floor(durationMinutes / 60);
+        var mins = durationMinutes % 60;
+
+        var scheduledIn = clockState.scheduledIn || '09:00';
+        var scheduledOut = clockState.scheduledOut || '17:00';
+
+        var nowMinutes = now.getHours() * 60 + now.getMinutes();
+        var scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
+
+        var isLate = nowMinutes > scheduledOutMinutes + 5;
+        var isEarly = nowMinutes < scheduledOutMinutes - 5;
+
+        var logEntry = {
             date: dateString,
             dateKey: getTodayKey(),
             clockIn: new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -749,15 +722,15 @@ function toggleClock() {
             isLate: isLate,
             isEarly: isEarly
         };
-        
+
         clockLog.unshift(logEntry);
         if (clockLog.length > 100) clockLog.pop();
         storageSet('ff-clock-log', clockLog);
-        
+
         if (!clockState.attendanceLog) clockState.attendanceLog = [];
         clockState.attendanceLog.unshift(logEntry);
         if (clockState.attendanceLog.length > 365) clockState.attendanceLog.pop();
-        
+
         clockState = { 
             clockedIn: false, 
             startedAt: null,
@@ -766,26 +739,26 @@ function toggleClock() {
             attendanceLog: clockState.attendanceLog || []
         };
         storageSet('ff-clock-state', clockState);
-        
+
         btn.textContent = 'Clock In';
         btn.classList.remove('active', 'clocking-out');
-        
+
         updateAttendanceDisplay();
         renderDailyRecap();
-        
-        const statusMsg = isLate ? '⚠️ Clocked out LATE' : isEarly ? '✅ Clocked out EARLY' : '✅ Clocked out ON TIME';
-        const durationMsg = `${hours}h ${mins}m worked today.`;
-        const summaryBox = $('summary-content');
+
+        var statusMsg = isLate ? '⚠️ Clocked out LATE' : isEarly ? '✅ Clocked out EARLY' : '✅ Clocked out ON TIME';
+        var durationMsg = hours + 'h ' + mins + 'm worked today.';
+        var summaryBox = $('summary-content');
         if (summaryBox) {
-            summaryBox.textContent = `⏰ ${statusMsg} — ${durationMsg}`;
+            summaryBox.textContent = '⏰ ' + statusMsg + ' — ' + durationMsg;
         }
-        
-        if (confirm(`Clocked Out at ${timeString}. ${durationMsg}\n\nGenerate a Daily Check-Out Brief?`)) {
+
+        if (confirm('Clocked Out at ' + timeString + '. ' + durationMsg + '\n\nGenerate a Daily Check-Out Brief?')) {
             generateDailyCheckOut();
         }
-        
-        sendNotification('Clocked Out', `Worked ${hours}h ${mins}m. ${statusMsg}`);
-        
+
+        sendNotification('Clocked Out', 'Worked ' + hours + 'h ' + mins + 'm. ' + statusMsg);
+
     } else {
         clockState = { 
             clockedIn: true, 
@@ -795,41 +768,41 @@ function toggleClock() {
             attendanceLog: clockState.attendanceLog || []
         };
         storageSet('ff-clock-state', clockState);
-        
+
         btn.textContent = 'Clock Out';
         btn.classList.add('active');
-        
-        const scheduledIn = clockState.scheduledIn || '09:00';
-        const scheduledInMinutes = parseInt(scheduledIn.split(':')[0]) * 60 + parseInt(scheduledIn.split(':')[1]);
-        const nowMinutes = now.getHours() * 60 + now.getMinutes();
-        const isLate = nowMinutes > scheduledInMinutes + 5;
-        
-        if (isLate) {
+
+        var scheduledIn2 = clockState.scheduledIn || '09:00';
+        var scheduledInMinutes2 = parseInt(scheduledIn2.split(':')[0]) * 60 + parseInt(scheduledIn2.split(':')[1]);
+        var nowMinutes2 = now.getHours() * 60 + now.getMinutes();
+        var isLate2 = nowMinutes2 > scheduledInMinutes2 + 5;
+
+        if (isLate2) {
             btn.classList.add('clocking-out');
-            const lateMins = nowMinutes - scheduledInMinutes;
-            const summaryBox = $('summary-content');
-            if (summaryBox) {
-                summaryBox.textContent = `⏰ Clocked in ${lateMins} minutes LATE at ${timeString}.`;
+            var lateMins = nowMinutes2 - scheduledInMinutes2;
+            var summaryBox2 = $('summary-content');
+            if (summaryBox2) {
+                summaryBox2.textContent = '⏰ Clocked in ' + lateMins + ' minutes LATE at ' + timeString + '.';
             }
         } else {
-            const summaryBox = $('summary-content');
-            if (summaryBox) {
-                summaryBox.textContent = `✅ Clocked in ON TIME at ${timeString}.`;
+            var summaryBox3 = $('summary-content');
+            if (summaryBox3) {
+                summaryBox3.textContent = '✅ Clocked in ON TIME at ' + timeString + '.';
             }
         }
-        
+
         updateAttendanceDisplay();
         renderDailyRecap();
-        sendNotification('Clocked In', `Started work at ${timeString}`);
+        sendNotification('Clocked In', 'Started work at ' + timeString);
     }
-    
+
     updateAttendanceDisplay();
 }
 
 function saveAttendanceSettings() {
-    const scheduledIn = document.getElementById('scheduled-in')?.value || '09:00';
-    const scheduledOut = document.getElementById('scheduled-out')?.value || '17:00';
-    
+    var scheduledIn = document.getElementById('scheduled-in') ? document.getElementById('scheduled-in').value : '09:00';
+    var scheduledOut = document.getElementById('scheduled-out') ? document.getElementById('scheduled-out').value : '17:00';
+
     clockState.scheduledIn = scheduledIn;
     clockState.scheduledOut = scheduledOut;
     storageSet('ff-clock-state', clockState);
@@ -837,21 +810,21 @@ function saveAttendanceSettings() {
 }
 
 function updateAttendanceDisplay() {
-    const statusEl = document.getElementById('attendance-status');
-    const actualInEl = document.getElementById('actual-in-display');
-    const actualOutEl = document.getElementById('actual-out-display');
-    const todayHoursEl = document.getElementById('today-hours');
-    const summaryEl = document.getElementById('attendance-summary');
-    
+    var statusEl = document.getElementById('attendance-status');
+    var actualInEl = document.getElementById('actual-in-display');
+    var actualOutEl = document.getElementById('actual-out-display');
+    var todayHoursEl = document.getElementById('today-hours');
+    var summaryEl = document.getElementById('attendance-summary');
+
     if (!statusEl) return;
-    
-    const now = new Date();
-    const todayKey = getTodayKey();
-    const todayDateStr = now.toLocaleDateString();
-    
-    const todayLog = clockLog.filter(l => l.dateKey === todayKey || l.date === todayDateStr);
-    const todayEntry = todayLog.length > 0 ? todayLog[0] : null;
-    
+
+    var now = new Date();
+    var todayKey = getTodayKey();
+    var todayDateStr = now.toLocaleDateString();
+
+    var todayLog = clockLog.filter(function(l) { return l.dateKey === todayKey || l.date === todayDateStr; });
+    var todayEntry = todayLog.length > 0 ? todayLog[0] : null;
+
     if (clockState.clockedIn) {
         statusEl.textContent = 'On Duty';
         statusEl.className = 'attendance-status on-duty';
@@ -865,39 +838,39 @@ function updateAttendanceDisplay() {
         statusEl.textContent = 'Off Duty';
         statusEl.className = 'attendance-status off-duty';
     }
-    
+
     if (todayEntry) {
         if (actualInEl) actualInEl.textContent = todayEntry.clockIn || '--:--';
         if (actualOutEl) actualOutEl.textContent = todayEntry.clockOut || '--:--';
-        
+
         if (todayEntry.durationMinutes) {
-            const hours = Math.floor(todayEntry.durationMinutes / 60);
-            const mins = todayEntry.durationMinutes % 60;
-            if (todayHoursEl) todayHoursEl.textContent = `${hours}h ${mins}m`;
+            var hours = Math.floor(todayEntry.durationMinutes / 60);
+            var mins = todayEntry.durationMinutes % 60;
+            if (todayHoursEl) todayHoursEl.textContent = hours + 'h ' + mins + 'm';
         } else if (clockState.clockedIn) {
-            const durationMs = Date.now() - clockState.startedAt;
-            const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
-            const hours = Math.floor(durationMinutes / 60);
-            const mins = durationMinutes % 60;
-            if (todayHoursEl) todayHoursEl.textContent = `${hours}h ${mins}m (in progress)`;
+            var durationMs2 = Date.now() - clockState.startedAt;
+            var durationMinutes2 = Math.max(1, Math.round(durationMs2 / 60000));
+            var hours2 = Math.floor(durationMinutes2 / 60);
+            var mins2 = durationMinutes2 % 60;
+            if (todayHoursEl) todayHoursEl.textContent = hours2 + 'h ' + mins2 + 'm (in progress)';
         } else {
             if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
         }
-        
+
         if (todayEntry.clockOut && todayEntry.scheduledOut) {
-            const scheduledOut = todayEntry.scheduledOut || '17:00';
-            const scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
-            const actualOutMinutes = parseInt(todayEntry.clockOut.split(':')[0]) * 60 + parseInt(todayEntry.clockOut.split(':')[1]);
-            const diff = actualOutMinutes - scheduledOutMinutes;
-            
+            var scheduledOut2 = todayEntry.scheduledOut || '17:00';
+            var scheduledOutMinutes2 = parseInt(scheduledOut2.split(':')[0]) * 60 + parseInt(scheduledOut2.split(':')[1]);
+            var actualOutMinutes = parseInt(todayEntry.clockOut.split(':')[0]) * 60 + parseInt(todayEntry.clockOut.split(':')[1]);
+            var diff = actualOutMinutes - scheduledOutMinutes2;
+
             if (todayEntry.isLate) {
                 if (summaryEl) {
-                    summaryEl.textContent = `⚠️ ${Math.abs(diff)} min late`;
+                    summaryEl.textContent = '⚠️ ' + Math.abs(diff) + ' min late';
                     summaryEl.className = 'attendance-time-display late-text';
                 }
             } else if (todayEntry.isEarly) {
                 if (summaryEl) {
-                    summaryEl.textContent = `✅ ${Math.abs(diff)} min early`;
+                    summaryEl.textContent = '✅ ' + Math.abs(diff) + ' min early';
                     summaryEl.className = 'attendance-time-display early-text';
                 }
             } else {
@@ -908,8 +881,8 @@ function updateAttendanceDisplay() {
             }
         } else if (clockState.clockedIn) {
             if (summaryEl) {
-                const scheduledOut = clockState.scheduledOut || '17:00';
-                summaryEl.textContent = `Scheduled out at ${scheduledOut}`;
+                var scheduledOut3 = clockState.scheduledOut || '17:00';
+                summaryEl.textContent = 'Scheduled out at ' + scheduledOut3;
                 summaryEl.className = 'attendance-time-display';
             }
         } else {
@@ -927,8 +900,8 @@ function updateAttendanceDisplay() {
             summaryEl.className = 'attendance-time-display';
         }
     }
-    
-    const btn = $('clock-btn');
+
+    var btn = $('clock-btn');
     if (btn) {
         if (clockState.clockedIn) {
             btn.textContent = 'Clock Out';
@@ -942,40 +915,41 @@ function updateAttendanceDisplay() {
 }
 
 // ---------- Task board ----------
-const defaultColumns = [
+var defaultColumns = [
     { id: 1, title: 'Client A / Priority 1', tasks: [], notesRequired: false },
     { id: 2, title: 'Client B / Priority 2', tasks: [], notesRequired: false },
     { id: 3, title: 'Admin & Content', tasks: [], notesRequired: false }
 ];
 
-let boardData = storageGet('focus_board_data', defaultColumns);
-let historyData = storageGet('focus_history_data', []);
-let taskTimeMemory = storageGet('ff-task-time-memory', {});
+var boardData = storageGet('focus_board_data', defaultColumns);
+var historyData = storageGet('focus_history_data', []);
+var taskTimeMemory = storageGet('ff-task-time-memory', {});
 
 function getTodayKey() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 function getYesterdayKey() {
-    const d = new Date(); d.setDate(d.getDate() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    var d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 function dateKeyFromISO(isoString) {
-    const d = new Date(isoString);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    var d = new Date(isoString);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 function formatDateKey(dateKey) {
     if (dateKey === getTodayKey()) return 'Today';
     if (dateKey === getYesterdayKey()) return 'Yesterday';
-    const d = new Date(dateKey + 'T00:00:00');
+    var d = new Date(dateKey + 'T00:00:00');
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 function adjustTasksForMidnight() {
-    const today = getTodayKey();
-    let changed = false;
-    boardData.forEach(col => {
-        col.tasks.forEach(task => {
+    var today = getTodayKey();
+    var changed = false;
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
             if (!task.completed && task.dateAdded !== today) {
                 task.dateAdded = today;
                 changed = true;
@@ -988,11 +962,11 @@ function adjustTasksForMidnight() {
     }
 }
 
-// Migration to Enterprise Schema
-boardData.forEach(col => {
+// Migration
+boardData.forEach(function(col) {
     if (col.collapsed === undefined) col.collapsed = false;
     if (col.notesRequired === undefined) col.notesRequired = false;
-    col.tasks.forEach(t => {
+    col.tasks.forEach(function(t) {
         if (t.estimateMinutes === undefined) t.estimateMinutes = 15;
         if (t.trackedSeconds === undefined) t.trackedSeconds = 0;
         if (t.isTracking === undefined) t.isTracking = false;
@@ -1023,7 +997,7 @@ function saveBoardData() {
 
 function urgencyClassFor(task) {
     if (!task.estimateMinutes || task.trackedSeconds === 0) return '';
-    const ratio = (task.trackedSeconds / 60) / task.estimateMinutes;
+    var ratio = (task.trackedSeconds / 60) / task.estimateMinutes;
     if (ratio < 0.8) return 'time-ok';
     if (ratio <= 1.0) return 'time-warn';
     return 'time-over';
@@ -1031,50 +1005,52 @@ function urgencyClassFor(task) {
 
 function getDeadlineBadge(task) {
     if (!task.deadlineTime) return '';
-    const ms = new Date(task.deadlineTime).getTime() - Date.now();
-    const hrs = ms / 3600000;
-    if (hrs < 0) return `<span class="deadline-badge red">Overdue</span>`;
-    if (hrs <= 1) return `<span class="deadline-badge red">< 1h</span>`;
-    if (hrs <= 3) return `<span class="deadline-badge amber">< 3h</span>`;
+    var ms = new Date(task.deadlineTime).getTime() - Date.now();
+    var hrs = ms / 3600000;
+    if (hrs < 0) return '<span class="deadline-badge red">Overdue</span>';
+    if (hrs <= 1) return '<span class="deadline-badge red">< 1h</span>';
+    if (hrs <= 3) return '<span class="deadline-badge amber">< 3h</span>';
     return '';
 }
 
 function formatMinSec(totalSeconds) {
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    var m = Math.floor(totalSeconds / 60);
+    var s = totalSeconds % 60;
+    return m + ':' + s.toString().padStart(2, '0');
 }
 
-let _toggledDateGroups = {};
+var _toggledDateGroups = {};
 function groupTasksByDate(tasks) {
-    const groups = {};
-    tasks.forEach((task, originalIndex) => {
-        const key = task.dateAdded || getTodayKey();
+    var groups = {};
+    tasks.forEach(function(task, originalIndex) {
+        var key = task.dateAdded || getTodayKey();
         if (!groups[key]) groups[key] = { incomplete: [], completed: [] };
-        if (task.completed) groups[key].completed.push({ task, originalIndex });
-        else groups[key].incomplete.push({ task, originalIndex });
+        if (task.completed) groups[key].completed.push({ task: task, originalIndex: originalIndex });
+        else groups[key].incomplete.push({ task: task, originalIndex: originalIndex });
     });
-    Object.values(groups).forEach((g) => g.completed.sort((a, b) => (a.task.completedAt || 0) - (b.task.completedAt || 0)));
+    Object.values(groups).forEach(function(g) {
+        g.completed.sort(function(a, b) { return (a.task.completedAt || 0) - (b.task.completedAt || 0); });
+    });
 
-    const today = getTodayKey();
-    const yesterday = getYesterdayKey();
+    var today = getTodayKey();
+    var yesterday = getYesterdayKey();
 
-    return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map((key) => {
-        let isCollapsed = (key !== today && key !== yesterday);
+    return Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); }).map(function(key) {
+        var isCollapsed = (key !== today && key !== yesterday);
         if (_toggledDateGroups[key] !== undefined) isCollapsed = _toggledDateGroups[key];
         return {
             dateKey: key,
             dateLabel: formatDateKey(key),
-            isCollapsed,
-            items: [...groups[key].incomplete, ...groups[key].completed]
+            isCollapsed: isCollapsed,
+            items: groups[key].incomplete.concat(groups[key].completed)
         };
     });
 }
 
 function toggleDateGroup(key) {
-    const today = getTodayKey();
-    const yesterday = getYesterdayKey();
-    let isCurrentlyCollapsed = (key !== today && key !== yesterday);
+    var today = getTodayKey();
+    var yesterday = getYesterdayKey();
+    var isCurrentlyCollapsed = (key !== today && key !== yesterday);
     if (_toggledDateGroups[key] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[key];
     _toggledDateGroups[key] = !isCurrentlyCollapsed;
     renderBoard();
@@ -1083,22 +1059,24 @@ function toggleDateGroup(key) {
 // ---------- Autosuggest ----------
 function setupAutosuggest(inputElement) {
     if (!inputElement) return;
-    let timeout;
+    var timeout;
     inputElement.addEventListener('input', function(e) {
         clearTimeout(timeout);
-        const val = this.value.trim();
+        var val = this.value.trim();
         if (val.length < 2) return;
-        const allTaskNames = [];
-        boardData.forEach(col => col.tasks.forEach(t => allTaskNames.push(t.text)));
-        const matches = allTaskNames.filter(name => name.toLowerCase().startsWith(val.toLowerCase()) && name !== val);
+        var allTaskNames = [];
+        boardData.forEach(function(col) { col.tasks.forEach(function(t) { allTaskNames.push(t.text); }); });
+        var matches = allTaskNames.filter(function(name) {
+            return name.toLowerCase().startsWith(val.toLowerCase()) && name !== val;
+        });
         if (matches.length > 0) {
-            let datalist = document.getElementById('autosuggest-datalist');
+            var datalist = document.getElementById('autosuggest-datalist');
             if (!datalist) {
                 datalist = document.createElement('datalist');
                 datalist.id = 'autosuggest-datalist';
                 document.body.appendChild(datalist);
             }
-            datalist.innerHTML = matches.map(m => `<option value="${escapeHTML(m)}">`).join('');
+            datalist.innerHTML = matches.map(function(m) { return '<option value="' + escapeHTML(m) + '">'; }).join('');
             inputElement.setAttribute('list', 'autosuggest-datalist');
         } else {
             inputElement.removeAttribute('list');
@@ -1108,26 +1086,26 @@ function setupAutosuggest(inputElement) {
 
 // ---------- Natural Language Task Creation ----------
 async function naturalLanguageAddTask(ci) {
-    const input = $(`nl-task-input-${ci}`);
+    var input = document.getElementById('nl-task-input-' + ci);
     if (!input) return;
-    const text = input.value.trim();
+    var text = input.value.trim();
     if (!text) return;
-    
-    const apiKey = storageGet('gemini_api_key', null);
+
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) {
         alert('Please add your Gemini API key for natural language parsing.');
         return;
     }
-    
-    const prompt = `Parse this task into components: task name, time estimate (in minutes), deadline (if any). Return ONLY JSON: {"task":"name","minutes":number,"deadline":"YYYY-MM-DDTHH:mm" or null}. Input: "${text}"`;
-    
+
+    var prompt = 'Parse this task into components: task name, time estimate (in minutes), deadline (if any). Return ONLY JSON: {"task":"name","minutes":number,"deadline":"YYYY-MM-DDTHH:mm" or null}. Input: "' + text + '"';
+
     try {
-        const responseText = await callGemini(prompt);
-        const cleaned = responseText.replace(/```json|```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        
-        const col = boardData[ci];
-        const newTask = {
+        var responseText = await callGemini(prompt);
+        var cleaned = responseText.replace(/```json|```/g, '').trim();
+        var parsed = JSON.parse(cleaned);
+
+        var col = boardData[ci];
+        var newTask = {
             id: 't_' + Math.random().toString(36).substr(2,9),
             text: parsed.task || text,
             estimateMinutes: parsed.minutes || 15,
@@ -1166,14 +1144,14 @@ async function naturalLanguageAddTask(ci) {
 
 // ---------- Recurring Tasks ----------
 function setupRecurringTasks() {
-    const today = getTodayKey();
-    boardData.forEach(col => {
-        col.tasks.forEach(task => {
+    var today = getTodayKey();
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
             if (!task.recurrence || task.completed) return;
-            
-            const shouldCreateNew = shouldRecurToday(task);
+
+            var shouldCreateNew = shouldRecurToday(task);
             if (shouldCreateNew) {
-                const newTask = JSON.parse(JSON.stringify(task));
+                var newTask = JSON.parse(JSON.stringify(task));
                 newTask.id = 't_' + Math.random().toString(36).substr(2,9);
                 newTask.completed = false;
                 newTask.completedAt = null;
@@ -1198,22 +1176,22 @@ function setupRecurringTasks() {
 
 function shouldRecurToday(task) {
     if (!task.recurrence) return false;
-    const today = getTodayKey();
+    var today = getTodayKey();
     if (task.lastRecurrenceDate === today) return false;
-    
-    const now = new Date();
-    const lastDate = task.lastRecurrenceDate ? new Date(task.lastRecurrenceDate) : null;
-    const taskDate = task.dateAdded ? new Date(task.dateAdded) : null;
-    
+
+    var now = new Date();
+    var lastDate = task.lastRecurrenceDate ? new Date(task.lastRecurrenceDate) : null;
+    var taskDate = task.dateAdded ? new Date(task.dateAdded) : null;
+
     switch(task.recurrence) {
         case 'daily':
-            const diffDays = lastDate ? Math.floor((now - lastDate) / 86400000) : 1;
+            var diffDays = lastDate ? Math.floor((now - lastDate) / 86400000) : 1;
             return diffDays >= 1;
         case 'weekly':
-            const diffWeeks = lastDate ? Math.floor((now - lastDate) / 604800000) : 1;
+            var diffWeeks = lastDate ? Math.floor((now - lastDate) / 604800000) : 1;
             return diffWeeks >= 1 && now.getDay() === (taskDate ? taskDate.getDay() : 1);
         case 'monthly':
-            const diffMonths = lastDate ? (now.getMonth() - lastDate.getMonth()) + (now.getFullYear() - lastDate.getFullYear()) * 12 : 1;
+            var diffMonths = lastDate ? (now.getMonth() - lastDate.getMonth()) + (now.getFullYear() - lastDate.getFullYear()) * 12 : 1;
             return diffMonths >= 1 && now.getDate() === (taskDate ? taskDate.getDate() : 1);
         default:
             return false;
@@ -1226,51 +1204,51 @@ function startVoiceInput(ci) {
         alert('Voice input is not supported in this browser.');
         return;
     }
-    
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = false;
-    
+
     recognition.onstart = function() {
-        const btn = $(`voice-btn-${ci}`);
+        var btn = document.getElementById('voice-btn-' + ci);
         if (btn) btn.textContent = '🎙️ Listening...';
     };
-    
+
     recognition.onerror = function(event) {
-        const btn = $(`voice-btn-${ci}`);
+        var btn = document.getElementById('voice-btn-' + ci);
         if (btn) btn.textContent = '🎙️';
         alert('Voice input error: ' + event.error);
     };
-    
+
     recognition.onresult = function(event) {
-        const transcript = event.results[0][0].transcript;
-        const input = $(`task-input-${ci}`);
+        var transcript = event.results[0][0].transcript;
+        var input = document.getElementById('task-input-' + ci);
         if (input) {
             input.value = transcript;
             naturalLanguageAddTask(ci);
         }
-        const btn = $(`voice-btn-${ci}`);
+        var btn = document.getElementById('voice-btn-' + ci);
         if (btn) btn.textContent = '🎙️';
     };
-    
+
     recognition.start();
 }
 
 // ---------- PDF Report ----------
 function generatePDFReport() {
-    const summaryBox = $('summary-content');
+    var summaryBox = $('summary-content');
     summaryBox.textContent = 'Generating PDF report...';
-    
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
+
+    var printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
         alert('Please allow pop-ups to generate PDF reports.');
         return;
     }
-    
-    const today = new Date().toLocaleDateString();
-    let html = `
+
+    var today = new Date().toLocaleDateString();
+    var html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -1301,36 +1279,36 @@ function generatePDFReport() {
                 </div>
             </div>
     `;
-    
-    boardData.forEach(col => {
-        const openTasks = col.tasks.filter(t => !t.completed && !t.parentId);
-        const doneTasks = col.tasks.filter(t => t.completed && !t.parentId);
+
+    boardData.forEach(function(col) {
+        var openTasks = col.tasks.filter(function(t) { return !t.completed && !t.parentId; });
+        var doneTasks = col.tasks.filter(function(t) { return t.completed && !t.parentId; });
         if (openTasks.length === 0 && doneTasks.length === 0) return;
-        html += `<div class="client-section"><h2>${escapeHTML(col.title)}</h2>`;
+        html += '<div class="client-section"><h2>' + escapeHTML(col.title) + '</h2>';
         if (openTasks.length > 0) {
-            html += `<h3>Open Tasks</h3>`;
-            openTasks.forEach(t => {
-                html += `<div class="task-item">${escapeHTML(t.text)} <span class="task-meta">${t.estimateMinutes}m est</span></div>`;
-                const subtasks = col.tasks.filter(st => st.parentId === t.id);
-                subtasks.forEach(st => {
-                    html += `<div class="task-item" style="margin-left:24px;">↳ ${escapeHTML(st.text)} <span class="task-meta">${st.estimateMinutes}m est</span></div>`;
+            html += '<h3>Open Tasks</h3>';
+            openTasks.forEach(function(t) {
+                html += '<div class="task-item">' + escapeHTML(t.text) + ' <span class="task-meta">' + t.estimateMinutes + 'm est</span></div>';
+                var subtasks = col.tasks.filter(function(st) { return st.parentId === t.id; });
+                subtasks.forEach(function(st) {
+                    html += '<div class="task-item" style="margin-left:24px;">↳ ' + escapeHTML(st.text) + ' <span class="task-meta">' + st.estimateMinutes + 'm est</span></div>';
                 });
             });
         }
         if (doneTasks.length > 0) {
-            html += `<h3>Completed</h3>`;
-            doneTasks.forEach(t => {
-                html += `<div class="task-item task-done">${escapeHTML(t.text)} <span class="task-meta">${t.trackedSeconds ? Math.round(t.trackedSeconds/60) : t.estimateMinutes}m</span></div>`;
+            html += '<h3>Completed</h3>';
+            doneTasks.forEach(function(t) {
+                html += '<div class="task-item task-done">' + escapeHTML(t.text) + ' <span class="task-meta">' + (t.trackedSeconds ? Math.round(t.trackedSeconds/60) : t.estimateMinutes) + 'm</span></div>';
             });
         }
-        html += `</div>`;
+        html += '</div>';
     });
-    
+
     html += `
         </body>
         </html>
     `;
-    
+
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
@@ -1338,36 +1316,34 @@ function generatePDFReport() {
 }
 
 function getTodayCompleted() {
-    const today = getTodayKey();
-    return historyData.filter(h => dateKeyFromISO(h.completedAt) === today).length;
+    var today = getTodayKey();
+    return historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === today; }).length;
 }
 
 // ---------- Render Board ----------
 function renderBoard() {
-    const container = $('board-container');
+    var container = $('board-container');
     if (!container) return;
-    container.querySelectorAll('.task-column').forEach((el) => el.remove());
+    container.querySelectorAll('.task-column').forEach(function(el) { el.remove(); });
 
-    const colCountLabel = $('column-count-label');
-    if (colCountLabel) colCountLabel.textContent = `${boardData.length}/8 columns`;
+    var colCountLabel = $('column-count-label');
+    if (colCountLabel) colCountLabel.textContent = boardData.length + '/8 columns';
 
-    boardData.forEach((col, colIndex) => {
-        const columnEl = document.createElement('div');
+    boardData.forEach(function(col, colIndex) {
+        var columnEl = document.createElement('div');
         columnEl.className = 'task-column';
         columnEl.dataset.colIndex = colIndex;
-        const openCount = col.tasks.filter((t) => !t.completed).length;
+        var openCount = col.tasks.filter(function(t) { return !t.completed; }).length;
 
-        let suggestionsHtml = '';
+        var suggestionsHtml = '';
         if (col.aiSuggestions) {
-            suggestionsHtml = col.aiSuggestions.map((s, idx) => `
-                <div class="ai-suggestion-banner">
-                    <div><strong>AI Suggests:</strong> ${escapeHTML(s.task)} (${s.minutes}m)</div>
-                    <div>
-                        <button onclick="acceptAISuggestion(${colIndex}, ${idx})">Add</button>
-                        <button onclick="dismissAISuggestion(${colIndex}, ${idx})">Dismiss</button>
-                    </div>
-                </div>
-            `).join('');
+            suggestionsHtml = col.aiSuggestions.map(function(s, idx) {
+                return '<div class="ai-suggestion-banner">' +
+                    '<div><strong>AI Suggests:</strong> ' + escapeHTML(s.task) + ' (' + s.minutes + 'm)</div>' +
+                    '<div><button onclick="acceptAISuggestion(' + colIndex + ', ' + idx + ')">Add</button> ' +
+                    '<button onclick="dismissAISuggestion(' + colIndex + ', ' + idx + ')">Dismiss</button></div>' +
+                    '</div>';
+            }).join('');
         }
 
         columnEl.innerHTML = `
@@ -1422,10 +1398,10 @@ function renderBoard() {
                     <li class="date-group-header" onclick="toggleDateGroup('${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
                     ${group.isCollapsed ? '' : group.items.map(({ task, originalIndex: taskIndex }) => {
                         if (task.parentId) return '';
-                        
+
                         const hasSubtasks = col.tasks.some(t => t.parentId === task.id);
                         const isCollapsed = task.collapsed && hasSubtasks;
-                        
+
                         let html = `
                             <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
                                 <div class="task-main-row">
@@ -1475,7 +1451,7 @@ function renderBoard() {
                                 </div>` : ''}
                             </li>
                         `;
-                        
+
                         if (hasSubtasks && !isCollapsed) {
                             const subtasks = col.tasks.filter(t => t.parentId === task.id);
                             html += subtasks.map((subtask) => {
@@ -1512,7 +1488,7 @@ function renderBoard() {
                                 `;
                             }).join('');
                         }
-                        
+
                         return html;
                     }).join('')}
                 `).join('')}
@@ -1520,7 +1496,7 @@ function renderBoard() {
             </div>
         `;
         container.appendChild(columnEl);
-        const input = $(`task-input-${colIndex}`);
+        var input = document.getElementById('task-input-' + colIndex);
         if (input) setupAutosuggest(input);
     });
     updateAdaptiveHacks();
@@ -1533,7 +1509,7 @@ function renderBoard() {
 
 // ---------- Toggle subtasks collapse ----------
 function toggleSubtasksCollapse(ci, ti) {
-    const task = boardData[ci].tasks[ti];
+    var task = boardData[ci].tasks[ti];
     task.collapsed = !task.collapsed;
     saveBoardData();
     renderBoard();
@@ -1541,10 +1517,10 @@ function toggleSubtasksCollapse(ci, ti) {
 
 // ---------- Remove all subtasks ----------
 function removeAllSubtasks(ci, ti) {
-    const task = boardData[ci].tasks[ti];
+    var task = boardData[ci].tasks[ti];
     if (!task.hasSubtasks) return;
-    if (!confirm(`Remove all subtasks from "${task.text}"?`)) return;
-    boardData[ci].tasks = boardData[ci].tasks.filter(t => t.parentId !== task.id);
+    if (!confirm('Remove all subtasks from "' + task.text + '"?')) return;
+    boardData[ci].tasks = boardData[ci].tasks.filter(function(t) { return t.parentId !== task.id; });
     task.hasSubtasks = false;
     task.collapsed = false;
     saveBoardData();
@@ -1553,7 +1529,7 @@ function removeAllSubtasks(ci, ti) {
 
 // ---------- Set recurrence ----------
 function setRecurrence(ci, ti, value) {
-    const task = boardData[ci].tasks[ti];
+    var task = boardData[ci].tasks[ti];
     task.recurrence = value || null;
     task.lastRecurrenceDate = value ? getTodayKey() : null;
     saveBoardData();
@@ -1561,7 +1537,7 @@ function setRecurrence(ci, ti, value) {
 }
 
 function removeRecurrence(ci, ti) {
-    const task = boardData[ci].tasks[ti];
+    var task = boardData[ci].tasks[ti];
     task.recurrence = null;
     task.lastRecurrenceDate = null;
     saveBoardData();
@@ -1570,29 +1546,29 @@ function removeRecurrence(ci, ti) {
 
 // ---------- Daily Progress Bar ----------
 function updateDailyProgress() {
-    const progressEl = document.getElementById('daily-progress');
+    var progressEl = document.getElementById('daily-progress');
     if (!progressEl) return;
-    
-    const todayKey = getTodayKey();
-    let totalEstimated = 0;
-    let totalTracked = 0;
-    
-    boardData.forEach(col => {
-        col.tasks.forEach(task => {
+
+    var todayKey = getTodayKey();
+    var totalEstimated = 0;
+    var totalTracked = 0;
+
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
             if (task.dateAdded === todayKey && !task.completed) {
                 totalEstimated += task.estimateMinutes;
                 totalTracked += Math.round(task.trackedSeconds / 60);
             }
         });
     });
-    
-    const todayHistory = historyData.filter(h => dateKeyFromISO(h.completedAt) === todayKey);
-    const completedMinutes = todayHistory.reduce((a, h) => a + (h.actualMinutes || 0), 0);
+
+    var todayHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
+    var completedMinutes = todayHistory.reduce(function(a, h) { return a + (h.actualMinutes || 0); }, 0);
     totalTracked += completedMinutes;
-    
-    const percent = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
-    const remaining = Math.max(0, totalEstimated - totalTracked);
-    
+
+    var percent = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
+    var remaining = Math.max(0, totalEstimated - totalTracked);
+
     progressEl.innerHTML = `
         <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#888;">
             <span>Today's Progress</span>
@@ -1611,49 +1587,49 @@ function updateDailyProgress() {
 
 // ---------- Focus Score ----------
 function updateFocusScore() {
-    const scoreEl = document.getElementById('focus-score');
+    var scoreEl = document.getElementById('focus-score');
     if (!scoreEl) return;
-    
-    const todayKey = getTodayKey();
-    const todayHistory = historyData.filter(h => dateKeyFromISO(h.completedAt) === todayKey);
-    
-    let totalEstimated = 0;
-    let totalTracked = 0;
-    boardData.forEach(col => {
-        col.tasks.forEach(task => {
+
+    var todayKey = getTodayKey();
+    var todayHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
+
+    var totalEstimated = 0;
+    var totalTracked = 0;
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
             if (task.dateAdded === todayKey) {
                 totalEstimated += task.estimateMinutes;
                 totalTracked += Math.round(task.trackedSeconds / 60);
             }
         });
     });
-    const historyMinutes = todayHistory.reduce((a, h) => a + (h.actualMinutes || 0), 0);
+    var historyMinutes = todayHistory.reduce(function(a, h) { return a + (h.actualMinutes || 0); }, 0);
     totalTracked += historyMinutes;
-    const flowScore = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
-    
-    const todayTasks = [];
-    boardData.forEach(col => {
-        col.tasks.forEach(task => {
+    var flowScore = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
+
+    var todayTasks = [];
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
             if (task.dateAdded === todayKey) todayTasks.push(task);
         });
     });
-    const totalToday = todayTasks.length;
-    const completedToday = todayTasks.filter(t => t.completed).length;
-    const completionScore = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
-    
-    const breakLog = storageGet('ff-break-log', []);
-    const todayBreaks = breakLog.filter(b => new Date(b.date).toLocaleDateString() === new Date().toLocaleDateString());
-    const breakScore = todayBreaks.length > 0 ? Math.min(100, Math.round(100 / (todayBreaks.length))) : 100;
-    
-    const overall = Math.round((flowScore * 0.5) + (completionScore * 0.3) + (breakScore * 0.2));
-    
-    let grade = '💪 Excellent';
-    let color = 'var(--green)';
+    var totalToday = todayTasks.length;
+    var completedToday = todayTasks.filter(function(t) { return t.completed; }).length;
+    var completionScore = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
+
+    var breakLog = storageGet('ff-break-log', []);
+    var todayBreaks = breakLog.filter(function(b) { return new Date(b.date).toLocaleDateString() === new Date().toLocaleDateString(); });
+    var breakScore = todayBreaks.length > 0 ? Math.min(100, Math.round(100 / (todayBreaks.length))) : 100;
+
+    var overall = Math.round((flowScore * 0.5) + (completionScore * 0.3) + (breakScore * 0.2));
+
+    var grade = '💪 Excellent';
+    var color = 'var(--green)';
     if (overall < 30) { grade = '🌱 Starting'; color = '#888'; }
     else if (overall < 50) { grade = '📈 Building'; color = 'var(--amber)'; }
     else if (overall < 70) { grade = '🔥 Good'; color = 'var(--cherry-red)'; }
     else if (overall < 90) { grade = '🌟 Great'; color = 'var(--cherry-red)'; }
-    
+
     scoreEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:12px;">
             <div style="width:50px;height:50px;border-radius:50%;background:var(--input-bg);border:3px solid ${color};display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:${color};">
@@ -1674,33 +1650,34 @@ function toggleNotesRequired(colIndex, checked) {
     renderBoard();
 }
 
-let dragContext = null;
+var dragContext = null;
 function dragStart(e, ci, ti) {
-    dragContext = { ci, ti };
+    dragContext = { ci: ci, ti: ti };
     e.dataTransfer.effectAllowed = "move";
-    setTimeout(()=> e.target.classList.add('dragging'), 0);
+    setTimeout(function() { e.target.classList.add('dragging'); }, 0);
 }
 function allowDrop(e) { e.preventDefault(); }
 function dropTask(e, targetColIndex) {
     e.preventDefault();
-    document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
-    if(!dragContext) return;
-    const { ci, ti } = dragContext;
-    const task = boardData[ci].tasks[ti];
+    document.querySelectorAll('.dragging').forEach(function(el) { el.classList.remove('dragging'); });
+    if (!dragContext) return;
+    var ci = dragContext.ci;
+    var ti = dragContext.ti;
+    var task = boardData[ci].tasks[ti];
 
-    const list = e.currentTarget;
-    const y = e.clientY;
-    let afterElement = null;
-    let targetIndex = boardData[targetColIndex].tasks.length;
+    var list = e.currentTarget;
+    var y = e.clientY;
+    var afterElement = null;
+    var targetIndex = boardData[targetColIndex].tasks.length;
 
-    const draggableElements = [...list.querySelectorAll('.task-item:not(.dragging)')];
-    draggableElements.forEach(child => {
-        const box = child.getBoundingClientRect();
-        if(y > box.top && y < box.bottom) afterElement = child;
+    var draggableElements = Array.from(list.querySelectorAll('.task-item:not(.dragging)'));
+    draggableElements.forEach(function(child) {
+        var box = child.getBoundingClientRect();
+        if (y > box.top && y < box.bottom) afterElement = child;
     });
 
-    if(afterElement) {
-        const parts = afterElement.id.split('-');
+    if (afterElement) {
+        var parts = afterElement.id.split('-');
         targetIndex = parseInt(parts[2]);
     }
 
@@ -1714,25 +1691,31 @@ function dropTask(e, targetColIndex) {
 function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
 function toggleColumnCollapse(ci) { boardData[ci].collapsed = !boardData[ci].collapsed; saveBoardData(); renderBoard(); }
 function moveColumn(ci, dir) {
-    const target = ci + dir;
+    var target = ci + dir;
     if (target < 0 || target >= boardData.length) return;
-    [boardData[ci], boardData[target]] = [boardData[target], boardData[ci]];
-    saveBoardData(); renderBoard();
+    var temp = boardData[ci];
+    boardData[ci] = boardData[target];
+    boardData[target] = temp;
+    saveBoardData();
+    renderBoard();
 }
 function addColumn() {
     if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
-    boardData.push({ id: Date.now(), title: `New Project`, collapsed: false, tasks: [], notesRequired: false });
-    saveBoardData(); renderBoard();
+    boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
+    saveBoardData();
+    renderBoard();
 }
 function deleteColumn(ci) {
     if (boardData.length <= 1) { alert('Keep at least one column.'); return; }
-    if (!confirm(`Delete "${boardData[ci].title}"?`)) return;
-    boardData.splice(ci, 1); saveBoardData(); renderBoard();
+    if (!confirm('Delete "' + boardData[ci].title + '"?')) return;
+    boardData.splice(ci, 1);
+    saveBoardData();
+    renderBoard();
 }
 
 function promptDeadline(ci, ti) {
-    const task = boardData[ci].tasks[ti];
-    const input = document.createElement('input');
+    var task = boardData[ci].tasks[ti];
+    var input = document.createElement('input');
     input.type = 'datetime-local';
     input.value = task.deadlineTime || '';
     input.style.width = '100%';
@@ -1743,7 +1726,7 @@ function promptDeadline(ci, ti) {
         saveBoardData();
         renderBoard();
     });
-    const btn = document.querySelector(`[onclick="promptDeadline(${ci}, ${ti})"]`);
+    var btn = document.querySelector('[onclick="promptDeadline(' + ci + ', ' + ti + ')"]');
     if (btn) btn.replaceWith(input);
     input.focus();
 }
@@ -1753,29 +1736,29 @@ function normalizeTaskName(text) {
     return text.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 function getTaskEstimateFromMemory(taskText) {
-    const key = normalizeTaskName(taskText);
-    const entry = taskTimeMemory[key];
+    var key = normalizeTaskName(taskText);
+    var entry = taskTimeMemory[key];
     return entry ? Math.round(entry.total / entry.count) : null;
 }
 async function getTaskEstimateFromAI(taskText, notes) {
-    const apiKey = storageGet('gemini_api_key', null);
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) return null;
-    const prompt = `Estimate realistic minutes for this task: "${taskText}" Notes: "${notes || 'none'}" Respond with ONLY a number.`;
+    var prompt = 'Estimate realistic minutes for this task: "' + taskText + '" Notes: "' + (notes || 'none') + '" Respond with ONLY a number.';
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+        var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
         if (!res.ok) return null;
-        const data = await res.json();
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const num = parseInt(raw.match(/\d+/)?.[0]);
+        var data = await res.json();
+        var raw = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '';
+        var num = parseInt(raw.match(/\d+/));
         return num ? Math.max(1, num) : null;
     } catch(e) { return null; }
 }
 async function estimateTask(task) {
-    let est = getTaskEstimateFromMemory(task.text);
+    var est = getTaskEstimateFromMemory(task.text);
     if (est) {
         task.estimateMinutes = est;
         saveBoardData();
@@ -1792,18 +1775,18 @@ async function estimateTask(task) {
 
 // ---------- Add task (single) ----------
 function addTask(ci) {
-    const input = $(`task-input-${ci}`);
-    const estInput = $(`task-est-${ci}`);
-    const text = input.value.trim();
+    var input = document.getElementById('task-input-' + ci);
+    var estInput = document.getElementById('task-est-' + ci);
+    var text = input.value.trim();
     if (!text) return;
 
-    const col = boardData[ci];
+    var col = boardData[ci];
     if (col.notesRequired) {
         alert("This column requires notes. Please add notes via Details after creating the task.");
     }
 
-    const estimate = parseInt(estInput.value) || 15;
-    const task = {
+    var estimate = parseInt(estInput.value) || 15;
+    var task = {
         id: 't_' + Math.random().toString(36).substr(2,9),
         text: text,
         estimateMinutes: estimate,
@@ -1839,38 +1822,38 @@ function addTask(ci) {
 
 // ---------- Bulk paste ----------
 function parseTimeFromLine(line) {
-    const re = /(\d+(?:\.\d+)?)\s*(hours|hour|hrs|hr|minutes|minute|mins|min|seconds|second|secs|sec)\b/i;
-    const match = line.match(re);
+    var re = /(\d+(?:\.\d+)?)\s*(hours|hour|hrs|hr|minutes|minute|mins|min|seconds|second|secs|sec)\b/i;
+    var match = line.match(re);
     if (!match) return { text: line.trim(), minutes: null };
 
-    const value = parseFloat(match[1]);
-    const unit = match[2].toLowerCase();
-    let minutes;
+    var value = parseFloat(match[1]);
+    var unit = match[2].toLowerCase();
+    var minutes;
     if (unit.startsWith('h')) minutes = Math.round(value * 60);
     else if (unit.startsWith('s')) minutes = Math.max(1, Math.round(value / 60));
     else minutes = Math.round(value);
 
-    const cleanText = (line.slice(0, match.index) + line.slice(match.index + match[0].length))
+    var cleanText = (line.slice(0, match.index) + line.slice(match.index + match[0].length))
         .replace(/[\s,.:-]+$/, '')
         .trim();
-    return { text: cleanText || line.trim(), minutes };
+    return { text: cleanText || line.trim(), minutes: minutes };
 }
 function addPastedTasks(ci) {
-    const textarea = $(`paste-box-${ci}`);
-    const lines = textarea.value.split('\n').map((l) => l.trim()).filter(Boolean);
+    var textarea = document.getElementById('paste-box-' + ci);
+    var lines = textarea.value.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
     if (lines.length === 0) return;
 
-    const col = boardData[ci];
+    var col = boardData[ci];
     if (col.notesRequired) {
         alert("This column requires notes. Please add notes via Details after pasting.");
     }
 
-    const newTasks = lines.map((line) => {
-        const { text, minutes } = parseTimeFromLine(line);
-        let finalMins = minutes || 15;
+    var newTasks = lines.map(function(line) {
+        var parsed = parseTimeFromLine(line);
+        var finalMins = parsed.minutes || 15;
         return {
             id: 't_' + Math.random().toString(36).substr(2,9),
-            text: text,
+            text: parsed.text,
             estimateMinutes: finalMins,
             trackedSeconds: 0,
             isTracking: false,
@@ -1894,12 +1877,12 @@ function addPastedTasks(ci) {
         };
     });
 
-    col.tasks.push(...newTasks);
+    col.tasks.push.apply(col.tasks, newTasks);
     textarea.value = '';
     saveBoardData();
     renderBoard();
 
-    newTasks.forEach(task => {
+    newTasks.forEach(function(task) {
         if (task.estimateMinutes <= 15) {
             estimateTask(task);
         }
@@ -1908,26 +1891,29 @@ function addPastedTasks(ci) {
 
 function updateTaskText(ci, ti, v) { boardData[ci].tasks[ti].text = v.trim() || 'Untitled task'; saveBoardData(); }
 function updateTaskEstimate(ci, ti, v) {
-    if(isNaN(v) || v<1) v=1;
+    if (isNaN(v) || v < 1) v = 1;
     boardData[ci].tasks[ti].estimateMinutes = v;
-    saveBoardData(); renderBoard();
+    saveBoardData();
+    renderBoard();
 }
 function moveTask(ci, ti, dir) {
-    const tasks = boardData[ci].tasks;
-    const task = tasks[ti];
+    var tasks = boardData[ci].tasks;
+    var task = tasks[ti];
     if (task.completed) return;
-    const listEl = $(`task-${ci}-${ti}`).closest('.task-list');
-    const scrollPos = listEl ? listEl.scrollTop : 0;
+    var listEl = document.getElementById('task-' + ci + '-' + ti);
+    var scrollPos = listEl ? listEl.closest('.task-list').scrollTop : 0;
 
-    let target = ti + dir;
+    var target = ti + dir;
     while (target >= 0 && target < tasks.length) {
         if (tasks[target].dateAdded === task.dateAdded && !tasks[target].completed) {
-            [tasks[ti], tasks[target]] = [tasks[target], tasks[ti]];
+            var temp = tasks[ti];
+            tasks[ti] = tasks[target];
+            tasks[target] = temp;
             saveBoardData();
             renderBoard();
-            setTimeout(() => {
-                const newList = $(`task-${ci}-${target}`).closest('.task-list');
-                if(newList) newList.scrollTop = scrollPos;
+            setTimeout(function() {
+                var newList = document.getElementById('task-' + ci + '-' + target);
+                if (newList) newList.closest('.task-list').scrollTop = scrollPos;
             }, 0);
             return;
         }
@@ -1940,104 +1926,106 @@ function cleanEmDashes(text) {
     return text.replace(/[\u2014\u2013]|--/g, ', ');
 }
 async function callGemini(promptText) {
-    const apiKey = storageGet('gemini_api_key', null);
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) throw new Error('API key missing');
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
+    var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
     });
-    if (!res.ok) throw new Error(`API error ${res.status}`);
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!res.ok) throw new Error('API error ' + res.status);
+    var data = await res.json();
+    var text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '';
     return cleanEmDashes(text);
 }
 
 async function suggestColumnTimesAI(ci) {
-    const apiKey = storageGet('gemini_api_key', null);
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key in settings.'); return; }
 
-    let openTasks = boardData[ci].tasks.filter(t=>!t.completed);
-    if(openTasks.length===0) return;
+    var openTasks = boardData[ci].tasks.filter(function(t) { return !t.completed; });
+    if (openTasks.length === 0) return;
 
-    const prompt = `Estimate realistic minutes for these tasks as JSON array: [{"id":"<task.id>","minutes":<num>}]. Tasks: ` +
-        openTasks.map(t=>`[id:${t.id}] ${t.text}`).join('; ');
+    var prompt = 'Estimate realistic minutes for these tasks as JSON array: [{"id":"<task.id>","minutes":<num>}]. Tasks: ' +
+        openTasks.map(function(t) { return '[id:' + t.id + '] ' + t.text; }).join('; ');
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
-        const data = await res.json();
-        const raw = data.candidates[0].content.parts[0].text;
-        const cleaned = raw.replace(/```json|```/g, '').trim();
-        const estimates = JSON.parse(cleaned);
-        estimates.forEach(e => {
-            const task = openTasks.find(t => t.id === e.id);
-            if(task) task.stagedEstimate = Math.max(1, e.minutes);
+        var data = await res.json();
+        var raw = data.candidates[0].content.parts[0].text;
+        var cleaned = raw.replace(/```json|```/g, '').trim();
+        var estimates = JSON.parse(cleaned);
+        estimates.forEach(function(e) {
+            var task = openTasks.find(function(t) { return t.id === e.id; });
+            if (task) task.stagedEstimate = Math.max(1, e.minutes);
         });
         saveBoardData();
         renderBoard();
-    } catch(e) { alert('AI error: '+e.message); }
+    } catch(e) { alert('AI error: ' + e.message); }
 }
 
 function applyTaskEstimate(ci, ti) {
-    const task = boardData[ci].tasks[ti];
+    var task = boardData[ci].tasks[ti];
     if (task.stagedEstimate) { task.estimateMinutes = task.stagedEstimate; task.stagedEstimate = null; }
-    saveBoardData(); renderBoard();
+    saveBoardData();
+    renderBoard();
 }
 function dismissTaskEstimate(ci, ti) { boardData[ci].tasks[ti].stagedEstimate = null; saveBoardData(); renderBoard(); }
 function applyAllEstimates(ci) {
-    boardData[ci].tasks.forEach(t => { if(t.stagedEstimate) { t.estimateMinutes = t.stagedEstimate; t.stagedEstimate = null; } });
-    saveBoardData(); renderBoard();
+    boardData[ci].tasks.forEach(function(t) { if (t.stagedEstimate) { t.estimateMinutes = t.stagedEstimate; t.stagedEstimate = null; } });
+    saveBoardData();
+    renderBoard();
 }
 function dismissAllEstimates(ci) {
-    boardData[ci].tasks.forEach(t => t.stagedEstimate = null);
-    saveBoardData(); renderBoard();
+    boardData[ci].tasks.forEach(function(t) { t.stagedEstimate = null; });
+    saveBoardData();
+    renderBoard();
 }
 
 async function optimizeColumnFlowAI(ci) {
-    const apiKey = storageGet('gemini_api_key', null);
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key.'); return; }
 
-    let openTasks = boardData[ci].tasks.filter(t=>!t.completed);
-    if(openTasks.length===0) return;
+    var openTasks = boardData[ci].tasks.filter(function(t) { return !t.completed; });
+    if (openTasks.length === 0) return;
 
-    const prompt = `Review these tasks for a project. 
-1. Reorder them into the most logical execution sequence.
-2. If critical intermediate steps are missing based on standard project workflows, suggest them.
-Return ONLY JSON format: {"orderedIds": ["id1", "id2"], "missingTasks": [{"task":"Name", "minutes": 15}]}
-Tasks: ` + openTasks.map(t=>`[id:${t.id}] ${t.text}`).join('; ');
+    var prompt = 'Review these tasks for a project. \n1. Reorder them into the most logical execution sequence.\n2. If critical intermediate steps are missing based on standard project workflows, suggest them.\nReturn ONLY JSON format: {"orderedIds": ["id1", "id2"], "missingTasks": [{"task":"Name", "minutes": 15}]}\nTasks: ' + openTasks.map(function(t) { return '[id:' + t.id + '] ' + t.text; }).join('; ');
 
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
-        const data = await res.json();
-        const cleaned = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
-        const result = JSON.parse(cleaned);
+        var data = await res.json();
+        var cleaned = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+        var result = JSON.parse(cleaned);
 
-        if(result.orderedIds && result.orderedIds.length === openTasks.length) {
-            let sortedOpen = [];
-            result.orderedIds.forEach(id => {
-                const found = openTasks.find(t=>t.id === id);
-                if(found) sortedOpen.push(found);
+        if (result.orderedIds && result.orderedIds.length === openTasks.length) {
+            var sortedOpen = [];
+            result.orderedIds.forEach(function(id) {
+                var found = openTasks.find(function(t) { return t.id === id; });
+                if (found) sortedOpen.push(found);
             });
-            let comp = boardData[ci].tasks.filter(t=>t.completed);
-            boardData[ci].tasks = [...sortedOpen, ...comp];
+            var comp = boardData[ci].tasks.filter(function(t) { return t.completed; });
+            boardData[ci].tasks = sortedOpen.concat(comp);
         }
 
-        if(result.missingTasks && result.missingTasks.length > 0) {
+        if (result.missingTasks && result.missingTasks.length > 0) {
             boardData[ci].aiSuggestions = result.missingTasks;
         }
 
-        saveBoardData(); renderBoard();
-    } catch(e) { alert('AI optimization error: '+e.message); }
+        saveBoardData();
+        renderBoard();
+    } catch(e) { alert('AI optimization error: ' + e.message); }
 }
 
 function acceptAISuggestion(ci, sIdx) {
-    const s = boardData[ci].aiSuggestions[sIdx];
+    var s = boardData[ci].aiSuggestions[sIdx];
     boardData[ci].tasks.unshift({
         id: 't_' + Math.random().toString(36).substr(2,9),
         text: s.task,
@@ -2063,26 +2051,28 @@ function acceptAISuggestion(ci, sIdx) {
         lastRecurrenceDate: null
     });
     boardData[ci].aiSuggestions.splice(sIdx, 1);
-    if(boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
-    saveBoardData(); renderBoard();
+    if (boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
+    saveBoardData();
+    renderBoard();
 }
 function dismissAISuggestion(ci, sIdx) {
     boardData[ci].aiSuggestions.splice(sIdx, 1);
-    if(boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
-    saveBoardData(); renderBoard();
+    if (boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
+    saveBoardData();
+    renderBoard();
 }
 
 async function generateColumnCheckIn(ci) {
-    const summaryBox = $('summary-content');
-    summaryBox.textContent = `Generating daily check-in for ${boardData[ci].title}...`;
-    let openTasks = boardData[ci].tasks.filter(t => !t.completed).map(t => t.text);
-    if(openTasks.length === 0) {
-        summaryBox.textContent = `No open tasks for ${boardData[ci].title} today.`;
+    var summaryBox = $('summary-content');
+    summaryBox.textContent = 'Generating daily check-in for ' + boardData[ci].title + '...';
+    var openTasks = boardData[ci].tasks.filter(function(t) { return !t.completed; }).map(function(t) { return t.text; });
+    if (openTasks.length === 0) {
+        summaryBox.textContent = 'No open tasks for ' + boardData[ci].title + ' today.';
         return;
     }
-    const prompt = `Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today for the project/client "${boardData[ci].title}" based on this task list: ${JSON.stringify(openTasks)}. Use formal language. Do not use em-dashes.`;
+    var prompt = 'Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today for the project/client "' + boardData[ci].title + '" based on this task list: ' + JSON.stringify(openTasks) + '. Use formal language. Do not use em-dashes.';
     try {
-        const result = await callGemini(prompt);
+        var result = await callGemini(prompt);
         summaryBox.textContent = result;
     } catch(e) {
         summaryBox.textContent = 'Error: ' + e.message;
@@ -2090,13 +2080,13 @@ async function generateColumnCheckIn(ci) {
 }
 
 async function generateDailyCheckOut() {
-    const summaryBox = $('summary-content');
+    var summaryBox = $('summary-content');
     summaryBox.textContent = 'Generating check-out brief...';
-    const todayKey = getTodayKey();
-    const todaysHistory = historyData.filter(h => dateKeyFromISO(h.completedAt) === todayKey);
-    const prompt = `Act as a world-class formal assistant. Write a short, warm, professional daily check-out brief summarizing accomplishments today based on this data: ${JSON.stringify(todaysHistory)}. Use formal language. End on an encouraging note for tomorrow. Do not use em-dashes.`;
+    var todayKey = getTodayKey();
+    var todaysHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
+    var prompt = 'Act as a world-class formal assistant. Write a short, warm, professional daily check-out brief summarizing accomplishments today based on this data: ' + JSON.stringify(todaysHistory) + '. Use formal language. End on an encouraging note for tomorrow. Do not use em-dashes.';
     try {
-        const result = await callGemini(prompt);
+        var result = await callGemini(prompt);
         summaryBox.textContent = result;
     } catch(e) {
         summaryBox.textContent = 'Error: ' + e.message;
@@ -2104,66 +2094,69 @@ async function generateDailyCheckOut() {
 }
 
 async function generateAISummary(silent) {
-    const summaryBox = $('summary-content');
+    var summaryBox = $('summary-content');
     if (!silent) summaryBox.textContent = 'Generating monthly report...';
-    const thisMonthData = historyData.filter(h => new Date(h.completedAt).getMonth() === new Date().getMonth());
-    const prompt = `Write a polished, professional monthly client report grouping accomplishments by client based on: ${JSON.stringify(thisMonthData)}. Do not use em-dashes.`;
+    var thisMonthData = historyData.filter(function(h) { return new Date(h.completedAt).getMonth() === new Date().getMonth(); });
+    var prompt = 'Write a polished, professional monthly client report grouping accomplishments by client based on: ' + JSON.stringify(thisMonthData) + '. Do not use em-dashes.';
     try {
-        const result = await callGemini(prompt);
+        var result = await callGemini(prompt);
         if (!silent) summaryBox.textContent = result;
     } catch(e) {
         if (!silent) summaryBox.textContent = 'Error: ' + e.message;
     }
 }
 function maybeAutoGenerateSummary() {
-    const now = new Date();
-    const marker = `${now.getFullYear()}-${now.getMonth()}`;
+    var now = new Date();
+    var marker = now.getFullYear() + '-' + now.getMonth();
     if (storageGet('ff-last-summary-month', null) === marker) return;
-    const apiKey = storageGet('gemini_api_key', null);
+    var apiKey = storageGet('gemini_api_key', null);
     if (apiKey) generateAISummary(true);
 }
 
 // ---------- Task Details Modal ----------
-let openDetailsRef = null;
+var openDetailsRef = null;
 function openDetailsModal(ci, ti) {
-    openDetailsRef = { ci, ti };
-    const task = boardData[ci].tasks[ti];
-    $('details-task-name').textContent = task.text;
-    $('details-notes-textarea').value = task.notes || '';
-    $('details-link-input').value = task.googleLink || '';
-    $('details-deadline-input').value = task.deadlineTime || '';
-    $('details-estimate-label').textContent = `Est: ${task.estimateMinutes} min`;
-    $('details-overlay').style.display = 'flex';
+    openDetailsRef = { ci: ci, ti: ti };
+    var task = boardData[ci].tasks[ti];
+    document.getElementById('details-task-name').textContent = task.text;
+    document.getElementById('details-notes-textarea').value = task.notes || '';
+    document.getElementById('details-link-input').value = task.googleLink || '';
+    document.getElementById('details-deadline-input').value = task.deadlineTime || '';
+    document.getElementById('details-estimate-label').textContent = 'Est: ' + task.estimateMinutes + ' min';
+    document.getElementById('details-overlay').style.display = 'flex';
 }
 function closeDetailsModal() {
     if (openDetailsRef) {
-        const { ci, ti } = openDetailsRef;
-        const task = boardData[ci].tasks[ti];
-        task.notes = $('details-notes-textarea').value;
-        task.googleLink = $('details-link-input').value;
-        task.deadlineTime = $('details-deadline-input').value || null;
+        var ci = openDetailsRef.ci;
+        var ti = openDetailsRef.ti;
+        var task = boardData[ci].tasks[ti];
+        task.notes = document.getElementById('details-notes-textarea').value;
+        task.googleLink = document.getElementById('details-link-input').value;
+        task.deadlineTime = document.getElementById('details-deadline-input').value || null;
         saveBoardData();
         renderBoard();
     }
     openDetailsRef = null;
-    $('details-overlay').style.display = 'none';
+    document.getElementById('details-overlay').style.display = 'none';
 }
 async function suggestTimeFromDetails() {
     if (!openDetailsRef) return;
-    const { ci, ti } = openDetailsRef;
-    const task = boardData[ci].tasks[ti];
-    const apiKey = storageGet('gemini_api_key', null);
+    var ci = openDetailsRef.ci;
+    var ti = openDetailsRef.ti;
+    var task = boardData[ci].tasks[ti];
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key.'); return; }
-    const prompt = `Estimate realistic minutes for this task: "${task.text}" Notes: "${task.notes || 'none'}" Respond with ONLY a number.`;
+    var prompt = 'Estimate realistic minutes for this task: "' + task.text + '" Notes: "' + (task.notes || 'none') + '" Respond with ONLY a number.';
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
-        const data = await res.json();
-        const raw = data.candidates[0].content.parts[0].text;
-        const num = parseInt(raw.match(/\d+/)[0]);
-        if (num) { task.estimateMinutes = Math.max(1, num); saveBoardData(); renderBoard(); $('details-estimate-label').textContent = `Est: ${task.estimateMinutes} min`; }
+        var data = await res.json();
+        var raw = data.candidates[0].content.parts[0].text;
+        var num = parseInt(raw.match(/\d+/)[0]);
+        if (num) { task.estimateMinutes = Math.max(1, num); saveBoardData(); renderBoard(); document.getElementById('details-estimate-label').textContent = 'Est: ' + task.estimateMinutes + ' min'; }
     } catch(e) { alert('AI error'); }
 }
 
@@ -2172,57 +2165,40 @@ async function breakdownTask() {
         alert('No task selected.');
         return;
     }
-    
-    const { ci, ti } = openDetailsRef;
-    const task = boardData[ci].tasks[ti];
-    
-    const existingSubtasks = boardData[ci].tasks.filter(t => t.parentId === task.id);
+
+    var ci = openDetailsRef.ci;
+    var ti = openDetailsRef.ti;
+    var task = boardData[ci].tasks[ti];
+
+    var existingSubtasks = boardData[ci].tasks.filter(function(t) { return t.parentId === task.id; });
     if (existingSubtasks.length > 0) {
-        if (!confirm(`This task already has ${existingSubtasks.length} subtask(s). Generate new ones? This will replace them.`)) {
+        if (!confirm('This task already has ' + existingSubtasks.length + ' subtask(s). Generate new ones? This will replace them.')) {
             return;
         }
-        boardData[ci].tasks = boardData[ci].tasks.filter(t => t.parentId !== task.id);
+        boardData[ci].tasks = boardData[ci].tasks.filter(function(t) { return t.parentId !== task.id; });
         task.hasSubtasks = false;
         task.collapsed = false;
         saveBoardData();
         renderBoard();
     }
-    
-    const apiKey = storageGet('gemini_api_key', null);
+
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) {
         alert('Please add your Gemini API key in the AI settings (gear icon or footer).');
         return;
     }
-    
-    const prompt = `You are a project management expert. Analyze this task and determine if it should be broken down into subtasks.
 
-Task: "${task.text}"
-Additional notes: "${task.notes || 'none'}"
-
-RULES:
-1. ONLY break down if the task is large enough to warrant subtasks (15+ minutes estimated, or clearly has multiple steps).
-2. If the task is simple and doesn't need breaking down, return: {"subtasks": []}
-3. If breaking down, provide 2-8 specific, actionable subtasks with realistic time estimates.
-4. Each subtask should be a discrete, completable action.
-5. Subtasks should flow logically from start to finish.
-
-Return ONLY JSON with this structure:
-{
-  "subtasks": [
-    {"text": "Subtask description", "minutes": 15, "notes": "optional context"},
-    {"text": "Another subtask", "minutes": 30, "notes": "optional"}
-  ]
-}`;
+    var prompt = 'You are a project management expert. Analyze this task and determine if it should be broken down into subtasks.\n\nTask: "' + task.text + '"\nAdditional notes: "' + (task.notes || 'none') + '"\n\nRULES:\n1. ONLY break down if the task is large enough to warrant subtasks (15+ minutes estimated, or clearly has multiple steps).\n2. If the task is simple and doesn\'t need breaking down, return: {"subtasks": []}\n3. If breaking down, provide 2-8 specific, actionable subtasks with realistic time estimates.\n4. Each subtask should be a discrete, completable action.\n5. Subtasks should flow logically from start to finish.\n\nReturn ONLY JSON with this structure:\n{\n  "subtasks": [\n    {"text": "Subtask description", "minutes": 15, "notes": "optional context"},\n    {"text": "Another subtask", "minutes": 30, "notes": "optional"}\n  ]\n}';
 
     try {
-        const summaryBox = $('summary-content');
+        var summaryBox = $('summary-content');
         summaryBox.textContent = '🧠 AI is analyzing and breaking down your task...';
-        
-        const responseText = await callGemini(prompt);
-        const cleaned = responseText.replace(/```json|```/g, '').trim();
-        let result = JSON.parse(cleaned);
-        
-        let subtasks = [];
+
+        var responseText = await callGemini(prompt);
+        var cleaned = responseText.replace(/```json|```/g, '').trim();
+        var result = JSON.parse(cleaned);
+
+        var subtasks = [];
         if (Array.isArray(result)) {
             subtasks = result;
         } else if (result.subtasks && Array.isArray(result.subtasks)) {
@@ -2230,35 +2206,35 @@ Return ONLY JSON with this structure:
         } else if (result.tasks && Array.isArray(result.tasks)) {
             subtasks = result.tasks;
         } else {
-            const keys = Object.keys(result);
-            for (let key of keys) {
-                if (Array.isArray(result[key])) {
-                    subtasks = result[key];
+            var keys = Object.keys(result);
+            for (var i = 0; i < keys.length; i++) {
+                if (Array.isArray(result[keys[i]])) {
+                    subtasks = result[keys[i]];
                     break;
                 }
             }
         }
-        
+
         if (!subtasks || subtasks.length === 0) {
-            const summaryBox2 = $('summary-content');
-            summaryBox2.textContent = `💡 "${task.text}" doesn't need breaking down – it's simple enough as a single task.`;
-            alert(`💡 "${task.text}" doesn't need breaking down – it's simple enough as a single task.`);
+            var summaryBox2 = $('summary-content');
+            summaryBox2.textContent = '💡 "' + task.text + '" doesn\'t need breaking down – it\'s simple enough as a single task.';
+            alert('💡 "' + task.text + '" doesn\'t need breaking down – it\'s simple enough as a single task.');
             closeDetailsModal();
             return;
         }
-        
+
         if (subtasks.length > 8) {
             subtasks = subtasks.slice(0, 8);
         }
-        
-        subtasks = subtasks.filter(st => st.text && st.text.trim().length > 0);
-        
+
+        subtasks = subtasks.filter(function(st) { return st.text && st.text.trim().length > 0; });
+
         if (subtasks.length === 0) {
-            throw new Error('AI didn't return valid subtasks.');
+            throw new Error('AI didn\'t return valid subtasks.');
         }
-        
-        let createdCount = 0;
-        subtasks.forEach((st) => {
+
+        var createdCount = 0;
+        subtasks.forEach(function(st) {
             if (st.text && st.text.trim()) {
                 boardData[ci].tasks.push({
                     id: 't_' + Math.random().toString(36).substr(2,9),
@@ -2287,49 +2263,49 @@ Return ONLY JSON with this structure:
                 createdCount++;
             }
         });
-        
+
         task.hasSubtasks = true;
         task.collapsed = false;
-        
+
         saveBoardData();
         renderBoard();
         renderInternalQueue();
         closeDetailsModal();
-        
-        const summaryBox2 = $('summary-content');
-        summaryBox2.textContent = `✅ Task broken down into ${createdCount} subtask(s). They've been added to the same column and will appear in your flow sequence.`;
-        
-        alert(`✨ ${createdCount} subtask(s) created! They will appear indented under the parent task and in your flow sequence.`);
-        
+
+        var summaryBox3 = $('summary-content');
+        summaryBox3.textContent = '✅ Task broken down into ' + createdCount + ' subtask(s). They\'ve been added to the same column and will appear in your flow sequence.';
+
+        alert('✨ ' + createdCount + ' subtask(s) created! They will appear indented under the parent task and in your flow sequence.');
+
     } catch (e) {
         alert('AI breakdown error: ' + e.message);
         console.error('Breakdown error details:', e);
-        const summaryBox = $('summary-content');
-        summaryBox.textContent = '❌ Error breaking down task: ' + e.message;
+        var summaryBox4 = $('summary-content');
+        summaryBox4.textContent = '❌ Error breaking down task: ' + e.message;
     }
 }
 
 // ---------- Streaks & Badges ----------
 function updateStreaksAndBadges() {
-    const streakEl = document.getElementById('streak-display');
-    const badgesEl = document.getElementById('badges-display');
+    var streakEl = document.getElementById('streak-display');
+    var badgesEl = document.getElementById('badges-display');
     if (!streakEl || !badgesEl) return;
 
-    let streak = 0;
-    const today = new Date();
-    let checkDate = new Date(today);
-    const completionDays = new Set();
-    historyData.forEach(h => {
-        const d = new Date(h.completedAt);
-        const key = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+    var streak = 0;
+    var today = new Date();
+    var checkDate = new Date(today);
+    var completionDays = new Set();
+    historyData.forEach(function(h) {
+        var d = new Date(h.completedAt);
+        var key = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
         completionDays.add(key);
     });
     while (true) {
-        const year = checkDate.getFullYear();
-        const month = checkDate.getMonth() + 1;
-        const day = checkDate.getDate();
-        const key = `${year}-${month}-${day}`;
-        const dow = checkDate.getDay();
+        var year = checkDate.getFullYear();
+        var month = checkDate.getMonth() + 1;
+        var day = checkDate.getDate();
+        var key = year + '-' + month + '-' + day;
+        var dow = checkDate.getDay();
         if (dow === 0 || dow === 6) {
             checkDate.setDate(checkDate.getDate() - 1);
             continue;
@@ -2342,18 +2318,18 @@ function updateStreaksAndBadges() {
         }
     }
 
-    const totalCompleted = historyData.length;
-    const badges = [];
-    const badgeDefinitions = [
+    var totalCompleted = historyData.length;
+    var badges = [];
+    var badgeDefinitions = [
         { id: 'first', label: 'First Task', icon: '🌟', condition: totalCompleted >= 1, desc: 'Completed your first task.' },
         { id: 'ten', label: '10 Tasks', icon: '🚀', condition: totalCompleted >= 10, desc: 'Finished 10 tasks total.' },
         { id: 'fifty', label: '50 Tasks', icon: '💪', condition: totalCompleted >= 50, desc: 'Reached 50 completed tasks.' },
         { id: 'hundred', label: '100 Tasks', icon: '🏆', condition: totalCompleted >= 100, desc: 'A century of tasks – outstanding!' },
-        { id: 'accuracy', label: 'Accuracy Pro', icon: '🎯', condition: (() => {
-            const withBoth = historyData.filter(h => h.estimateMinutes && h.actualMinutes);
+        { id: 'accuracy', label: 'Accuracy Pro', icon: '🎯', condition: (function() {
+            var withBoth = historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; });
             if (withBoth.length < 10) return false;
-            const totalDiff = withBoth.reduce((a, h) => a + (h.actualMinutes - h.estimateMinutes), 0);
-            const avgDiff = totalDiff / withBoth.length;
+            var totalDiff = withBoth.reduce(function(a, h) { return a + (h.actualMinutes - h.estimateMinutes); }, 0);
+            var avgDiff = totalDiff / withBoth.length;
             return Math.abs(avgDiff) < 2;
         })(), desc: 'Average estimate error under 2 minutes across 10+ tasks.' },
         { id: 'flowmaster', label: 'Flow Master', icon: '⚡', condition: flowBlocksCompleted >= 5, desc: 'Completed 5 flow sessions.' },
@@ -2361,17 +2337,17 @@ function updateStreaksAndBadges() {
         { id: 'streak30', label: '30-Day Streak', icon: '🌟', condition: streak >= 30, desc: 'A whole month of consistent work!' }
     ];
 
-    const earned = badgeDefinitions.filter(b => b.condition);
-    let nextBadge = badgeDefinitions.find(b => !b.condition);
-    let progress = 0;
-    let progressMax = 0;
+    var earned = badgeDefinitions.filter(function(b) { return b.condition; });
+    var nextBadge = badgeDefinitions.find(function(b) { return !b.condition; });
+    var progress = 0;
+    var progressMax = 0;
     if (nextBadge) {
         if (nextBadge.id === 'ten') { progress = totalCompleted; progressMax = 10; }
         else if (nextBadge.id === 'fifty') { progress = totalCompleted; progressMax = 50; }
         else if (nextBadge.id === 'hundred') { progress = totalCompleted; progressMax = 100; }
         else if (nextBadge.id === 'accuracy') {
-            const withBoth = historyData.filter(h => h.estimateMinutes && h.actualMinutes);
-            progress = withBoth.length;
+            var withBoth2 = historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; });
+            progress = withBoth2.length;
             progressMax = 10;
         }
         else if (nextBadge.id === 'flowmaster') { progress = flowBlocksCompleted; progressMax = 5; }
@@ -2381,19 +2357,19 @@ function updateStreaksAndBadges() {
         progress = Math.min(progress, progressMax);
     }
 
-    streakEl.textContent = `🔥 Streak: ${streak} day${streak!==1?'s':''}`;
+    streakEl.textContent = '🔥 Streak: ' + streak + ' day' + (streak !== 1 ? 's' : '');
 
     if (earned.length === 0) {
-        badgesEl.innerHTML = `<span style="color:#888;font-size:0.75rem;">No badges yet – complete your first task to get started.</span>`;
+        badgesEl.innerHTML = '<span style="color:#888;font-size:0.75rem;">No badges yet – complete your first task to get started.</span>';
     } else {
-        badgesEl.innerHTML = earned.map(b =>
-            `<span class="badge-pill" title="${b.desc}">${b.icon} ${b.label}</span>`
-        ).join(' ');
+        badgesEl.innerHTML = earned.map(function(b) {
+            return '<span class="badge-pill" title="' + b.desc + '">' + b.icon + ' ' + b.label + '</span>';
+        }).join(' ');
     }
 
     if (nextBadge && progressMax > 0) {
-        const pct = Math.round((progress / progressMax) * 100);
-        const progressHtml = `
+        var pct = Math.round((progress / progressMax) * 100);
+        var progressHtml = `
             <div style="margin-top:6px;font-size:0.7rem;color:#888;">
                 <span>Next: ${nextBadge.icon} ${nextBadge.label}</span>
                 <div style="width:100%;height:4px;background:var(--border-color);border-radius:2px;margin-top:2px;">
@@ -2402,9 +2378,9 @@ function updateStreaksAndBadges() {
                 <span style="font-size:0.65rem;">${progress}/${progressMax}</span>
             </div>
         `;
-        const existingProgress = badgesEl.querySelector('.badge-progress');
+        var existingProgress = badgesEl.querySelector('.badge-progress');
         if (existingProgress) existingProgress.remove();
-        const progressDiv = document.createElement('div');
+        var progressDiv = document.createElement('div');
         progressDiv.className = 'badge-progress';
         progressDiv.innerHTML = progressHtml;
         badgesEl.appendChild(progressDiv);
@@ -2419,7 +2395,7 @@ document.addEventListener('keydown', function(e) {
             case 'r': resetTimer(); e.preventDefault(); break;
             case 'f': startFlow(); e.preventDefault(); break;
             case 'a': {
-                const firstInput = document.querySelector('.task-input');
+                var firstInput = document.querySelector('.task-input');
                 if (firstInput) firstInput.focus();
                 e.preventDefault();
                 break;
@@ -2429,9 +2405,9 @@ document.addEventListener('keydown', function(e) {
             case 'q': toggleDarkMode(); e.preventDefault(); break;
             case 'x': skipCurrentSegment(); e.preventDefault(); break;
             case 'v': {
-                const firstVoiceBtn = document.querySelector('[id^="voice-btn-"]');
+                var firstVoiceBtn = document.querySelector('[id^="voice-btn-"]');
                 if (firstVoiceBtn) {
-                    const ci = parseInt(firstVoiceBtn.id.split('-')[2]);
+                    var ci = parseInt(firstVoiceBtn.id.split('-')[2]);
                     startVoiceInput(ci);
                 }
                 e.preventDefault();
@@ -2443,15 +2419,15 @@ document.addEventListener('keydown', function(e) {
 
 // ---------- Start AI Flow ----------
 async function startAIFlow() {
-    const apiKey = storageGet('gemini_api_key', null);
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) {
         alert('Please add your Gemini API key in the AI settings (gear icon or footer).');
         return;
     }
 
-    const openTasks = [];
-    boardData.forEach((col) => {
-        col.tasks.forEach((task) => {
+    var openTasks = [];
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
             if (!task.completed) {
                 openTasks.push({
                     id: task.id,
@@ -2470,16 +2446,16 @@ async function startAIFlow() {
         return;
     }
 
-    for (let t of openTasks) {
+    for (var t of openTasks) {
         if (t.estimate <= 5) {
-            const found = boardData.flatMap(col => col.tasks).find(task => task.id === t.id);
+            var found = boardData.flatMap(function(col) { return col.tasks; }).find(function(task) { return task.id === t.id; });
             if (found) await estimateTask(found);
         }
     }
 
-    const updatedOpen = [];
-    boardData.forEach(col => {
-        col.tasks.forEach(task => {
+    var updatedOpen = [];
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
             if (!task.completed) {
                 updatedOpen.push({
                     id: task.id,
@@ -2492,15 +2468,15 @@ async function startAIFlow() {
         });
     });
 
-    const prompt = `You are a productivity expert. Given these tasks, suggest the most efficient order to work on them. Consider deadlines (if any), task type, logical dependencies, and typical energy patterns. Return ONLY a JSON array of task IDs in the order they should be done. Tasks: ${JSON.stringify(updatedOpen)}`;
+    var prompt = 'You are a productivity expert. Given these tasks, suggest the most efficient order to work on them. Consider deadlines (if any), task type, logical dependencies, and typical energy patterns. Return ONLY a JSON array of task IDs in the order they should be done. Tasks: ' + JSON.stringify(updatedOpen);
 
     try {
-        const responseText = await callGemini(prompt);
-        const cleaned = responseText.replace(/```json|```/g, '').trim();
-        let orderedIds = JSON.parse(cleaned);
+        var responseText = await callGemini(prompt);
+        var cleaned = responseText.replace(/```json|```/g, '').trim();
+        var orderedIds = JSON.parse(cleaned);
 
         if (typeof orderedIds === 'object' && !Array.isArray(orderedIds)) {
-            const keys = Object.keys(orderedIds);
+            var keys = Object.keys(orderedIds);
             if (keys.length === 1 && Array.isArray(orderedIds[keys[0]])) {
                 orderedIds = orderedIds[keys[0]];
             } else {
@@ -2524,65 +2500,68 @@ async function startAIFlow() {
 
 // ---------- Re-estimate all tasks ----------
 async function reEstimateAllTasks() {
-    const apiKey = storageGet('gemini_api_key', null);
+    var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key.'); return; }
-    const allOpenTasks = [];
-    boardData.forEach(col => col.tasks.forEach(t => { if (!t.completed) allOpenTasks.push(t); }));
+    var allOpenTasks = [];
+    boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (!t.completed) allOpenTasks.push(t); }); });
     if (allOpenTasks.length === 0) return;
-    if (!confirm(`Re-estimate ${allOpenTasks.length} task(s)?`)) return;
-    const prompt = `Estimate realistic minutes for these tasks as JSON array: [{"task":"<task text>","minutes":<num>}]. Tasks: ` + allOpenTasks.map(t=>`"${t.text}"`).join('; ');
+    if (!confirm('Re-estimate ' + allOpenTasks.length + ' task(s)?')) return;
+    var prompt = 'Estimate realistic minutes for these tasks as JSON array: [{"task":"<task text>","minutes":<num>}]. Tasks: ' + allOpenTasks.map(function(t) { return '"' + t.text + '"'; }).join('; ');
     try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
-        const data = await res.json();
-        const raw = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
-        const estimates = JSON.parse(raw);
-        estimates.forEach(e => {
-            const task = allOpenTasks.find(t => t.text === e.task);
+        var data = await res.json();
+        var raw = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+        var estimates = JSON.parse(raw);
+        estimates.forEach(function(e) {
+            var task = allOpenTasks.find(function(t) { return t.text === e.task; });
             if (task) task.estimateMinutes = Math.max(1, e.minutes);
         });
-        saveBoardData(); renderBoard();
+        saveBoardData();
+        renderBoard();
     } catch(e) { alert('AI error'); }
 }
 
 // ---------- Render functions ----------
 function renderEstimateLog() {
-    const logBox = $('estimate-log');
+    var logBox = $('estimate-log');
     if (!logBox) return;
-    const recent = historyData.slice(0, 40);
+    var recent = historyData.slice(0, 40);
     if (recent.length === 0) { logBox.innerHTML = '<p style="font-size:0.85rem;color:#888;">Complete a tracked task to start your log.</p>'; return; }
-    const groups = {};
-    recent.forEach((h) => { const key = dateKeyFromISO(h.completedAt); if (!groups[key]) groups[key] = []; groups[key].push(h); });
-    const orderedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-    logBox.innerHTML = `<ul class="log-list">${orderedKeys.map((key) => `
-        <li class="date-group-header">${formatDateKey(key)}</li>
-        ${groups[key].map((h) => {
-            const diff = (h.actualMinutes || 0) - (h.estimateMinutes || 0);
-            let cls = 'under', label = `${diff <= 0 ? diff : '+' + diff}m`;
-            if (diff > (h.estimateMinutes * 0.2)) cls = 'over';
-            else if (diff > 0) cls = 'near';
-            return `<li class="log-item"><span>${escapeHTML(h.task)}</span><span class="log-variance ${cls}">Est ${h.estimateMinutes}m / Act ${h.actualMinutes}m (${label})</span></li>`;
-        }).join('')}
-    `).join('')}</ul>`;
+    var groups = {};
+    recent.forEach(function(h) { var key = dateKeyFromISO(h.completedAt); if (!groups[key]) groups[key] = []; groups[key].push(h); });
+    var orderedKeys = Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); });
+    logBox.innerHTML = '<ul class="log-list">' + orderedKeys.map(function(key) {
+        return '<li class="date-group-header">' + formatDateKey(key) + '</li>' +
+            groups[key].map(function(h) {
+                var diff = (h.actualMinutes || 0) - (h.estimateMinutes || 0);
+                var cls = 'under';
+                var label = (diff <= 0 ? diff : '+' + diff) + 'm';
+                if (diff > (h.estimateMinutes * 0.2)) cls = 'over';
+                else if (diff > 0) cls = 'near';
+                return '<li class="log-item"><span>' + escapeHTML(h.task) + '</span><span class="log-variance ' + cls + '">Est ' + h.estimateMinutes + 'm / Act ' + h.actualMinutes + 'm (' + label + ')</span></li>';
+            }).join('');
+    }).join('') + '</ul>';
 }
 
 function renderDailyRecap() {
-    const box = $('daily-recap-box');
+    var box = $('daily-recap-box');
     if (!box) return;
-    const todayKey = getTodayKey();
-    const todayDateStr = new Date().toLocaleDateString();
-    const todaysHistory = historyData.filter((h) => dateKeyFromISO(h.completedAt) === todayKey);
-    const totalActual = todaysHistory.reduce((a, h) => a + (h.actualMinutes || 0), 0);
-    let openFromToday = 0;
-    boardData.forEach((col) => col.tasks.forEach((t) => { if (t.dateAdded === todayKey && !t.completed) openFromToday++; }));
-    let clockedMinutesToday = clockLog.filter((c) => c.date === todayDateStr).reduce((a, c) => a + c.durationMinutes, 0);
+    var todayKey = getTodayKey();
+    var todayDateStr = new Date().toLocaleDateString();
+    var todaysHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
+    var totalActual = todaysHistory.reduce(function(a, h) { return a + (h.actualMinutes || 0); }, 0);
+    var openFromToday = 0;
+    boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (t.dateAdded === todayKey && !t.completed) openFromToday++; }); });
+    var clockedMinutesToday = clockLog.filter(function(c) { return c.date === todayDateStr; }).reduce(function(a, c) { return a + c.durationMinutes; }, 0);
     if (clockState.clockedIn) clockedMinutesToday += Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
-    let breakMinutesToday = todaysHistory.reduce((a, h) => a + (h.breakMinutes || 0), 0);
-    const breakLog = storageGet('ff-break-log', []);
-    const todayBreaks = breakLog.filter(b => new Date(b.date).toLocaleDateString() === todayDateStr);
-    breakMinutesToday += todayBreaks.reduce((a, b) => a + b.durationMinutes, 0);
+    var breakMinutesToday = todaysHistory.reduce(function(a, h) { return a + (h.breakMinutes || 0); }, 0);
+    var breakLog = storageGet('ff-break-log', []);
+    var todayBreaks = breakLog.filter(function(b) { return new Date(b.date).toLocaleDateString() === todayDateStr; });
+    breakMinutesToday += todayBreaks.reduce(function(a, b) { return a + b.durationMinutes; }, 0);
 
     box.innerHTML = `
         <div id="daily-progress" style="margin-bottom:8px;"></div>
@@ -2600,13 +2579,15 @@ function renderDailyRecap() {
 }
 
 function computeColumnTimeline(standardBreakMinutes) {
-    let grandWork = 0;
-    const perColumn = boardData.map((col) => {
-        let colWork = 0, colTotalWithBreaks = 0;
-        const openTasks = col.tasks.filter((t) => !t.completed && !t.parentId);
-        openTasks.forEach((task, i) => {
-            const { chunks, bonusBreakMinutes } = buildChunks(Math.max(1, task.estimateMinutes || 15));
-            const taskWork = chunks.reduce((a, b) => a + b, 0);
+    var grandWork = 0;
+    var perColumn = boardData.map(function(col) {
+        var colWork = 0, colTotalWithBreaks = 0;
+        var openTasks = col.tasks.filter(function(t) { return !t.completed && !t.parentId; });
+        openTasks.forEach(function(task, i) {
+            var chunkData = buildChunks(Math.max(1, task.estimateMinutes || 15));
+            var chunks = chunkData.chunks;
+            var bonusBreakMinutes = chunkData.bonusBreakMinutes;
+            var taskWork = chunks.reduce(function(a, b) { return a + b; }, 0);
             colWork += taskWork;
             colTotalWithBreaks += taskWork + (chunks.length - 1) * standardBreakMinutes;
             if (i < openTasks.length - 1) colTotalWithBreaks += standardBreakMinutes + bonusBreakMinutes;
@@ -2614,81 +2595,94 @@ function computeColumnTimeline(standardBreakMinutes) {
         grandWork += colWork;
         return { title: col.title, workMinutes: colWork, totalWithBreaksMinutes: colTotalWithBreaks, taskCount: openTasks.length };
     });
-    let grandTotal = 0;
-    perColumn.forEach((c, idx) => {
+    var grandTotal = 0;
+    perColumn.forEach(function(c, idx) {
         grandTotal += c.totalWithBreaksMinutes;
         if (idx < perColumn.length - 1 && c.taskCount > 0) grandTotal += standardBreakMinutes;
     });
-    return { perColumn, grandWorkMinutes: grandWork, grandTotalMinutes: grandTotal };
+    return { perColumn: perColumn, grandWorkMinutes: grandWork, grandTotalMinutes: grandTotal };
 }
 
 function getSelectedTimezone() { return storageGet('ff-timezone', Intl.DateTimeFormat().resolvedOptions().timeZone); }
 function updateTimezone(tz) { storageSet('ff-timezone', tz); renderTimeCounter(); }
 function populateTimezoneSelect() {
-    const sel = $('timezone-select');
+    var sel = $('timezone-select');
     if (!sel) return;
-    let zones; try { zones = Intl.supportedValuesOf('timeZone'); } catch(e){ zones = ['UTC','Africa/Lagos','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Europe/Paris','Asia/Dubai','Asia/Kolkata','Asia/Shanghai','Australia/Sydney']; }
-    const current = getSelectedTimezone();
-    sel.innerHTML = zones.map((z) => `<option value="${z}" ${z === current ? 'selected' : ''}>${z}</option>`).join('');
+    var zones; try { zones = Intl.supportedValuesOf('timeZone'); } catch(e){ zones = ['UTC','Africa/Lagos','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Europe/Paris','Asia/Dubai','Asia/Kolkata','Asia/Shanghai','Australia/Sydney']; }
+    var current = getSelectedTimezone();
+    sel.innerHTML = zones.map(function(z) { return '<option value="' + z + '" ' + (z === current ? 'selected' : '') + '>' + z + '</option>'; }).join('');
 }
 function formatTimeInZone(date, tz) { return date.toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); }
 function renderTimeCounter() {
-    const box = $('time-counter-box');
+    var box = $('time-counter-box');
     if (!box) return;
-    const breakMin = parseInt(breakInput.value) || 5;
-    const { perColumn, grandWorkMinutes, grandTotalMinutes } = computeColumnTimeline(breakMin);
-    const tz = getSelectedTimezone();
-    const now = new Date();
-    let cursor = new Date(now);
-    let rows = '';
-    perColumn.forEach((c, idx) => {
-        if (c.taskCount === 0) { rows += `<div class="log-item"><span>${escapeHTML(c.title)}</span><span style="color:#999;">No open tasks</span></div>`; return; }
+    var breakMin = parseInt(breakInput.value) || 5;
+    var result = computeColumnTimeline(breakMin);
+    var perColumn = result.perColumn;
+    var grandWorkMinutes = result.grandWorkMinutes;
+    var grandTotalMinutes = result.grandTotalMinutes;
+    var tz = getSelectedTimezone();
+    var now = new Date();
+    var cursor = new Date(now);
+    var rows = '';
+    perColumn.forEach(function(c, idx) {
+        if (c.taskCount === 0) { rows += '<div class="log-item"><span>' + escapeHTML(c.title) + '</span><span style="color:#999;">No open tasks</span></div>'; return; }
         cursor = new Date(cursor.getTime() + c.totalWithBreaksMinutes * 60000);
-        rows += `<div class="log-item"><span>${escapeHTML(c.title)} (${c.workMinutes} min work)</span><span class="log-variance under">Done by ${formatTimeInZone(cursor, tz)}</span></div>`;
+        rows += '<div class="log-item"><span>' + escapeHTML(c.title) + ' (' + c.workMinutes + ' min work)</span><span class="log-variance under">Done by ' + formatTimeInZone(cursor, tz) + '</span></div>';
         if (idx < perColumn.length - 1 && c.taskCount > 0) cursor = new Date(cursor.getTime() + breakMin * 60000);
     });
-    const grandDone = new Date(now.getTime() + grandTotalMinutes * 60000);
-    box.innerHTML = `<ul class="log-list">${rows}</ul>
-        <p style="margin-top:8px;font-size:0.85rem;"><strong>${grandWorkMinutes} min</strong> total work.</p>
-        <p style="font-weight:700;">All done by ${formatTimeInZone(grandDone, tz)} (${tz})</p>`;
+    var grandDone = new Date(now.getTime() + grandTotalMinutes * 60000);
+    box.innerHTML = '<ul class="log-list">' + rows + '</ul>' +
+        '<p style="margin-top:8px;font-size:0.85rem;"><strong>' + grandWorkMinutes + ' min</strong> total work.</p>' +
+        '<p style="font-weight:700;">All done by ' + formatTimeInZone(grandDone, tz) + ' (' + tz + ')</p>';
 }
 
 function updateAdaptiveHacks() {
-    const box = $('adaptive-hacks');
+    var box = $('adaptive-hacks');
     if (!box) return;
-    let totalEstimate = 0, openTasks = 0;
-    boardData.forEach(col => col.tasks.forEach(t => { if (!t.completed && !t.parentId) { totalEstimate += (t.estimateMinutes || 0); openTasks++; } }));
-    const workMin = Math.round((workDuration || 1500) / 60);
-    const sessions = openTasks > 0 ? Math.ceil(totalEstimate / workMin) : 0;
-    box.innerHTML = `<ul>
-        <li><strong>Active Load:</strong> ${totalEstimate} min across ${openTasks} task(s)${sessions ? ` — roughly ${sessions} focus session(s).` : '.'}</li>
-        <li><strong>Timer Flash:</strong> 3 min left warning.</li>
-    </ul>`;
+    var totalEstimate = 0, openTasks = 0;
+    boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (!t.completed && !t.parentId) { totalEstimate += (t.estimateMinutes || 0); openTasks++; } }); });
+    var workMin = Math.round((workDuration || 1500) / 60);
+    var sessions = openTasks > 0 ? Math.ceil(totalEstimate / workMin) : 0;
+    box.innerHTML = '<ul><li><strong>Active Load:</strong> ' + totalEstimate + ' min across ' + openTasks + ' task(s)' + (sessions ? ' — roughly ' + sessions + ' focus session(s).' : '.') + '</li><li><strong>Timer Flash:</strong> 3 min left warning.</li></ul>';
 }
 
 // ---------- Export/Import ----------
 function exportAllDataJSON() {
-    const data = {
-        appSettings, boardData, historyData, clockLog, clockState,
-        flowBlocksCompleted, taskTimeMemory, customQueueOrder, headerClockZones
+    var data = {
+        appSettings: appSettings,
+        boardData: boardData,
+        historyData: historyData,
+        clockLog: clockLog,
+        clockState: clockState,
+        flowBlocksCompleted: flowBlocksCompleted,
+        taskTimeMemory: taskTimeMemory,
+        customQueueOrder: customQueueOrder,
+        headerClockZones: headerClockZones
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `focus-flow-backup-${getTodayKey()}.json`; a.click();
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'focus-flow-backup-' + getTodayKey() + '.json';
+    a.click();
 }
 function exportHistoryCSV() {
-    const rows = [['Date','Client','Task','Estimate (min)','Actual (min)','Breaks (min)','Notes']];
-    historyData.forEach(h => rows.push([dateKeyFromISO(h.completedAt), h.client, h.task, h.estimateMinutes, h.actualMinutes, (h.breakMinutes||0), (h.notes||'').replace(/"/g,'""')]));
-    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `focus-flow-history-${getTodayKey()}.csv`; a.click();
+    var rows = [['Date','Client','Task','Estimate (min)','Actual (min)','Breaks (min)','Notes']];
+    historyData.forEach(function(h) { rows.push([dateKeyFromISO(h.completedAt), h.client, h.task, h.estimateMinutes, h.actualMinutes, (h.breakMinutes||0), (h.notes||'').replace(/"/g,'""')]); });
+    var csv = rows.map(function(r) { return r.map(function(v) { return '"' + String(v).replace(/"/g,'""') + '"'; }).join(','); }).join('\n');
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'focus-flow-history-' + getTodayKey() + '.csv';
+    a.click();
 }
 function importAllDataJSON(event) {
-    const file = event.target.files[0];
+    var file = event.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    var reader = new FileReader();
+    reader.onload = function(e) {
         try {
-            const data = JSON.parse(e.target.result);
+            var data = JSON.parse(e.target.result);
             if (data.boardData) { boardData = data.boardData; storageSet('focus_board_data', boardData); }
             if (data.historyData) { historyData = data.historyData; storageSet('focus_history_data', historyData); }
             if (data.clockLog) { clockLog = data.clockLog; storageSet('ff-clock-log', clockLog); }
@@ -2698,9 +2692,14 @@ function importAllDataJSON(event) {
             if (data.flowBlocksCompleted !== undefined) { flowBlocksCompleted = data.flowBlocksCompleted; localStorage.setItem('focus_daily_sessions', flowBlocksCompleted); }
             if (data.appSettings) { appSettings = data.appSettings; storageSet('ff-app-settings', appSettings); applySettings(); }
             if (data.taskTimeMemory) { taskTimeMemory = data.taskTimeMemory; storageSet('ff-task-time-memory', taskTimeMemory); }
-            renderBoard(); renderDailyRecap(); renderEstimateLog(); renderClockCard();
+            renderBoard();
+            renderDailyRecap();
+            renderEstimateLog();
+            renderClockCard();
             alert('Import successful!');
-        } catch(err) { alert('Invalid JSON: '+err.message); }
+        } catch(err) {
+            alert('Invalid JSON: ' + err.message);
+        }
     };
     reader.readAsText(file);
     event.target.value = '';
@@ -2714,19 +2713,19 @@ async function sendNotification(title, body) {
         await Notification.requestPermission();
     }
     if (Notification.permission === 'granted') {
-        new Notification(title, { body, icon: 'icon-192.png' });
+        new Notification(title, { body: body, icon: 'icon-192.png' });
     }
 }
 
 function checkForNotifications() {
-    const now = new Date();
-    boardData.forEach(col => {
-        col.tasks.forEach(task => {
+    var now = new Date();
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
             if (task.deadlineTime && !task.completed) {
-                const deadline = new Date(task.deadlineTime);
-                const diff = (deadline - now) / 3600000;
+                var deadline = new Date(task.deadlineTime);
+                var diff = (deadline - now) / 3600000;
                 if (diff < 1 && diff > 0) {
-                    sendNotification('⏰ Deadline Approaching', `"${task.text}" is due within 1 hour.`);
+                    sendNotification('⏰ Deadline Approaching', '"' + task.text + '" is due within 1 hour.');
                 }
             }
         });
@@ -2739,12 +2738,12 @@ function syncWithCalendar() {
         alert('Calendar sync is not supported in this browser. Please use Chrome or Edge.');
         return;
     }
-    
-    navigator.calendar.requestPermission().then(result => {
+
+    navigator.calendar.requestPermission().then(function(result) {
         if (result === 'granted') {
-            const tasksWithDeadlines = [];
-            boardData.forEach(col => {
-                col.tasks.forEach(task => {
+            var tasksWithDeadlines = [];
+            boardData.forEach(function(col) {
+                col.tasks.forEach(function(task) {
                     if (task.deadlineTime && !task.completed) {
                         tasksWithDeadlines.push({
                             title: task.text,
@@ -2754,25 +2753,25 @@ function syncWithCalendar() {
                     }
                 });
             });
-            
+
             if (tasksWithDeadlines.length === 0) {
                 alert('No tasks with deadlines to sync.');
                 return;
             }
-            
-            tasksWithDeadlines.forEach(task => {
+
+            tasksWithDeadlines.forEach(function(task) {
                 navigator.calendar.createEvent({
                     title: task.title,
                     startDate: task.startDate,
                     notes: task.notes
-                }).catch(err => console.error('Calendar error:', err));
+                }).catch(function(err) { console.error('Calendar error:', err); });
             });
-            
-            alert(`✅ Synced ${tasksWithDeadlines.length} task(s) to your calendar.`);
+
+            alert('✅ Synced ' + tasksWithDeadlines.length + ' task(s) to your calendar.');
         } else {
             alert('Calendar permission denied. Please enable in browser settings.');
         }
-    }).catch(() => {
+    }).catch(function() {
         alert('Calendar sync requires Chrome or Edge browser.');
     });
 }
@@ -2782,20 +2781,41 @@ function initApp() {
     applySettings();
     updateClocks();
     setInterval(updateClocks, 1000);
-    setInterval(tickTracking, 1000);
-    setInterval(() => {
-        const now = new Date();
+
+    // Simple tick tracking for stopwatch
+    setInterval(function() {
+        var anyTracking = false;
+        boardData.forEach(function(col, ci) {
+            col.tasks.forEach(function(task, ti) {
+                if (task.isTracking && !task.completed) {
+                    anyTracking = true;
+                    task.trackedSeconds++;
+                    var btn = document.getElementById('track-btn-' + ci + '-' + ti);
+                    if (btn) btn.textContent = '⏸ ' + formatMinSec(task.trackedSeconds);
+                }
+            });
+        });
+        if (anyTracking) {
+            // save occasionally
+            if (Math.random() < 0.1) saveBoardData();
+        }
+    }, 1000);
+
+    setInterval(function() {
+        var now = new Date();
         if (now.getHours() === 0 && now.getMinutes() === 0) {
             adjustTasksForMidnight();
             setupRecurringTasks();
         }
     }, 60000);
-    
+
     setInterval(checkForNotifications, 300000);
 
-    const key = storageGet('gemini_api_key', '');
-    if ($('gemini-api-key')) $('gemini-api-key').value = key;
-    if ($('gemini-api-key-modal')) $('gemini-api-key-modal').value = key;
+    var key = storageGet('gemini_api_key', '');
+    var keyInput = document.getElementById('gemini-api-key');
+    if (keyInput) keyInput.value = key;
+    var keyInputModal = document.getElementById('gemini-api-key-modal');
+    if (keyInputModal) keyInputModal.value = key;
 
     setFlowControlsVisible(false);
     renderClockCard();
@@ -2806,78 +2826,89 @@ function initApp() {
     updateDisplay();
     startQuoteRotation();
     renderDailyRecap();
-    
+
     setupRecurringTasks();
-    
-    // Load scheduled times
-    const scheduledIn = clockState.scheduledIn || '09:00';
-    const scheduledOut = clockState.scheduledOut || '17:00';
-    const inEl = document.getElementById('scheduled-in');
-    const outEl = document.getElementById('scheduled-out');
+
+    var scheduledIn = clockState.scheduledIn || '09:00';
+    var scheduledOut = clockState.scheduledOut || '17:00';
+    var inEl = document.getElementById('scheduled-in');
+    var outEl = document.getElementById('scheduled-out');
     if (inEl) inEl.value = scheduledIn;
     if (outEl) outEl.value = scheduledOut;
     updateAttendanceDisplay();
     setInterval(updateAttendanceDisplay, 30000);
-    
+
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
+
+    console.log('Focus & Flow Studio initialized successfully.');
 }
 
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
-function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, tag => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[tag]||tag)); }
+function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, function(tag) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[tag] || tag; }); }
 
 // ---------- Task callbacks ----------
-let pendingCompletion = null;
+var pendingCompletion = null;
 function toggleTask(ci, ti) {
-    const task = boardData[ci].tasks[ti];
+    var task = boardData[ci].tasks[ti];
     if (task.completed) {
-        task.completed = false; task.completedAt = null; task.completedAtIso = null;
+        task.completed = false;
+        task.completedAt = null;
+        task.completedAtIso = null;
         if (task._historyId) {
-            const idx = historyData.findIndex((h) => h._id === task._historyId);
+            var idx = historyData.findIndex(function(h) { return h._id === task._historyId; });
             if (idx !== -1) historyData.splice(idx, 1);
             task._historyId = null;
         }
-        saveBoardData(); renderBoard(); renderEstimateLog();
+        saveBoardData();
+        renderBoard();
+        renderEstimateLog();
         return;
     }
     if (boardData[ci].notesRequired && (!task.notes || task.notes.trim() === '')) {
         alert("This column requires notes! Please add notes via Details before completing.");
-        renderBoard(); return;
+        renderBoard();
+        return;
     }
     if (task.trackedSeconds === 0) {
         pendingCompletion = { colIndex: ci, taskIndex: ti };
-        $('completion-task-name').textContent = task.text;
-        $('completion-actual-input').value = task.estimateMinutes;
-        $('completion-overlay').style.display = 'flex';
+        document.getElementById('completion-task-name').textContent = task.text;
+        document.getElementById('completion-actual-input').value = task.estimateMinutes;
+        document.getElementById('completion-overlay').style.display = 'flex';
         return;
     }
     finalizeTaskCompletion(ci, ti, task.trackedSeconds);
 }
 function confirmCompletion() {
     if (!pendingCompletion) return;
-    const { colIndex, taskIndex } = pendingCompletion;
-    const task = boardData[colIndex].tasks[taskIndex];
-    const minutes = Math.max(1, parseInt($('completion-actual-input').value) || task.estimateMinutes);
+    var colIndex = pendingCompletion.colIndex;
+    var taskIndex = pendingCompletion.taskIndex;
+    var task = boardData[colIndex].tasks[taskIndex];
+    var minutes = Math.max(1, parseInt(document.getElementById('completion-actual-input').value) || task.estimateMinutes);
     finalizeTaskCompletion(colIndex, taskIndex, minutes * 60);
     pendingCompletion = null;
-    $('completion-overlay').style.display = 'none';
+    document.getElementById('completion-overlay').style.display = 'none';
 }
-function cancelCompletion() { pendingCompletion = null; $('completion-overlay').style.display = 'none'; renderBoard(); }
+function cancelCompletion() {
+    pendingCompletion = null;
+    document.getElementById('completion-overlay').style.display = 'none';
+    renderBoard();
+}
 function finalizeTaskCompletion(ci, ti, actualSeconds) {
-    const task = boardData[ci].tasks[ti];
+    var task = boardData[ci].tasks[ti];
     task.completed = true;
     task.isTracking = false;
     task.trackedSeconds = actualSeconds;
     task.completedAt = Date.now();
     task.completedAtIso = new Date().toISOString();
-    if(task.startedAtIso) task.timeSegments.push({start: task.startedAtIso, end: task.completedAtIso});
+    if (task.startedAtIso) task.timeSegments.push({ start: task.startedAtIso, end: task.completedAtIso });
 
-    const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    var historyId = 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     task._historyId = historyId;
-    const totalBreaks = task.breaks.reduce((acc, b) => acc + (b.durationMinutes || 0), 0);
-    let breaksStr = task.breaks.length ? `[Breaks: ${task.breaks.map(b=>b.reason).join(', ')}] ` : '';
+    var totalBreaks = task.breaks.reduce(function(acc, b) { return acc + (b.durationMinutes || 0); }, 0);
+    var breaksStr = task.breaks.length ? '[Breaks: ' + task.breaks.map(function(b) { return b.reason; }).join(', ') + '] ' : '';
     historyData.unshift({
         _id: historyId,
         client: boardData[ci].title,
@@ -2896,9 +2927,9 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
     renderDailyRecap();
     renderInternalQueue();
 }
-function deleteTask(ci, ti) { 
-    const task = boardData[ci].tasks[ti];
-    boardData[ci].tasks = boardData[ci].tasks.filter(t => t.parentId !== task.id);
+function deleteTask(ci, ti) {
+    var task = boardData[ci].tasks[ti];
+    boardData[ci].tasks = boardData[ci].tasks.filter(function(t) { return t.parentId !== task.id; });
     boardData[ci].tasks.splice(ti, 1);
     saveBoardData();
     renderBoard();
@@ -2906,74 +2937,13 @@ function deleteTask(ci, ti) {
 }
 
 function rememberTaskTime(text, minutes) {
-    const key = normalizeTaskName(text);
+    var key = normalizeTaskName(text);
     if (!key) return;
-    const entry = taskTimeMemory[key] || { total: 0, count: 0 };
+    var entry = taskTimeMemory[key] || { total: 0, count: 0 };
     entry.total += minutes;
     entry.count += 1;
     taskTimeMemory[key] = entry;
     storageSet('ff-task-time-memory', taskTimeMemory);
 }
-
-// ---------- Background tracker ----------
-let backgroundTracker = { active: false, startTime: null, taskId: null, interval: null };
-
-function startBackgroundTracking(taskId) {
-    if (backgroundTracker.active) return;
-    backgroundTracker.active = true;
-    backgroundTracker.startTime = Date.now();
-    backgroundTracker.taskId = taskId;
-    backgroundTracker.interval = setInterval(() => {
-        let found = false;
-        boardData.forEach(col => {
-            col.tasks.forEach(task => {
-                if (task.id === backgroundTracker.taskId && !task.completed) {
-                    task.trackedSeconds += 1;
-                    found = true;
-                }
-            });
-        });
-        if (!found) {
-            stopBackgroundTracking();
-        }
-    }, 1000);
-}
-
-function stopBackgroundTracking() {
-    if (backgroundTracker.interval) {
-        clearInterval(backgroundTracker.interval);
-        backgroundTracker.interval = null;
-    }
-    backgroundTracker.active = false;
-    backgroundTracker.taskId = null;
-    backgroundTracker.startTime = null;
-}
-
-// Track time when in flow work segment
-const originalAddFiveMinutes = addFiveMinutes;
-addFiveMinutes = function() {
-    if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
-        const task = currentFlowSegment().entry.task;
-        if (task && !task.completed) {
-            startBackgroundTracking(task.id);
-        }
-    }
-    originalAddFiveMinutes();
-};
-
-const originalToggleTimer = toggleTimer;
-toggleTimer = function() {
-    if (!isRunning) {
-        if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
-            const task = currentFlowSegment().entry.task;
-            if (task && !task.completed) {
-                startBackgroundTracking(task.id);
-            }
-        }
-    } else {
-        stopBackgroundTracking();
-    }
-    originalToggleTimer();
-};
 
 document.addEventListener('DOMContentLoaded', initApp);
