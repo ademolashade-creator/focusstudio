@@ -835,20 +835,49 @@ function updateAttendanceDisplay() {
     var todayEntry = todayLog.length > 0 ? todayLog[0] : null;
 
     if (clockState.clockedIn) {
-        statusEl.textContent = 'On Duty';
-        statusEl.className = 'attendance-status on-duty';
-    } else if (todayEntry && todayEntry.clockOut) {
+    statusEl.textContent = 'On Duty';
+    statusEl.className = 'attendance-status on-duty';
+
+    if (actualInEl) {
+        var clockInTime = todayEntry ? todayEntry.clockIn : new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        actualInEl.textContent = clockInTime || '--:--';
+    }
+    if (actualOutEl) actualOutEl.textContent = 'In progress';
+
+    // Elapsed time so far
+    var diffMs = Date.now() - clockState.startedAt;
+    var minutes = Math.round(diffMs / 60000);
+    var hours = Math.floor(minutes / 60);
+    var mins = minutes % 60;
+    if (todayHoursEl) todayHoursEl.textContent = hours + 'h ' + mins + 'm (in progress)';
+
+    // Countdown to scheduled out
+    if (summaryEl) {
+        var scheduledOut = clockState.scheduledOut || '17:00';
+        var scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
+        var nowMinutes = now.getHours() * 60 + now.getMinutes();
+        var remainingMinutes = scheduledOutMinutes - nowMinutes;
+        if (remainingMinutes > 0) {
+            var remHours = Math.floor(remainingMinutes / 60);
+            var remMins = remainingMinutes % 60;
+            summaryEl.textContent = 'Clock out in ' + remHours + 'h ' + remMins + 'm';
+            summaryEl.className = 'attendance-time-display';
+        } else if (remainingMinutes === 0) {
+            summaryEl.textContent = '⏰ Time to clock out!';
+            summaryEl.className = 'attendance-time-display late-text';
+        } else {
+            var overdue = Math.abs(remainingMinutes);
+            var overHours = Math.floor(overdue / 60);
+            var overMins = overdue % 60;
+            summaryEl.textContent = '⚠️ Overdue by ' + overHours + 'h ' + overMins + 'm';
+            summaryEl.className = 'attendance-time-display late-text';
+        }
+    }
+} else if (todayEntry && todayEntry.clockOut) {
+        // Clocked out
         statusEl.textContent = 'Clocked Out';
         statusEl.className = 'attendance-status off-duty';
-    } else if (todayEntry && todayEntry.clockIn) {
-        statusEl.textContent = 'Clocked In';
-        statusEl.className = 'attendance-status on-duty';
-    } else {
-        statusEl.textContent = 'Off Duty';
-        statusEl.className = 'attendance-status off-duty';
-    }
 
-    if (todayEntry) {
         if (actualInEl) actualInEl.textContent = todayEntry.clockIn || '--:--';
         if (actualOutEl) actualOutEl.textContent = todayEntry.clockOut || '--:--';
 
@@ -856,58 +885,45 @@ function updateAttendanceDisplay() {
             var hours = Math.floor(todayEntry.durationMinutes / 60);
             var mins = todayEntry.durationMinutes % 60;
             if (todayHoursEl) todayHoursEl.textContent = hours + 'h ' + mins + 'm';
-        } else if (clockState.clockedIn) {
-            var durationMs2 = Date.now() - clockState.startedAt;
-            var durationMinutes2 = Math.max(1, Math.round(durationMs2 / 60000));
-            var hours2 = Math.floor(durationMinutes2 / 60);
-            var mins2 = durationMinutes2 % 60;
-            if (todayHoursEl) todayHoursEl.textContent = hours2 + 'h ' + mins2 + 'm (in progress)';
         } else {
             if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
         }
 
-        if (todayEntry.clockOut && todayEntry.scheduledOut) {
+        if (summaryEl) {
             var scheduledOut2 = todayEntry.scheduledOut || '17:00';
             var scheduledOutMinutes2 = parseInt(scheduledOut2.split(':')[0]) * 60 + parseInt(scheduledOut2.split(':')[1]);
             var actualOutMinutes = parseInt(todayEntry.clockOut.split(':')[0]) * 60 + parseInt(todayEntry.clockOut.split(':')[1]);
             var diff = actualOutMinutes - scheduledOutMinutes2;
 
             if (todayEntry.isLate) {
-                if (summaryEl) {
-                    summaryEl.textContent = '⚠️ ' + Math.abs(diff) + ' min late';
-                    summaryEl.className = 'attendance-time-display late-text';
-                }
+                summaryEl.textContent = '⚠️ ' + Math.abs(diff) + ' min late';
+                summaryEl.className = 'attendance-time-display late-text';
             } else if (todayEntry.isEarly) {
-                if (summaryEl) {
-                    summaryEl.textContent = '✅ ' + Math.abs(diff) + ' min early';
-                    summaryEl.className = 'attendance-time-display early-text';
-                }
+                summaryEl.textContent = '✅ ' + Math.abs(diff) + ' min early';
+                summaryEl.className = 'attendance-time-display early-text';
             } else {
-                if (summaryEl) {
-                    summaryEl.textContent = '✅ On time';
-                    summaryEl.className = 'attendance-time-display';
-                }
-            }
-        } else if (clockState.clockedIn) {
-            if (summaryEl) {
-                var scheduledOut3 = clockState.scheduledOut || '17:00';
-                summaryEl.textContent = 'Scheduled out at ' + scheduledOut3;
-                summaryEl.className = 'attendance-time-display';
-            }
-        } else {
-            if (summaryEl) {
-                summaryEl.textContent = 'Not clocked in today';
+                summaryEl.textContent = '✅ On time';
                 summaryEl.className = 'attendance-time-display';
             }
         }
+
+    } else if (todayEntry && todayEntry.clockIn) {
+        // Clocked in earlier but clocked out now? This case is covered above.
+        // But if for some reason the entry exists but not clocked out, we handle it.
+        statusEl.textContent = 'Clocked In';
+        statusEl.className = 'attendance-status on-duty';
+        if (actualInEl) actualInEl.textContent = todayEntry.clockIn || '--:--';
+        if (actualOutEl) actualOutEl.textContent = '--:--';
+        if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
+        if (summaryEl) summaryEl.textContent = 'Not clocked out';
     } else {
+        // Not clocked in today
+        statusEl.textContent = 'Off Duty';
+        statusEl.className = 'attendance-status off-duty';
         if (actualInEl) actualInEl.textContent = '--:--';
         if (actualOutEl) actualOutEl.textContent = '--:--';
         if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
-        if (summaryEl) {
-            summaryEl.textContent = 'Not clocked in today';
-            summaryEl.className = 'attendance-time-display';
-        }
+        if (summaryEl) summaryEl.textContent = 'Not clocked in today';
     }
 
     var btn = $('clock-btn');
@@ -969,13 +985,25 @@ function formatDateKey(dateKey) {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+// ---------- Format minutes to hours/minutes ----------
+function formatHoursMinutes(totalMinutes) {
+    if (totalMinutes < 60) return totalMinutes + 'm';
+    var hours = Math.floor(totalMinutes / 60);
+    var mins = totalMinutes % 60;
+    return hours + 'h ' + mins + 'm';
+}
+
+// ---------- Midnight adjustment: move unfinished tasks to today ----------
 function adjustTasksForMidnight() {
     var today = getTodayKey();
     var changed = false;
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
             if (!task.completed && task.dateAdded !== today) {
+                // Move to today and mark as carried over
                 task.dateAdded = today;
+                task.carriedOver = true;
+                task.originalDate = task.originalDate || task.dateAdded;
                 changed = true;
             }
         });
@@ -1011,6 +1039,8 @@ boardData.forEach(function(col) {
         if (t.recurrence === undefined) t.recurrence = null;
         if (t.lastRecurrenceDate === undefined) t.lastRecurrenceDate = null;
         if (t.collapsedControls === undefined) t.collapsedControls = false;
+        if (t.carriedOver === undefined) t.carriedOver = false;
+        if (t.originalDate === undefined) t.originalDate = null;
     });
 });
 saveBoardData();
@@ -1151,9 +1181,11 @@ async function naturalLanguageAddTask(ci) {
             isSubtask: false,
             hasSubtasks: false,
             collapsed: false,
-            collapsedControls: false,  // 👈 ADD THIS LINE
+            collapsedControls: false,
             recurrence: null,
-            lastRecurrenceDate: null
+            lastRecurrenceDate: null,
+            carriedOver: false,
+            originalDate: null
         };
         col.tasks.push(newTask);
         input.value = '';
@@ -1347,7 +1379,15 @@ function getTodayCompleted() {
 }
 
 // ---------- Render Board ----------
+// Preserve scroll positions when re-rendering
+var scrollPositions = {};
+
 function renderBoard() {
+    // Save scroll positions of task lists
+    document.querySelectorAll('.task-list').forEach(function(list, idx) {
+        scrollPositions['list-' + idx] = list.scrollTop;
+    });
+
     var container = $('board-container');
     if (!container) return;
     container.querySelectorAll('.task-column').forEach(function(el) { el.remove(); });
@@ -1389,7 +1429,6 @@ function renderBoard() {
 
     <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
 
-    <!-- TASK LIST FIRST -->
     <ul class="task-list" ondragover="allowDrop(event)" ondrop="dropTask(event, ${colIndex})">
         ${groupTasksByDate(col.tasks).map((group) => `
             <li class="date-group-header" onclick="toggleDateGroup('${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
@@ -1407,6 +1446,11 @@ function renderBoard() {
                     deadlineHtml = `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${taskIndex})">+ Deadline</button>`;
                 }
 
+                let carriedOverBadge = '';
+                if (task.carriedOver) {
+                    carriedOverBadge = `<span class="carried-over-badge" title="Carried over from ${task.originalDate || 'previous day'}">⏳ Carried</span>`;
+                }
+
                 let html = `
                     <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
                         <div class="task-top-row">
@@ -1415,6 +1459,7 @@ function renderBoard() {
                                 <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
                                 ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">📋</span>` : ''}
                                 ${task.recurrence ? `<span class="recurrence-badge">🔄 ${task.recurrence}</span>` : ''}
+                                ${carriedOverBadge}
                             </div>
                             <div class="task-top-actions">
                                 <button class="collapse-toggle-btn" onclick="toggleTaskCollapse(${colIndex}, ${taskIndex})" title="${isSubtaskCollapsed ? 'Expand' : 'Collapse'} controls">
@@ -1511,7 +1556,6 @@ function renderBoard() {
         `).join('')}
     </ul>
 
-    <!-- CONTROLS AT THE BOTTOM -->
     <div class="ai-batch-actions">
         <button onclick="suggestColumnTimesAI(${colIndex})">Suggest Times (AI)</button>
         <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow (AI)</button>
@@ -1554,6 +1598,14 @@ function renderBoard() {
     updateStreaksAndBadges();
     updateDailyProgress();
     updateFocusScore();
+
+    // Restore scroll positions
+    document.querySelectorAll('.task-list').forEach(function(list, idx) {
+        var key = 'list-' + idx;
+        if (scrollPositions[key] !== undefined) {
+            list.scrollTop = scrollPositions[key];
+        }
+    });
 }
 
 // ---------- Toggle task controls collapse ----------
@@ -1727,15 +1779,15 @@ function updateDailyProgress() {
     progressEl.innerHTML = `
         <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#888;">
             <span>Today's Progress</span>
-            <span>${totalTracked}m / ${totalEstimated}m</span>
+            <span>${formatHoursMinutes(totalTracked)} / ${formatHoursMinutes(totalEstimated)}</span>
             <span>${percent}%</span>
         </div>
         <div style="width:100%;height:6px;background:var(--border-color);border-radius:3px;margin-top:2px;">
             <div style="width:${percent}%;height:100%;background:var(--cherry-red);border-radius:3px;transition:width 0.5s;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#888;margin-top:2px;">
-            <span>${remaining > 0 ? remaining + 'm remaining' : '🎉 All done!'}</span>
-            <span>${completedMinutes}m completed</span>
+            <span>${remaining > 0 ? formatHoursMinutes(remaining) + ' remaining' : '🎉 All done!'}</span>
+            <span>${formatHoursMinutes(completedMinutes)} completed</span>
         </div>
     `;
 }
@@ -1748,20 +1800,24 @@ function updateFocusScore() {
     var todayKey = getTodayKey();
     var todayHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
 
+    // total estimated for tasks that are today's and not completed
     var totalEstimated = 0;
     var totalTracked = 0;
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
-            if (task.dateAdded === todayKey) {
+            if (task.dateAdded === todayKey && !task.completed) {
                 totalEstimated += task.estimateMinutes;
                 totalTracked += Math.round(task.trackedSeconds / 60);
             }
         });
     });
-    var historyMinutes = todayHistory.reduce(function(a, h) { return a + (h.actualMinutes || 0); }, 0);
-    totalTracked += historyMinutes;
+    // add completed tasks of today
+    var completedMinutes = todayHistory.reduce(function(a, h) { return a + (h.actualMinutes || 0); }, 0);
+    totalTracked += completedMinutes;
+
     var flowScore = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
 
+    // completion ratio among tasks added today
     var todayTasks = [];
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
@@ -1874,9 +1930,11 @@ function addTask(ci) {
         isSubtask: false,
         hasSubtasks: false,
         collapsed: false,
-        collapsedControls: false,  // 👈 ADD THIS LINE
+        collapsedControls: false,
         recurrence: null,
-        lastRecurrenceDate: null
+        lastRecurrenceDate: null,
+        carriedOver: false,
+        originalDate: null
     };
     col.tasks.push(task);
     input.value = '';
@@ -1940,9 +1998,11 @@ function addPastedTasks(ci) {
             isSubtask: false,
             hasSubtasks: false,
             collapsed: false,
-            collapsedControls: false,  // 👈 ADD THIS LINE
+            collapsedControls: false,
             recurrence: null,
-            lastRecurrenceDate: null
+            lastRecurrenceDate: null,
+            carriedOver: false,
+            originalDate: null
         };
     });
 
@@ -1963,6 +2023,17 @@ function updateTaskEstimate(ci, ti, v) {
     if (isNaN(v) || v < 1) v = 1;
     boardData[ci].tasks[ti].estimateMinutes = v;
     saveBoardData();
+    // preserve scroll
+    var listEl = document.getElementById('task-' + ci + '-' + ti);
+    if (listEl) {
+        var list = listEl.closest('.task-list');
+        if (list) {
+            var scrollPos = list.scrollTop;
+            renderBoard();
+            list.scrollTop = scrollPos;
+            return;
+        }
+    }
     renderBoard();
 }
 function moveTask(ci, ti, dir) {
@@ -2638,9 +2709,9 @@ function renderDailyRecap() {
         <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
             <li><strong>${todaysHistory.length}</strong> task(s) finished</li>
             <li><strong>${openFromToday}</strong> still open</li>
-            <li><strong>${totalActual} min</strong> logged work</li>
-            <li><strong>${breakMinutesToday} min</strong> breaks/away</li>
-            <li><strong>${clockedMinutesToday} min</strong> clocked in</li>
+            <li><strong>${formatHoursMinutes(totalActual)}</strong> logged work</li>
+            <li><strong>${formatHoursMinutes(breakMinutesToday)}</strong> breaks/away</li>
+            <li><strong>${formatHoursMinutes(clockedMinutesToday)}</strong> clocked in</li>
         </ul>
     `;
     updateDailyProgress();
@@ -2712,7 +2783,7 @@ function renderTimeCounter() {
     });
     var grandDone = new Date(now.getTime() + grandTotalMinutes * 60000);
     box.innerHTML = '<ul class="log-list">' + rows + '</ul>' +
-        '<p style="margin-top:8px;font-size:0.85rem;"><strong>' + grandWorkMinutes + ' min</strong> total work.</p>' +
+        '<p style="margin-top:8px;font-size:0.85rem;"><strong>' + formatHoursMinutes(grandWorkMinutes) + '</strong> total work.</p>' +
         '<p style="font-weight:700;">All done by ' + formatTimeInZone(grandDone, tz) + ' (' + tz + ')</p>';
 }
 
@@ -2723,7 +2794,7 @@ function updateAdaptiveHacks() {
     boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (!t.completed && !t.parentId) { totalEstimate += (t.estimateMinutes || 0); openTasks++; } }); });
     var workMin = Math.round((workDuration || 1500) / 60);
     var sessions = openTasks > 0 ? Math.ceil(totalEstimate / workMin) : 0;
-    box.innerHTML = '<ul><li><strong>Active Load:</strong> ' + totalEstimate + ' min across ' + openTasks + ' task(s)' + (sessions ? ' — roughly ' + sessions + ' focus session(s).' : '.') + '</li><li><strong>Timer Flash:</strong> 3 min left warning.</li></ul>';
+    box.innerHTML = '<ul><li><strong>Active Load:</strong> ' + formatHoursMinutes(totalEstimate) + ' across ' + openTasks + ' task(s)' + (sessions ? ' — roughly ' + sessions + ' focus session(s).' : '.') + '</li><li><strong>Timer Flash:</strong> 3 min left warning.</li></ul>';
 }
 
 // ---------- Export/Import ----------
