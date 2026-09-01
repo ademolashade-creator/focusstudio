@@ -537,3 +537,92 @@ button:active { transform: scale(0.96); }
     .summary-header { flex-direction: column; align-items: stretch; }
     .header-top { gap: 0.5rem; }
 }
+
+/* Task name and controls layout */
+.task-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.task-checkbox-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0; /* prevents overflow */
+}
+.task-name-input {
+    font-size: 0.95rem !important; /* larger, more readable */
+    min-width: 60px;
+    flex: 1;
+}
+.task-controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--border-color);
+}
+.task-controls-row .details-trigger-btn {
+    margin-top: 0;
+}
+/* Subtask list indentation */
+.subtask-list {
+    border-left: 2px solid var(--amber);
+    padding-left: 12px;
+    margin-top: 4px;
+}
+/* Adjust subtask item */
+.task-item.subtask {
+    background-color: var(--input-bg);
+    border-left-color: var(--amber) !important;
+    opacity: 0.9;
+    font-size: 0.82rem;
+}
+.subtask-indent {
+    color: var(--amber);
+    font-weight: 700;
+    margin-right: 2px;
+    font-size: 0.8rem;
+}
+
+/* Collapse toggle button */
+.collapse-toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.7rem;
+    color: var(--text-color);
+    opacity: 0.4;
+    padding: 0 2px;
+    transition: opacity 0.15s ease;
+    width: 20px;
+    text-align: center;
+}
+.collapse-toggle-btn:hover {
+    opacity: 1;
+    color: var(--cherry-red);
+}
+
+.task-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+/* Task controls row - smooth transition */
+.task-controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--border-color);
+    transition: all 0.2s ease;
+}
