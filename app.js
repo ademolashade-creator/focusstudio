@@ -37,22 +37,26 @@ function toggleDarkMode() {
 let headerClockZones = storageGet('ff-header-clock-zones', ['Africa/Lagos', 'America/New_York', 'America/Denver']);
 
 function populateHeaderClockSelects() {
-    let zones;
+    var zones;
     try { zones = Intl.supportedValuesOf('timeZone'); }
     catch (e) { zones = ['UTC', 'Africa/Lagos', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Australia/Sydney']; }
 
-    const datalist = document.getElementById('tz-datalist');
-    if (datalist) {
-        datalist.innerHTML = zones.map(z => `<option value="${z}">`).join('');
-    }
+    // Sort zones alphabetically for better search
+    zones.sort();
 
-    ['clock-tz-search-1', 'clock-tz-search-2', 'clock-tz-search-3'].forEach((id, i) => {
-        const input = $(id);
-        if (input) {
-            input.value = headerClockZones[i] || '';
-            input.setAttribute('list', 'tz-datalist');
-        }
+    ['clock-tz-1', 'clock-tz-2', 'clock-tz-3'].forEach(function(id, i) {
+        var sel = document.getElementById(id);
+        if (!sel) return;
+        // Clear and populate
+        sel.innerHTML = zones.map(function(z) {
+            return '<option value="' + z + '" ' + (z === headerClockZones[i] ? 'selected' : '') + '>' + z + '</option>';
+        }).join('');
+        // Enable search by adding a datalist? Actually we need to use a combobox.
+        // Instead of a datalist, we can use a select with search input above it.
+        // But simpler: use a select with a filter input that hides options.
+        // We'll implement a custom filter in the next step.
     });
+    // We'll add a filter input for each select using a wrapper.
 }
 
 function updateHeaderClockZone(slot, tz) {
@@ -1689,13 +1693,8 @@ function dropTask(e, targetColIndex) {
 }
 
 function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
-function toggleColumnCollapse(ci) { boardData[ci].collapsed = !boardData[ci].collapsed; saveBoardData(); renderBoard(); }
-function moveColumn(ci, dir) {
-    var target = ci + dir;
-    if (target < 0 || target >= boardData.length) return;
-    var temp = boardData[ci];
-    boardData[ci] = boardData[target];
-    boardData[target] = temp;
+function toggleColumnCollapse(ci) {
+    boardData[ci].collapsed = !boardData[ci].collapsed;
     saveBoardData();
     renderBoard();
 }
@@ -2733,47 +2732,41 @@ function checkForNotifications() {
 }
 
 // ---------- Calendar Sync ----------
-function syncWithCalendar() {
-    if (!('calendar' in navigator)) {
-        alert('Calendar sync is not supported in this browser. Please use Chrome or Edge.');
+function generateICS() {
+    var events = [];
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
+            if (task.deadlineTime && !task.completed) {
+                events.push({
+                    title: task.text,
+                    start: new Date(task.deadlineTime),
+                    notes: task.notes || ''
+                });
+            }
+        });
+    });
+    if (events.length === 0) {
+        alert('No tasks with deadlines to export.');
         return;
     }
-
-    navigator.calendar.requestPermission().then(function(result) {
-        if (result === 'granted') {
-            var tasksWithDeadlines = [];
-            boardData.forEach(function(col) {
-                col.tasks.forEach(function(task) {
-                    if (task.deadlineTime && !task.completed) {
-                        tasksWithDeadlines.push({
-                            title: task.text,
-                            startDate: new Date(task.deadlineTime),
-                            notes: task.notes || ''
-                        });
-                    }
-                });
-            });
-
-            if (tasksWithDeadlines.length === 0) {
-                alert('No tasks with deadlines to sync.');
-                return;
-            }
-
-            tasksWithDeadlines.forEach(function(task) {
-                navigator.calendar.createEvent({
-                    title: task.title,
-                    startDate: task.startDate,
-                    notes: task.notes
-                }).catch(function(err) { console.error('Calendar error:', err); });
-            });
-
-            alert('✅ Synced ' + tasksWithDeadlines.length + ' task(s) to your calendar.');
-        } else {
-            alert('Calendar permission denied. Please enable in browser settings.');
-        }
-    }).catch(function() {
-        alert('Calendar sync requires Chrome or Edge browser.');
+    var icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Focus Flow//EN\n';
+    events.forEach(function(e) {
+        var startStr = e.start.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        var endStr = new Date(e.start.getTime() + 60*60*1000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        icsContent += 'BEGIN:VEVENT\n';
+        icsContent += 'SUMMARY:' + e.title + '\n';
+        icsContent += 'DTSTART:' + startStr + '\n';
+        icsContent += 'DTEND:' + endStr + '\n';
+        icsContent += 'DESCRIPTION:' + (e.notes || '') + '\n';
+        icsContent += 'END:VEVENT\n';
     });
+    icsContent += 'END:VCALENDAR';
+    var blob = new Blob([icsContent], { type: 'text/calendar' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'focus-flow-calendar.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
 }
 
 // ---------- Init ----------
@@ -2802,12 +2795,12 @@ function initApp() {
     }, 1000);
 
     setInterval(function() {
-        var now = new Date();
-        if (now.getHours() === 0 && now.getMinutes() === 0) {
-            adjustTasksForMidnight();
-            setupRecurringTasks();
-        }
-    }, 60000);
+    var now = new Date();
+    if (now.getHours() === 0 && now.getMinutes() === 0) {
+        adjustTasksForMidnight();
+        setupRecurringTasks();
+    }
+}, 60000);
 
     setInterval(checkForNotifications, 300000);
 

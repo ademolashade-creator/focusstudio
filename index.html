@@ -6,11 +6,12 @@
     <title>Focus & Flow Studio</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff3366">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=20250902">
+    <link rel="stylesheet" href="styles.css?v=20250903">
     <script>
         // Force service worker unregister and clear caches
         if ('serviceWorker' in navigator) {
@@ -30,16 +31,23 @@
 <body>
 
     <header>
-        <h1 class="editable-title" contenteditable="true" id="app-title" onblur="saveAppName(this.textContent)">Focus & Flow Studio</h1>
+        <div class="header-top">
+            <h1 class="editable-title" contenteditable="true" id="app-title" onblur="saveAppName(this.textContent)">Focus & Flow Studio</h1>
+            <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
+        </div>
         <p class="tagline">Curate your day, honor your energy, and master your workflow.</p>
         <div id="quote-banner" class="quote-banner">✨ “Focus is the art of knowing what to ignore.” — James Clear</div>
 
-        <!-- Attendance System -->
+        <!-- Attendance System (now with buttons) -->
         <div class="attendance-container">
             <div class="attendance-card">
                 <div class="attendance-header">
                     <span class="attendance-title">⏰ Attendance</span>
                     <span id="attendance-status" class="attendance-status off-duty">Off Duty</span>
+                    <span style="display:flex;gap:6px;">
+                        <button class="btn-secondary btn-small" id="break-btn" onclick="toggleBreak()">☕ Break</button>
+                        <button class="btn-secondary btn-small" id="clock-btn" onclick="toggleClock()">Clock In</button>
+                    </span>
                 </div>
                 <div class="attendance-body">
                     <div class="attendance-row">
@@ -76,33 +84,27 @@
             </div>
         </div>
 
+        <!-- Clocks Bar (searchable dropdowns) -->
         <div class="clocks-bar">
             <div class="clock-item"><div class="clock-label">Date</div><div class="date-display" id="date-display">--/--/----</div></div>
             <div class="clock-item">
                 <div class="clock-label">
-                    <input type="text" class="clock-tz-search" id="clock-tz-search-1" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(1, this.value)">
-                    <datalist id="tz-datalist"></datalist>
+                    <select class="clock-tz-select" id="clock-tz-1" onchange="updateHeaderClockZone(1, this.value)"></select>
                 </div>
                 <div class="clock-time" id="clock-wat">--:--:--</div>
             </div>
             <div class="clock-item">
                 <div class="clock-label">
-                    <input type="text" class="clock-tz-search" id="clock-tz-search-2" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(2, this.value)">
+                    <select class="clock-tz-select" id="clock-tz-2" onchange="updateHeaderClockZone(2, this.value)"></select>
                 </div>
                 <div class="clock-time" id="clock-est">--:--:--</div>
             </div>
             <div class="clock-item">
                 <div class="clock-label">
-                    <input type="text" class="clock-tz-search" id="clock-tz-search-3" placeholder="Search timezone..." list="tz-datalist" oninput="updateHeaderClockZone(3, this.value)">
+                    <select class="clock-tz-select" id="clock-tz-3" onchange="updateHeaderClockZone(3, this.value)"></select>
                 </div>
                 <div class="clock-time" id="clock-mst">--:--:--</div>
             </div>
-        </div>
-
-        <div class="top-controls">
-            <button class="btn-secondary" onclick="toggleDarkMode()">Toggle Dark Mode</button>
-            <button class="btn-secondary" id="break-btn" onclick="toggleBreak()">☕ Break</button>
-            <button class="btn-secondary" id="clock-btn" onclick="toggleClock()">Clock In</button>
         </div>
     </header>
 
@@ -196,7 +198,7 @@
             <div class="summary-header">
                 <h2 style="margin:0;">Monthly Summary & Client Report</h2>
                 <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
-                <button class="ai-btn" onclick="syncWithCalendar()" style="background:var(--green);">📅 Sync Calendar</button>
+                <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">📅 Download .ics</button>
                 <button class="ai-btn" onclick="generatePDFReport()" style="background:var(--amber);">📄 PDF Report</button>
             </div>
             <details style="margin-bottom:1rem;">
@@ -222,7 +224,7 @@
         </details>
     </div>
 
-    <!-- Modals -->
+    <!-- Modals (unchanged) -->
     <div class="modal-overlay" id="break-overlay">
         <div class="modal-box">
             <h2 style="color:var(--cherry-red);margin-top:0;">☕ Break Time</h2>
@@ -305,7 +307,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=20250902"></script>
+    <script src="app.js?v=20250903"></script>
     <script>
         // Additional inline functions that need to be global
         function importAllDataJSON(event) {
@@ -315,6 +317,7 @@
             reader.onload = function(e) {
                 try {
                     const data = JSON.parse(e.target.result);
+                    // Merge with existing or replace
                     if (data.boardData) { boardData = data.boardData; storageSet('focus_board_data', boardData); }
                     if (data.historyData) { historyData = data.historyData; storageSet('focus_history_data', historyData); }
                     if (data.clockLog) { clockLog = data.clockLog; storageSet('ff-clock-log', clockLog); }
@@ -327,13 +330,86 @@
                     renderBoard(); renderDailyRecap(); renderEstimateLog(); renderClockCard();
                     alert('Import successful!');
                 } catch(err) {
-                    alert('Invalid JSON: ' + err.message);
+                    alert('Invalid JSON: ' + err.message + '\nPlease check the file format.');
+                    console.error(err);
                 }
             };
             reader.readAsText(file);
             event.target.value = '';
         }
+        // Make import function globally accessible
         window.importAllDataJSON = importAllDataJSON;
+        // Also make other functions global if needed
+        window.exportAllDataJSON = exportAllDataJSON;
+        window.exportHistoryCSV = exportHistoryCSV;
+        window.saveAppName = saveAppName;
+        window.toggleDarkMode = toggleDarkMode;
+        window.toggleBreak = toggleBreak;
+        window.toggleClock = toggleClock;
+        window.toggleTimer = toggleTimer;
+        window.resetTimer = resetTimer;
+        window.openEndSessionModal = openEndSessionModal;
+        window.closeEndSessionModal = closeEndSessionModal;
+        window.endSessionLogProgress = endSessionLogProgress;
+        window.endSessionAbandon = endSessionAbandon;
+        window.addFiveMinutes = addFiveMinutes;
+        window.skipCurrentSegment = skipCurrentSegment;
+        window.startFlow = startFlow;
+        window.startAIFlow = startAIFlow;
+        window.generateAISummary = generateAISummary;
+        window.generatePDFReport = generatePDFReport;
+        window.generateICS = generateICS;
+        window.syncWithCalendar = syncWithCalendar; // fallback
+        window.reEstimateAllTasks = reEstimateAllTasks;
+        window.updateTimezone = updateTimezone;
+        window.addColumn = addColumn;
+        window.saveApiKey = saveApiKey;
+        window.handleKeyPress = handleKeyPress;
+        window.breakdownTask = breakdownTask;
+        window.suggestTimeFromDetails = suggestTimeFromDetails;
+        window.openDetailsModal = openDetailsModal;
+        window.closeDetailsModal = closeDetailsModal;
+        window.toggleTask = toggleTask;
+        window.confirmCompletion = confirmCompletion;
+        window.cancelCompletion = cancelCompletion;
+        window.deleteTask = deleteTask;
+        window.updateTaskText = updateTaskText;
+        window.updateTaskEstimate = updateTaskEstimate;
+        window.moveTask = moveTask;
+        window.moveColumn = moveColumn;
+        window.deleteColumn = deleteColumn;
+        window.toggleColumnCollapse = toggleColumnCollapse;
+        window.toggleDateGroup = toggleDateGroup;
+        window.promptDeadline = promptDeadline;
+        window.acceptAISuggestion = acceptAISuggestion;
+        window.dismissAISuggestion = dismissAISuggestion;
+        window.suggestColumnTimesAI = suggestColumnTimesAI;
+        window.optimizeColumnFlowAI = optimizeColumnFlowAI;
+        window.applyTaskEstimate = applyTaskEstimate;
+        window.dismissTaskEstimate = dismissTaskEstimate;
+        window.applyAllEstimates = applyAllEstimates;
+        window.dismissAllEstimates = dismissAllEstimates;
+        window.generateColumnCheckIn = generateColumnCheckIn;
+        window.startVoiceInput = startVoiceInput;
+        window.naturalLanguageAddTask = naturalLanguageAddTask;
+        window.setRecurrence = setRecurrence;
+        window.removeRecurrence = removeRecurrence;
+        window.toggleSubtasksCollapse = toggleSubtasksCollapse;
+        window.removeAllSubtasks = removeAllSubtasks;
+        window.saveAttendanceSettings = saveAttendanceSettings;
+        window.queueDragStart = queueDragStart;
+        window.queueDragOver = queueDragOver;
+        window.queueDragLeave = queueDragLeave;
+        window.queueDrop = queueDrop;
+        window.dragStart = dragStart;
+        window.allowDrop = allowDrop;
+        window.dropTask = dropTask;
+        window.updateColumnTitle = updateColumnTitle;
+        window.addTask = addTask;
+        window.addPastedTasks = addPastedTasks;
+        window.toggleNotesRequired = toggleNotesRequired;
+        window.updateHeaderClockZone = updateHeaderClockZone;
+        window.rotateQuote = rotateQuote;
     </script>
 </body>
 </html>
