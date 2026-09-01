@@ -85,46 +85,46 @@ function updateClocks() {
 
 // ---------- Quote Banner ----------
 const quotes = [
+    "Focus is the art of knowing what to ignore. — James Clear",
     "The secret of getting ahead is getting started. — Mark Twain",
-    "Your work is a reflection of your attention. Protect it like gold. — Unknown",
-    "In marketing, clarity is more persuasive than cleverness. — Unknown",
-    "Writing is an act of discovery. You cannot know what you think until you write it. — Joan Didion",
-    "For ADHD: Forget motivation. Build systems and rely on small wins. — Unknown",
-    "Start messy, refine later. Perfection is the enemy of done. — Unknown",
-    "Marketing is not about the product, but about the customer's transformation. — Seth Godin",
-    "You cannot edit a blank page. Write the worst draft you can. — Unknown",
-    "For ADHD: Consistency beats intensity. Five minutes today beats zero. — Unknown",
-    "Rest is the reset button for your cognitive engine. Guard it fiercely. — Unknown",
-    "Simplicity in marketing is the ultimate sophistication. One clear message wins. — Unknown",
-    "The only way to do great work is to give it your full presence. — Unknown",
-    "For ADHD: Break the task into the next five minutes. Nothing else exists. — Unknown",
-    "Marketing is a conversation, not a broadcast. Listen twice as much. — Unknown",
-    "Writing is rewriting. The magic lives in the revision. — Unknown",
-    "The energy you bring to your work is contagious. Choose intention. — Unknown",
-    "For ADHD: Progress is rarely linear. A step back is still valuable data. — Unknown",
-    "To sell something, make the customer the hero of the story. — Unknown",
-    "A writer's greatest tool is not talent, but a willingness to be imperfect. — Unknown",
-    "Work expands to fill the time given. Set strict boundaries to protect your focus. — Parkinson's Law",
-    "For ADHD: Externalize your thinking. Write it down, always. — Unknown",
-    "Marketing without testing is just guessing. Experiment without attachment. — Unknown",
-    "Writing is thinking on paper. Clear writing demands clear thinking. — Unknown",
-    "The greatest gift to your work is your undivided presence. — Unknown",
-    "For ADHD: Action precedes motivation. Start before you feel ready. — Unknown",
-    "Build a brand built on trust, not just recognition. — Unknown",
-    "Nobody sees your first drafts but you. Write freely. — Unknown",
-    "Your most productive hour is the one protected from interruption. — Unknown",
-    "For ADHD: Turn every large task into a micro-step. Eat the elephant bite by bite. — Unknown",
-    "Marketing is about attention. Give value first, and attention follows. — Unknown",
-    "Writing is a daily discipline, not a sudden burst of inspiration. — Unknown",
-    "The quality of your work reflects the quality of your input. Read widely. — Unknown",
-    "For ADHD: Guide your hyperfocus with intention. It is your superpower. — Unknown",
-    "In marketing, speak to the pain before you offer the cure. — Unknown",
-    "The first draft is just you telling yourself the story. — Terry Pratchett",
-    "Work is about progress, not perfection. — Unknown",
-    "For ADHD: Your brain is not broken. It is wired for curiosity. Use it. — Unknown",
-    "Marketing is about saying 'yes' to the right people at the right time. — Unknown",
-    "The words you leave out are as important as the ones you write. — Unknown",
-    "Your work is the signature you leave on the world. Make it intentional. — Unknown"
+    "It's not about having time; it's about making time. — Unknown",
+    "Your mind is the most powerful tool you have. Use it wisely. — Unknown",
+    "Clarity precedes mastery. — Robin Sharma",
+    "The best way to predict the future is to create it. — Peter Drucker",
+    "Success is the sum of small efforts repeated day in and day out. — Robert Collier",
+    "You don't have to be extreme, just consistent. — Unknown",
+    "The quality of your work is a reflection of the quality of your focus. — Unknown",
+    "Do not let what you cannot do interfere with what you can do. — John Wooden",
+    "The only way to do great work is to love what you do. — Steve Jobs",
+    "The beginning is the most important part of the work. — Plato",
+    "The secret of change is to focus all of your energy not on fighting the old, but on building the new. — Socrates",
+    "Your energy is your currency. Spend it wisely. — Unknown",
+    "The quieter you become, the more you can hear. — Ram Dass",
+    "It does not matter how slowly you go as long as you do not stop. — Confucius",
+    "The more you know yourself, the more you can focus. — Unknown",
+    "The key is not to prioritize what's on your schedule, but to schedule your priorities. — Stephen Covey",
+    "The best time to start was yesterday. The next best time is now. — Unknown",
+    "Discipline is choosing between what you want now and what you want most. — Abraham Lincoln",
+    "The only limit to our realization of tomorrow is our doubts of today. — FDR",
+    "Success is not final, failure is not fatal: it is the courage to continue that counts. — Churchill",
+    "The purpose of life is not to be happy. It is to be useful, to be honorable, to be compassionate. — Emerson",
+    "The future depends on what you do today. — Mahatma Gandhi",
+    "In the middle of difficulty lies opportunity. — Einstein",
+    "It always seems impossible until it is done. — Nelson Mandela",
+    "The journey of a thousand miles begins with one step. — Lao Tzu",
+    "Your time is limited, so don't waste it living someone else's life. — Steve Jobs",
+    "The only thing we have to fear is fear itself. — FDR",
+    "I have not failed. I've just found 10,000 ways that won't work. — Edison",
+    "The best revenge is massive success. — Frank Sinatra",
+    "The only source of knowledge is experience. — Einstein",
+    "The greatest glory in living lies not in never falling, but in rising every time we fall. — Mandela",
+    "The future belongs to those who believe in the beauty of their dreams. — Eleanor Roosevelt",
+    "The only way to achieve the impossible is to believe it is possible. — Charles Kingsleigh",
+    "The mind is everything. What you think you become. — Buddha",
+    "To be yourself in a world that is constantly trying to make you something else is the greatest accomplishment. — Emerson",
+    "Success is not how high you have climbed, but how you make a positive difference to the world. — Roy Bennett",
+    "The only person you are destined to become is the person you decide to be. — Emerson",
+    "The best way to find yourself is to lose yourself in the service of others. — Gandhi"
 ];
 let quoteInterval = null;
 function rotateQuote() {
@@ -705,45 +705,240 @@ function finishSessionCleanup(label) {
     updateAdaptiveHacks();
 }
 
-// ---------- Clock In / Out ----------
-let clockState = storageGet('ff-clock-state', { clockedIn: false, startedAt: null });
+// ---------- Clock In / Out (with Attendance System) ----------
+let clockState = storageGet('ff-clock-state', { 
+    clockedIn: false, 
+    startedAt: null,
+    scheduledIn: '09:00',
+    scheduledOut: '17:00',
+    attendanceLog: []
+});
+
 let clockLog = storageGet('ff-clock-log', []);
 
 function toggleClock() {
     const btn = $('clock-btn');
+    const now = new Date();
+    const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateString = now.toLocaleDateString();
+    
     if (clockState.clockedIn) {
         const durationMs = Date.now() - clockState.startedAt;
         const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
-        clockLog.unshift({
-            date: new Date(clockState.startedAt).toLocaleDateString(),
+        const hours = Math.floor(durationMinutes / 60);
+        const mins = durationMinutes % 60;
+        
+        const scheduledIn = clockState.scheduledIn || '09:00';
+        const scheduledOut = clockState.scheduledOut || '17:00';
+        
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
+        
+        const isLate = nowMinutes > scheduledOutMinutes + 5;
+        const isEarly = nowMinutes < scheduledOutMinutes - 5;
+        
+        const logEntry = {
+            date: dateString,
+            dateKey: getTodayKey(),
             clockIn: new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            clockOut: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            durationMinutes
-        });
-        if (clockLog.length > 30) clockLog.pop();
-        clockState = { clockedIn: false, startedAt: null };
+            clockOut: timeString,
+            durationMinutes: durationMinutes,
+            scheduledIn: scheduledIn,
+            scheduledOut: scheduledOut,
+            status: isLate ? 'Late' : isEarly ? 'Early' : 'On Time',
+            isLate: isLate,
+            isEarly: isEarly
+        };
+        
+        clockLog.unshift(logEntry);
+        if (clockLog.length > 100) clockLog.pop();
         storageSet('ff-clock-log', clockLog);
-        if (confirm("Clocked Out. Generate a Daily Check-Out Brief based on today's logs?")) {
+        
+        if (!clockState.attendanceLog) clockState.attendanceLog = [];
+        clockState.attendanceLog.unshift(logEntry);
+        if (clockState.attendanceLog.length > 365) clockState.attendanceLog.pop();
+        
+        clockState = { 
+            clockedIn: false, 
+            startedAt: null,
+            scheduledIn: clockState.scheduledIn || '09:00',
+            scheduledOut: clockState.scheduledOut || '17:00',
+            attendanceLog: clockState.attendanceLog || []
+        };
+        storageSet('ff-clock-state', clockState);
+        
+        btn.textContent = 'Clock In';
+        btn.classList.remove('active', 'clocking-out');
+        
+        updateAttendanceDisplay();
+        renderDailyRecap();
+        
+        const statusMsg = isLate ? '⚠️ Clocked out LATE' : isEarly ? '✅ Clocked out EARLY' : '✅ Clocked out ON TIME';
+        const durationMsg = `${hours}h ${mins}m worked today.`;
+        const summaryBox = $('summary-content');
+        if (summaryBox) {
+            summaryBox.textContent = `⏰ ${statusMsg} — ${durationMsg}`;
+        }
+        
+        if (confirm(`Clocked Out at ${timeString}. ${durationMsg}\n\nGenerate a Daily Check-Out Brief?`)) {
             generateDailyCheckOut();
         }
+        
+        sendNotification('Clocked Out', `Worked ${hours}h ${mins}m. ${statusMsg}`);
+        
     } else {
-        clockState = { clockedIn: true, startedAt: Date.now() };
-    }
-    storageSet('ff-clock-state', clockState);
-    renderClockCard();
-}
-
-function renderClockCard() {
-    const btn = $('clock-btn');
-    if (!btn) return;
-    if (clockState.clockedIn) {
+        clockState = { 
+            clockedIn: true, 
+            startedAt: Date.now(),
+            scheduledIn: clockState.scheduledIn || '09:00',
+            scheduledOut: clockState.scheduledOut || '17:00',
+            attendanceLog: clockState.attendanceLog || []
+        };
+        storageSet('ff-clock-state', clockState);
+        
         btn.textContent = 'Clock Out';
         btn.classList.add('active');
-    } else {
-        btn.textContent = 'Clock In';
-        btn.classList.remove('active');
+        
+        const scheduledIn = clockState.scheduledIn || '09:00';
+        const scheduledInMinutes = parseInt(scheduledIn.split(':')[0]) * 60 + parseInt(scheduledIn.split(':')[1]);
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const isLate = nowMinutes > scheduledInMinutes + 5;
+        
+        if (isLate) {
+            btn.classList.add('clocking-out');
+            const lateMins = nowMinutes - scheduledInMinutes;
+            const summaryBox = $('summary-content');
+            if (summaryBox) {
+                summaryBox.textContent = `⏰ Clocked in ${lateMins} minutes LATE at ${timeString}.`;
+            }
+        } else {
+            const summaryBox = $('summary-content');
+            if (summaryBox) {
+                summaryBox.textContent = `✅ Clocked in ON TIME at ${timeString}.`;
+            }
+        }
+        
+        updateAttendanceDisplay();
+        renderDailyRecap();
+        sendNotification('Clocked In', `Started work at ${timeString}`);
     }
-    renderDailyRecap();
+    
+    updateAttendanceDisplay();
+}
+
+function saveAttendanceSettings() {
+    const scheduledIn = document.getElementById('scheduled-in')?.value || '09:00';
+    const scheduledOut = document.getElementById('scheduled-out')?.value || '17:00';
+    
+    clockState.scheduledIn = scheduledIn;
+    clockState.scheduledOut = scheduledOut;
+    storageSet('ff-clock-state', clockState);
+    updateAttendanceDisplay();
+}
+
+function updateAttendanceDisplay() {
+    const statusEl = document.getElementById('attendance-status');
+    const actualInEl = document.getElementById('actual-in-display');
+    const actualOutEl = document.getElementById('actual-out-display');
+    const todayHoursEl = document.getElementById('today-hours');
+    const summaryEl = document.getElementById('attendance-summary');
+    
+    if (!statusEl) return;
+    
+    const now = new Date();
+    const todayKey = getTodayKey();
+    const todayDateStr = now.toLocaleDateString();
+    
+    const todayLog = clockLog.filter(l => l.dateKey === todayKey || l.date === todayDateStr);
+    const todayEntry = todayLog.length > 0 ? todayLog[0] : null;
+    
+    if (clockState.clockedIn) {
+        statusEl.textContent = 'On Duty';
+        statusEl.className = 'attendance-status on-duty';
+    } else if (todayEntry && todayEntry.clockOut) {
+        statusEl.textContent = 'Clocked Out';
+        statusEl.className = 'attendance-status off-duty';
+    } else if (todayEntry && todayEntry.clockIn) {
+        statusEl.textContent = 'Clocked In';
+        statusEl.className = 'attendance-status on-duty';
+    } else {
+        statusEl.textContent = 'Off Duty';
+        statusEl.className = 'attendance-status off-duty';
+    }
+    
+    if (todayEntry) {
+        if (actualInEl) actualInEl.textContent = todayEntry.clockIn || '--:--';
+        if (actualOutEl) actualOutEl.textContent = todayEntry.clockOut || '--:--';
+        
+        if (todayEntry.durationMinutes) {
+            const hours = Math.floor(todayEntry.durationMinutes / 60);
+            const mins = todayEntry.durationMinutes % 60;
+            if (todayHoursEl) todayHoursEl.textContent = `${hours}h ${mins}m`;
+        } else if (clockState.clockedIn) {
+            const durationMs = Date.now() - clockState.startedAt;
+            const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+            const hours = Math.floor(durationMinutes / 60);
+            const mins = durationMinutes % 60;
+            if (todayHoursEl) todayHoursEl.textContent = `${hours}h ${mins}m (in progress)`;
+        } else {
+            if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
+        }
+        
+        if (todayEntry.clockOut && todayEntry.scheduledOut) {
+            const scheduledOut = todayEntry.scheduledOut || '17:00';
+            const scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
+            const actualOutMinutes = parseInt(todayEntry.clockOut.split(':')[0]) * 60 + parseInt(todayEntry.clockOut.split(':')[1]);
+            const diff = actualOutMinutes - scheduledOutMinutes;
+            
+            if (todayEntry.isLate) {
+                if (summaryEl) {
+                    summaryEl.textContent = `⚠️ ${Math.abs(diff)} min late`;
+                    summaryEl.className = 'attendance-time-display late-text';
+                }
+            } else if (todayEntry.isEarly) {
+                if (summaryEl) {
+                    summaryEl.textContent = `✅ ${Math.abs(diff)} min early`;
+                    summaryEl.className = 'attendance-time-display early-text';
+                }
+            } else {
+                if (summaryEl) {
+                    summaryEl.textContent = '✅ On time';
+                    summaryEl.className = 'attendance-time-display';
+                }
+            }
+        } else if (clockState.clockedIn) {
+            if (summaryEl) {
+                const scheduledOut = clockState.scheduledOut || '17:00';
+                summaryEl.textContent = `Scheduled out at ${scheduledOut}`;
+                summaryEl.className = 'attendance-time-display';
+            }
+        } else {
+            if (summaryEl) {
+                summaryEl.textContent = 'Not clocked in today';
+                summaryEl.className = 'attendance-time-display';
+            }
+        }
+    } else {
+        if (actualInEl) actualInEl.textContent = '--:--';
+        if (actualOutEl) actualOutEl.textContent = '--:--';
+        if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
+        if (summaryEl) {
+            summaryEl.textContent = 'Not clocked in today';
+            summaryEl.className = 'attendance-time-display';
+        }
+    }
+    
+    const btn = $('clock-btn');
+    if (btn) {
+        if (clockState.clockedIn) {
+            btn.textContent = 'Clock Out';
+            btn.classList.add('active');
+            btn.classList.remove('clocking-out');
+        } else {
+            btn.textContent = 'Clock In';
+            btn.classList.remove('active', 'clocking-out');
+        }
+    }
 }
 
 // ---------- Task board ----------
@@ -793,6 +988,7 @@ function adjustTasksForMidnight() {
     }
 }
 
+// Migration to Enterprise Schema
 boardData.forEach(col => {
     if (col.collapsed === undefined) col.collapsed = false;
     if (col.notesRequired === undefined) col.notesRequired = false;
@@ -1053,7 +1249,6 @@ function startVoiceInput(ci) {
         const input = $(`task-input-${ci}`);
         if (input) {
             input.value = transcript;
-            // Trigger natural language parsing
             naturalLanguageAddTask(ci);
         }
         const btn = $(`voice-btn-${ci}`);
@@ -1068,7 +1263,6 @@ function generatePDFReport() {
     const summaryBox = $('summary-content');
     summaryBox.textContent = 'Generating PDF report...';
     
-    // Create a printable version of the board
     const printWindow = window.open('', '_blank', 'width=800,height=600');
     if (!printWindow) {
         alert('Please allow pop-ups to generate PDF reports.');
@@ -1148,7 +1342,7 @@ function getTodayCompleted() {
     return historyData.filter(h => dateKeyFromISO(h.completedAt) === today).length;
 }
 
-// ---------- Render Board (with all new features) ----------
+// ---------- Render Board ----------
 function renderBoard() {
     const container = $('board-container');
     if (!container) return;
@@ -1227,14 +1421,11 @@ function renderBoard() {
                 ${groupTasksByDate(col.tasks).map((group) => `
                     <li class="date-group-header" onclick="toggleDateGroup('${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
                     ${group.isCollapsed ? '' : group.items.map(({ task, originalIndex: taskIndex }) => {
-                        // Skip if this is a subtask (it will be rendered under its parent)
                         if (task.parentId) return '';
                         
-                        // Check if parent has subtasks and is collapsed
                         const hasSubtasks = col.tasks.some(t => t.parentId === task.id);
                         const isCollapsed = task.collapsed && hasSubtasks;
                         
-                        // Render parent task
                         let html = `
                             <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
                                 <div class="task-main-row">
@@ -1285,10 +1476,9 @@ function renderBoard() {
                             </li>
                         `;
                         
-                        // Add subtasks if any and not collapsed
                         if (hasSubtasks && !isCollapsed) {
                             const subtasks = col.tasks.filter(t => t.parentId === task.id);
-                            html += subtasks.map((subtask, subtaskIndex) => {
+                            html += subtasks.map((subtask) => {
                                 const subIdx = col.tasks.indexOf(subtask);
                                 return `
                                     <li class="task-item subtask ${subtask.completed ? 'completed' : ''} ${urgencyClassFor(subtask)}" 
@@ -1427,7 +1617,6 @@ function updateFocusScore() {
     const todayKey = getTodayKey();
     const todayHistory = historyData.filter(h => dateKeyFromISO(h.completedAt) === todayKey);
     
-    // Flow time score (percentage of estimated work time used)
     let totalEstimated = 0;
     let totalTracked = 0;
     boardData.forEach(col => {
@@ -1442,7 +1631,6 @@ function updateFocusScore() {
     totalTracked += historyMinutes;
     const flowScore = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
     
-    // Completion score
     const todayTasks = [];
     boardData.forEach(col => {
         col.tasks.forEach(task => {
@@ -1453,12 +1641,10 @@ function updateFocusScore() {
     const completedToday = todayTasks.filter(t => t.completed).length;
     const completionScore = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
     
-    // Break efficiency score
     const breakLog = storageGet('ff-break-log', []);
     const todayBreaks = breakLog.filter(b => new Date(b.date).toLocaleDateString() === new Date().toLocaleDateString());
     const breakScore = todayBreaks.length > 0 ? Math.min(100, Math.round(100 / (todayBreaks.length))) : 100;
     
-    // Overall score
     const overall = Math.round((flowScore * 0.5) + (completionScore * 0.3) + (breakScore * 0.2));
     
     let grade = '💪 Excellent';
@@ -1990,7 +2176,6 @@ async function breakdownTask() {
     const { ci, ti } = openDetailsRef;
     const task = boardData[ci].tasks[ti];
     
-    // Check if task already has subtasks
     const existingSubtasks = boardData[ci].tasks.filter(t => t.parentId === task.id);
     if (existingSubtasks.length > 0) {
         if (!confirm(`This task already has ${existingSubtasks.length} subtask(s). Generate new ones? This will replace them.`)) {
@@ -2534,13 +2719,12 @@ async function sendNotification(title, body) {
 }
 
 function checkForNotifications() {
-    // Check for tasks due within 1 hour
     const now = new Date();
     boardData.forEach(col => {
         col.tasks.forEach(task => {
             if (task.deadlineTime && !task.completed) {
                 const deadline = new Date(task.deadlineTime);
-                const diff = (deadline - now) / 3600000; // hours
+                const diff = (deadline - now) / 3600000;
                 if (diff < 1 && diff > 0) {
                     sendNotification('⏰ Deadline Approaching', `"${task.text}" is due within 1 hour.`);
                 }
@@ -2556,10 +2740,8 @@ function syncWithCalendar() {
         return;
     }
     
-    // Request calendar permission
     navigator.calendar.requestPermission().then(result => {
         if (result === 'granted') {
-            // Find tasks with deadlines
             const tasksWithDeadlines = [];
             boardData.forEach(col => {
                 col.tasks.forEach(task => {
@@ -2578,7 +2760,6 @@ function syncWithCalendar() {
                 return;
             }
             
-            // Create calendar events
             tasksWithDeadlines.forEach(task => {
                 navigator.calendar.createEvent({
                     title: task.title,
@@ -2610,7 +2791,6 @@ function initApp() {
         }
     }, 60000);
     
-    // Check for notifications every 5 minutes
     setInterval(checkForNotifications, 300000);
 
     const key = storageGet('gemini_api_key', '');
@@ -2627,10 +2807,18 @@ function initApp() {
     startQuoteRotation();
     renderDailyRecap();
     
-    // Setup recurring tasks on load
     setupRecurringTasks();
     
-    // Request notification permission
+    // Load scheduled times
+    const scheduledIn = clockState.scheduledIn || '09:00';
+    const scheduledOut = clockState.scheduledOut || '17:00';
+    const inEl = document.getElementById('scheduled-in');
+    const outEl = document.getElementById('scheduled-out');
+    if (inEl) inEl.value = scheduledIn;
+    if (outEl) outEl.value = scheduledOut;
+    updateAttendanceDisplay();
+    setInterval(updateAttendanceDisplay, 30000);
+    
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
@@ -2710,7 +2898,6 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
 }
 function deleteTask(ci, ti) { 
     const task = boardData[ci].tasks[ti];
-    // Also remove any subtasks
     boardData[ci].tasks = boardData[ci].tasks.filter(t => t.parentId !== task.id);
     boardData[ci].tasks.splice(ti, 1);
     saveBoardData();
@@ -2728,7 +2915,7 @@ function rememberTaskTime(text, minutes) {
     storageSet('ff-task-time-memory', taskTimeMemory);
 }
 
-// Track time in background (hidden tracker)
+// ---------- Background tracker ----------
 let backgroundTracker = { active: false, startTime: null, taskId: null, interval: null };
 
 function startBackgroundTracking(taskId) {
@@ -2737,7 +2924,6 @@ function startBackgroundTracking(taskId) {
     backgroundTracker.startTime = Date.now();
     backgroundTracker.taskId = taskId;
     backgroundTracker.interval = setInterval(() => {
-        // Find the task and update tracked time
         let found = false;
         boardData.forEach(col => {
             col.tasks.forEach(task => {
@@ -2763,10 +2949,9 @@ function stopBackgroundTracking() {
     backgroundTracker.startTime = null;
 }
 
-// Override addFiveMinutes to start/stop background tracking as needed
+// Track time when in flow work segment
 const originalAddFiveMinutes = addFiveMinutes;
 addFiveMinutes = function() {
-    // If we're in a flow work segment, track it
     if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
         const task = currentFlowSegment().entry.task;
         if (task && !task.completed) {
@@ -2776,11 +2961,9 @@ addFiveMinutes = function() {
     originalAddFiveMinutes();
 };
 
-// Modify toggleTimer to handle background tracking
 const originalToggleTimer = toggleTimer;
 toggleTimer = function() {
     if (!isRunning) {
-        // Starting timer
         if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
             const task = currentFlowSegment().entry.task;
             if (task && !task.completed) {
@@ -2788,7 +2971,6 @@ toggleTimer = function() {
             }
         }
     } else {
-        // Pausing timer - stop background tracking
         stopBackgroundTracking();
     }
     originalToggleTimer();
