@@ -287,19 +287,25 @@ button:active { transform: scale(0.96); }
     }
 }
 
-.task-column,
-.timer-card,
-.stats-card,
-.hacks-card,
-.log-card,
-.summary-container {
+.task-column {
     background-color: var(--card-bg);
-    border: 2px solid var(--border-color-pink); /* soft pink border */
+    padding: 1.5rem; /* increased from 1rem */
     border-radius: 20px;
+    border: 2px solid var(--border-color-pink);
     box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease;
 }
 .task-column .column-body {
-    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.2rem 0;
+}
+
+.column-body .task-list {
+    margin-bottom: 0.4rem;
 }
 
 .column-header-row {
@@ -337,16 +343,52 @@ button:active { transform: scale(0.96); }
 
 .task-input-group {
     display: flex;
+    flex-direction: column; /* stack vertically */
     gap: 6px;
-    margin-bottom: 0.6rem;
-    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.task-input-group .task-input-row {
+    display: flex;
+    gap: 4px;
     align-items: center;
 }
-.nl-task-input-group { display: flex; gap: 4px; margin-bottom: 0.4rem; }
-.task-input { flex: 1; padding: 0.3rem; font-family: var(--font-family); font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 8px; outline: none; background-color: var(--input-bg); color: var(--text-color); min-width: 80px; }
-.task-estimate-new { width: 50px; padding: 0.3rem; font-family: var(--font-family); font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 8px; text-align: center; background-color: var(--input-bg); color: var(--text-color); }
-.paste-textarea { width: 100%; resize: vertical; margin-bottom: 4px; box-sizing: border-box; font-size: 0.75rem; padding: 0.3rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); }
-.add-task-btn {
+
+.task-input {
+    flex: 1;
+    padding: 0.5rem 0.6rem;
+    font-family: var(--font-family);
+    font-size: 0.85rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    outline: none;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    min-width: 80px;
+    height: 2.8rem; /* taller for better text entry */
+}
+
+/* The row with estimate, mic, add button */
+.task-input-controls {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.task-estimate-new {
+    width: 55px;
+    padding: 0.3rem;
+    font-family: var(--font-family);
+    font-size: 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+}
+
+.task-input-controls .add-task-btn {
     background-color: var(--cherry-red);
     color: white;
     padding: 0.3rem 0.8rem;
@@ -355,9 +397,71 @@ button:active { transform: scale(0.96); }
     font-size: 0.8rem;
     border: none;
     cursor: pointer;
-    transition: background-color 0.2s;
+}
+
+.task-input-controls .btn-secondary {
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 0.3rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.nl-task-input-group {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.nl-task-input-group .add-task-btn {
+    background-color: var(--input-bg);
+    color: var(--cherry-red);
+    border: 1px solid var(--cherry-red);
+    padding: 0.3rem 0.8rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    cursor: pointer;
     white-space: nowrap;
 }
+
+.nl-task-input-group .add-task-btn:hover {
+    background-color: var(--cherry-red);
+    color: white;
+}
+
+.paste-textarea {
+    width: 100%;
+    resize: vertical;
+    box-sizing: border-box;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-family: var(--font-family);
+    min-height: 2.5rem;
+}
+
+.paste-area-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.paste-area-actions .add-task-btn {
+    background-color: var(--cherry-red);
+    color: white;
+    padding: 0.25rem 0.8rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.7rem;
+    border: none;
+    cursor: pointer;
+}
+
 .add-task-btn:hover {
     background-color: var(--cherry-hover);
 }
@@ -375,12 +479,14 @@ button:active { transform: scale(0.96); }
     border: 1px solid var(--border-color);
     border-left: 4px solid var(--cherry-red);
     border-radius: 12px;
-    margin-bottom: 0.5rem;
-    padding: 0.6rem 0.8rem; /* increased padding */
+    margin-bottom: 0.4rem;
+    padding: 0.6rem 0.8rem;
     font-size: 0.8rem;
     transition: border-color 0.2s ease;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    width: 100%;
+    box-sizing: border-box;
 }
 .task-item.time-ok { border-left-color: var(--green); }
 .task-item.time-warn { border-left-color: var(--amber); }
@@ -419,6 +525,8 @@ button:active { transform: scale(0.96); }
     line-height: 1.4;
     max-width: 100%;
     overflow-wrap: break-word;
+    width: 100%;
+    padding: 2px 0;
 }
 .task-estimate-input { width: 40px; padding: 2px; font-family: var(--font-family); font-weight: 600; text-align: center; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-color); font-size: 0.7rem; }
 
