@@ -66,9 +66,22 @@ function updateClocks() {
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         dateEl.textContent = `${dd}/${mm}/${now.getFullYear()}`;
     }
-    if (watEl) watEl.textContent = now.toLocaleTimeString('en-US', { timeZone: headerClockZones[0], hour12: true });
-    if (estEl) estEl.textContent = now.toLocaleTimeString('en-US', { timeZone: headerClockZones[1], hour12: true });
-    if (mstEl) mstEl.textContent = now.toLocaleTimeString('en-US', { timeZone: headerClockZones[2], hour12: true });
+
+    // Helper to safely get time string
+    function safeTimeString(tz) {
+        try {
+            // Check if the timezone is valid
+            const test = new Date().toLocaleString('en-US', { timeZone: tz });
+            return now.toLocaleTimeString('en-US', { timeZone: tz, hour12: true });
+        } catch (e) {
+            // Fallback to UTC if invalid
+            return now.toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: true });
+        }
+    }
+
+    if (watEl) watEl.textContent = safeTimeString(headerClockZones[0]);
+    if (estEl) estEl.textContent = safeTimeString(headerClockZones[1]);
+    if (mstEl) mstEl.textContent = safeTimeString(headerClockZones[2]);
 
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     if (now.getDate() === lastDay) {
@@ -1503,6 +1516,104 @@ function renderBoard() {
     updateFocusScore();
 }
 
+// ---------- Column operations ----------
+function moveColumn(ci, dir) {
+    var target = ci + dir;
+    if (target < 0 || target >= boardData.length) return;
+    var temp = boardData[ci];
+    boardData[ci] = boardData[target];
+    boardData[target] = temp;
+    saveBoardData();
+    renderBoard();
+}
+
+function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
+
+function toggleColumnCollapse(ci) {
+    boardData[ci].collapsed = !boardData[ci].collapsed;
+    saveBoardData();
+    renderBoard();
+}
+
+function addColumn() {
+    if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
+    boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
+    saveBoardData();
+    renderBoard();
+}
+
+function deleteColumn(ci) {
+    if (boardData.length <= 1) { alert('Keep at least one column.'); return; }
+    if (!confirm('Delete "' + boardData[ci].title + '"?')) return;
+    boardData.splice(ci, 1);
+    saveBoardData();
+    renderBoard();
+}
+
+function toggleNotesRequired(colIndex, checked) {
+    boardData[colIndex].notesRequired = checked;
+    saveBoardData();
+    renderBoard();
+}
+
+// ---------- Drag and drop for tasks ----------
+var dragContext = null;
+function dragStart(e, ci, ti) {
+    dragContext = { ci: ci, ti: ti };
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(function() { e.target.classList.add('dragging'); }, 0);
+}
+function allowDrop(e) { e.preventDefault(); }
+function dropTask(e, targetColIndex) {
+    e.preventDefault();
+    document.querySelectorAll('.dragging').forEach(function(el) { el.classList.remove('dragging'); });
+    if (!dragContext) return;
+    var ci = dragContext.ci;
+    var ti = dragContext.ti;
+    var task = boardData[ci].tasks[ti];
+
+    var list = e.currentTarget;
+    var y = e.clientY;
+    var afterElement = null;
+    var targetIndex = boardData[targetColIndex].tasks.length;
+
+    var draggableElements = Array.from(list.querySelectorAll('.task-item:not(.dragging)'));
+    draggableElements.forEach(function(child) {
+        var box = child.getBoundingClientRect();
+        if (y > box.top && y < box.bottom) afterElement = child;
+    });
+
+    if (afterElement) {
+        var parts = afterElement.id.split('-');
+        targetIndex = parseInt(parts[2]);
+    }
+
+    boardData[ci].tasks.splice(ti, 1);
+    boardData[targetColIndex].tasks.splice(targetIndex, 0, task);
+    dragContext = null;
+    saveBoardData();
+    renderBoard();
+}
+
+// ---------- Other column helpers ----------
+function promptDeadline(ci, ti) {
+    var task = boardData[ci].tasks[ti];
+    var input = document.createElement('input');
+    input.type = 'datetime-local';
+    input.value = task.deadlineTime || '';
+    input.style.width = '100%';
+    input.style.padding = '4px';
+    input.style.marginTop = '4px';
+    input.addEventListener('change', function() {
+        task.deadlineTime = this.value || null;
+        saveBoardData();
+        renderBoard();
+    });
+    var btn = document.querySelector('[onclick="promptDeadline(' + ci + ', ' + ti + ')"]');
+    if (btn) btn.replaceWith(input);
+    input.focus();
+}
+
 // ---------- Toggle subtasks collapse ----------
 function toggleSubtasksCollapse(ci, ti) {
     var task = boardData[ci].tasks[ti];
@@ -1637,89 +1748,6 @@ function updateFocusScore() {
             </div>
         </div>
     `;
-}
-
-// ---------- Column operations ----------
-function toggleNotesRequired(colIndex, checked) {
-    boardData[colIndex].notesRequired = checked;
-    saveBoardData();
-    renderBoard();
-}
-
-var dragContext = null;
-function dragStart(e, ci, ti) {
-    dragContext = { ci: ci, ti: ti };
-    e.dataTransfer.effectAllowed = "move";
-    setTimeout(function() { e.target.classList.add('dragging'); }, 0);
-}
-function allowDrop(e) { e.preventDefault(); }
-function dropTask(e, targetColIndex) {
-    e.preventDefault();
-    document.querySelectorAll('.dragging').forEach(function(el) { el.classList.remove('dragging'); });
-    if (!dragContext) return;
-    var ci = dragContext.ci;
-    var ti = dragContext.ti;
-    var task = boardData[ci].tasks[ti];
-
-    var list = e.currentTarget;
-    var y = e.clientY;
-    var afterElement = null;
-    var targetIndex = boardData[targetColIndex].tasks.length;
-
-    var draggableElements = Array.from(list.querySelectorAll('.task-item:not(.dragging)'));
-    draggableElements.forEach(function(child) {
-        var box = child.getBoundingClientRect();
-        if (y > box.top && y < box.bottom) afterElement = child;
-    });
-
-    if (afterElement) {
-        var parts = afterElement.id.split('-');
-        targetIndex = parseInt(parts[2]);
-    }
-
-    boardData[ci].tasks.splice(ti, 1);
-    boardData[targetColIndex].tasks.splice(targetIndex, 0, task);
-    dragContext = null;
-    saveBoardData();
-    renderBoard();
-}
-
-function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
-function toggleColumnCollapse(ci) {
-    boardData[ci].collapsed = !boardData[ci].collapsed;
-    saveBoardData();
-    renderBoard();
-}
-function addColumn() {
-    if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
-    boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
-    saveBoardData();
-    renderBoard();
-}
-function deleteColumn(ci) {
-    if (boardData.length <= 1) { alert('Keep at least one column.'); return; }
-    if (!confirm('Delete "' + boardData[ci].title + '"?')) return;
-    boardData.splice(ci, 1);
-    saveBoardData();
-    renderBoard();
-}
-
-function promptDeadline(ci, ti) {
-    var task = boardData[ci].tasks[ti];
-    var input = document.createElement('input');
-    input.type = 'datetime-local';
-    input.value = task.deadlineTime || '';
-    input.style.width = '100%';
-    input.style.padding = '4px';
-    input.style.marginTop = '4px';
-    input.addEventListener('change', function() {
-        task.deadlineTime = this.value || null;
-        saveBoardData();
-        renderBoard();
-    });
-    var btn = document.querySelector('[onclick="promptDeadline(' + ci + ', ' + ti + ')"]');
-    if (btn) btn.replaceWith(input);
-    input.focus();
 }
 
 // ---------- Task estimate helpers ----------
