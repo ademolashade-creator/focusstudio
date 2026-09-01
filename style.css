@@ -9,6 +9,7 @@
     --border-color: #e9ecef;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     --input-bg: #ffffff;
+    --border-color-pink: #ffb3c6; /* soft pink */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -23,6 +24,7 @@ body.dark-mode {
     --border-color: #3b2830;
     --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     --input-bg: #2a262c;
+    --border-color-pink: #6b4a5a; /* darker pink for dark mode */
 }
 
 * { box-sizing: border-box; }
@@ -104,7 +106,7 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
 
 .attendance-card {
     background: var(--card-bg);
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color-pink);
     border-radius: 16px;
     padding: 0.6rem 1rem;
     box-shadow: var(--shadow);
@@ -274,20 +276,31 @@ button:active { transform: scale(0.96); }
 .hacks-content ul { margin: 0; padding-left: 1.1rem; }
 .hacks-content li { margin-bottom: 0.2rem; }
 
-.board-container { display: grid; grid-template-columns: 1fr; gap: 1.2rem; }
-@media (min-width: 900px) { .board-container { grid-template-columns: repeat(3, 1fr); } }
+.board-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+}
+@media (min-width: 900px) {
+    .board-container {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
 
-.task-column {
+.task-column,
+.timer-card,
+.stats-card,
+.hacks-card,
+.log-card,
+.summary-container {
     background-color: var(--card-bg);
-    padding: 1rem;
+    border: 2px solid var(--border-color-pink); /* soft pink border */
     border-radius: 20px;
     box-shadow: var(--shadow);
-    border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
+}
+.task-column .column-body {
     transition: all 0.2s ease;
 }
-.task-column .column-body { transition: all 0.2s ease; }
 
 .column-header-row {
     display: flex;
@@ -329,12 +342,18 @@ button:active { transform: scale(0.96); }
 .paste-textarea { width: 100%; resize: vertical; margin-bottom: 4px; box-sizing: border-box; font-size: 0.75rem; padding: 0.3rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); }
 .add-task-btn { background-color: var(--cherry-red); color: white; padding: 0.3rem 0.6rem; border-radius: 8px; font-weight: 600; font-size: 0.8rem; }
 
-.task-list { list-style: none; padding: 0; margin: 0; flex: 1; overflow-y: auto; max-height: 350px; }
-
+.task-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 350px; /* increase if needed */
+}
 .task-item {
     background-color: var(--input-bg);
     border: 1px solid var(--border-color);
-    border-left: 4px solid var(--border-color);
+    border-left: 4px solid var(--cherry-red); /* use cherry red for left border */
     border-radius: 12px;
     margin-bottom: 0.4rem;
     padding: 0.5rem 0.8rem;
