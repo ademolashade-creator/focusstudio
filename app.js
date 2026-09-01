@@ -1583,6 +1583,14 @@ function toggleColumnCollapse(ci) {
     renderBoard();
 }
 
+// ---------- Toggle subtasks collapse (parent task) ----------
+function toggleSubtasksCollapse(ci, ti) {
+    var task = boardData[ci].tasks[ti];
+    task.collapsed = !task.collapsed;
+    saveBoardData();
+    renderBoard();
+}
+
 function addColumn() {
     if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
     boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
