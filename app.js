@@ -1573,11 +1573,11 @@ function renderBoard() {
 
     <div class="nl-task-input-group" style="display:flex;gap:6px;margin-bottom:8px;">
         <input type="text" class="task-input" id="nl-task-input-${colIndex}" placeholder="Natural language: 'Design homepage by Friday takes 2 hours'..." onkeypress="if(event.key==='Enter') naturalLanguageAddTask(${colIndex})">
-        <button class="add-task-btn" onclick="naturalLanguageAddTask(${colIndex})">✨ Smart</button>
+        <button class="btn-secondary" onclick="naturalLanguageAddTask(${colIndex})" style="padding:0.2rem 0.5rem;font-size:0.7rem;">✨ Smart</button>
     </div>
 
     <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (e.g. 'write script 25 mins')..."></textarea>
-    <button class="add-task-btn" style="width:100%;margin-bottom:0.6rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
+    <button class="add-task-btn" style="width:auto;margin-bottom:0.6rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
 
     ${col.tasks.some(t=>t.stagedEstimate) ? `
     <div class="ai-batch-actions" style="margin-top:10px;">

@@ -335,12 +335,32 @@ button:active { transform: scale(0.96); }
 .ai-batch-actions { display: flex; gap: 4px; margin-bottom: 0.5rem; flex-wrap: wrap; }
 .ai-batch-actions button { font-size: 0.6rem; padding: 0.2rem 0.4rem; flex: 1; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--cherry-red); border-radius: 8px; }
 
-.task-input-group { display: flex; gap: 4px; margin-bottom: 0.4rem; flex-wrap: wrap; }
+.task-input-group {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 0.6rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
 .nl-task-input-group { display: flex; gap: 4px; margin-bottom: 0.4rem; }
 .task-input { flex: 1; padding: 0.3rem; font-family: var(--font-family); font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 8px; outline: none; background-color: var(--input-bg); color: var(--text-color); min-width: 80px; }
 .task-estimate-new { width: 50px; padding: 0.3rem; font-family: var(--font-family); font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 8px; text-align: center; background-color: var(--input-bg); color: var(--text-color); }
 .paste-textarea { width: 100%; resize: vertical; margin-bottom: 4px; box-sizing: border-box; font-size: 0.75rem; padding: 0.3rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); }
-.add-task-btn { background-color: var(--cherry-red); color: white; padding: 0.3rem 0.6rem; border-radius: 8px; font-weight: 600; font-size: 0.8rem; }
+.add-task-btn {
+    background-color: var(--cherry-red);
+    color: white;
+    padding: 0.3rem 0.8rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    white-space: nowrap;
+}
+.add-task-btn:hover {
+    background-color: var(--cherry-hover);
+}
 
 .task-list {
     list-style: none;
@@ -353,10 +373,10 @@ button:active { transform: scale(0.96); }
 .task-item {
     background-color: var(--input-bg);
     border: 1px solid var(--border-color);
-    border-left: 4px solid var(--cherry-red); /* use cherry red for left border */
+    border-left: 4px solid var(--cherry-red);
     border-radius: 12px;
-    margin-bottom: 0.4rem;
-    padding: 0.5rem 0.8rem;
+    margin-bottom: 0.5rem;
+    padding: 0.6rem 0.8rem; /* increased padding */
     font-size: 0.8rem;
     transition: border-color 0.2s ease;
     word-wrap: break-word;
