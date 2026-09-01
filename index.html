@@ -19,6 +19,48 @@
         <p class="tagline">Curate your day, honor your energy, and master your workflow.</p>
         <div id="quote-banner" class="quote-banner">✨ “Focus is the art of knowing what to ignore.” — James Clear</div>
 
+        <!-- Attendance System -->
+        <div class="attendance-container">
+            <div class="attendance-card">
+                <div class="attendance-header">
+                    <span class="attendance-title">⏰ Attendance</span>
+                    <span id="attendance-status" class="attendance-status off-duty">Off Duty</span>
+                </div>
+                <div class="attendance-body">
+                    <div class="attendance-row">
+                        <div class="attendance-field">
+                            <label>Scheduled In</label>
+                            <input type="time" id="scheduled-in" class="attendance-time-input" value="09:00" onchange="saveAttendanceSettings()">
+                        </div>
+                        <div class="attendance-field">
+                            <label>Scheduled Out</label>
+                            <input type="time" id="scheduled-out" class="attendance-time-input" value="17:00" onchange="saveAttendanceSettings()">
+                        </div>
+                    </div>
+                    <div class="attendance-row">
+                        <div class="attendance-field">
+                            <label>Actual In</label>
+                            <div class="attendance-time-display" id="actual-in-display">--:--</div>
+                        </div>
+                        <div class="attendance-field">
+                            <label>Actual Out</label>
+                            <div class="attendance-time-display" id="actual-out-display">--:--</div>
+                        </div>
+                    </div>
+                    <div class="attendance-row">
+                        <div class="attendance-field">
+                            <label>Today's Hours</label>
+                            <div class="attendance-time-display" id="today-hours">0h 0m</div>
+                        </div>
+                        <div class="attendance-field">
+                            <label>Status</label>
+                            <div class="attendance-time-display" id="attendance-summary">Not clocked in</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="clocks-bar">
             <div class="clock-item"><div class="clock-label">Date</div><div class="date-display" id="date-display">--/--/----</div></div>
             <div class="clock-item">
@@ -61,7 +103,6 @@
                     <button id="reset-btn" onclick="resetTimer()">Restart</button>
                     <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
                     <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes">+5 min</button>
-                    <!-- SKIP BUTTON – right here -->
                     <button class="btn-secondary" onclick="skipCurrentSegment()" title="Skip current work/break segment">⏭ Skip</button>
                 </div>
 
@@ -78,10 +119,6 @@
                         <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
                         <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
                     </div>
-                    <div class="toggle-group" style="margin-top:4px;">
-                        <label for="focus-mode-toggle" style="font-size:0.75rem;">Focus Mode (fullscreen + wake lock)</label>
-                        <input type="checkbox" id="focus-mode-toggle" onchange="toggleFocusMode()">
-                    </div>
                     <details style="margin-top:4px;">
                         <summary style="font-size:0.7rem;color:#888;cursor:pointer;">Keyboard Shortcuts</summary>
                         <div style="font-size:0.7rem;padding:4px;background:var(--input-bg);border-radius:6px;border:1px solid var(--border-color);">
@@ -93,23 +130,9 @@
                             <div>Alt+Shift+B – Break</div>
                             <div>Alt+Shift+Q – Toggle Dark Mode</div>
                             <div>Alt+Shift+X – Skip Segment</div>
+                            <div>Alt+Shift+V – Voice Input</div>
                         </div>
                     </details>
-                    <div class="setting-row" style="margin-top:4px;">
-                        <div class="setting-group">
-                            <label style="font-size:0.7rem;">Ambient Sound</label>
-                            <select id="ambient-sound-select" onchange="changeAmbientSound(this.value)" style="width:100%;padding:0.2rem;font-size:0.75rem;background:var(--input-bg);color:var(--text-color);border:1px solid var(--border-color);border-radius:6px;">
-                                <option value="off">Off</option>
-                                <option value="rain">Rain</option>
-                                <option value="coffee">Coffee Shop</option>
-                                <option value="waves">Waves</option>
-                                <option value="forest">Forest</option>
-                            </select>
-                        </div>
-                        <div class="setting-group" style="flex:0 0 auto;display:flex;align-items:flex-end;">
-                            <button class="btn-secondary" onclick="toggleAmbientSound()" style="font-size:0.7rem;padding:0.2rem 0.6rem;">▶</button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -158,6 +181,8 @@
             <div class="summary-header">
                 <h2 style="margin:0;">Monthly Summary & Client Report</h2>
                 <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
+                <button class="ai-btn" onclick="syncWithCalendar()" style="background:var(--green);">📅 Sync Calendar</button>
+                <button class="ai-btn" onclick="generatePDFReport()" style="background:var(--amber);">📄 PDF Report</button>
             </div>
             <details style="margin-bottom:1rem;">
                 <summary style="font-size:0.75rem;color:#888;cursor:pointer;">AI settings (Gemini API key)</summary>

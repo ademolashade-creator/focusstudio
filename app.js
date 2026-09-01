@@ -12,14 +12,17 @@ function storageSet(key, value) {
 const $ = (id) => document.getElementById(id);
 
 // ---------- App settings ----------
-let appSettings = storageGet('ff-app-settings', { appName: 'Focus & Flow Studio', darkMode: false, focusMode: false });
+let appSettings = storageGet('ff-app-settings', { 
+    appName: 'Focus & Flow Studio', 
+    darkMode: false,
+    notificationsEnabled: true,
+    voiceEnabled: true
+});
 
 function applySettings() {
     const titleEl = $('app-title');
     if (titleEl) titleEl.textContent = appSettings.appName;
     document.body.classList.toggle('dark-mode', !!appSettings.darkMode);
-    const fm = $('focus-mode-toggle');
-    if (fm) fm.checked = !!appSettings.focusMode;
 }
 function saveAppName(name) {
     appSettings.appName = name.trim() || 'Focus & Flow Studio';
@@ -29,21 +32,6 @@ function toggleDarkMode() {
     appSettings.darkMode = !appSettings.darkMode;
     document.body.classList.toggle('dark-mode', appSettings.darkMode);
     storageSet('ff-app-settings', appSettings);
-}
-function toggleFocusMode() {
-    appSettings.focusMode = !appSettings.focusMode;
-    storageSet('ff-app-settings', appSettings);
-    if (appSettings.focusMode) {
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(() => {});
-        }
-        if ('wakeLock' in navigator) {
-            navigator.wakeLock.request('screen').then(lock => { window.wakeLockRef = lock; }).catch(() => {});
-        }
-    } else {
-        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-        if (window.wakeLockRef) { window.wakeLockRef.release(); window.wakeLockRef = null; }
-    }
 }
 
 // ---------- Clocks & date ----------
@@ -537,14 +525,6 @@ function buildFlowSegments() {
 }
 
 function startFlow() {
-    if (appSettings.focusMode) {
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(() => {});
-        }
-        if ('wakeLock' in navigator) {
-            navigator.wakeLock.request('screen').then(lock => { window.wakeLockRef = lock; }).catch(() => {});
-        }
-    }
     flowSegments = buildFlowSegments();
     if (flowSegments.length === 0) {
         alert("No open tasks to flow through — add a task with a time estimate first.");
@@ -652,60 +632,35 @@ function finishFlow() {
     announce('Flow complete. Nice work.');
 }
 
-// ============================================================
-// SKIP SEGMENT – FIXED
-// ============================================================
+// ---------- SKIP SEGMENT ----------
 function skipCurrentSegment() {
-    console.log('Skip button clicked - timerMode:', timerMode, 'isWorkTime:', isWorkTime);
-    
-    // --- FLOW MODE ---
     if (timerMode === 'flow') {
         const seg = currentFlowSegment();
-        if (!seg) {
-            console.warn('No current flow segment');
-            return;
-        }
-        
-        console.log('Skipping flow segment:', seg);
-        
+        if (!seg) return;
         if (seg.type === 'work') {
-            // Log time spent on this work segment
             const elapsed = (seg.minutes * 60 - timeLeft) + flowExtraSeconds;
             seg.entry.actualSecondsSoFar += elapsed;
-            console.log('Logged work time:', elapsed, 'seconds');
-            
-            // Complete the task if it's the last chunk
             if (seg.isLastChunk) {
                 completeFlowTask(seg.entry, seg.entry.actualSecondsSoFar);
             } else {
                 seg.entry.task.trackedSeconds = seg.entry.actualSecondsSoFar;
                 saveBoardData();
             }
-        } else {
-            // Break segment – just skip it
-            console.log('Skipping break segment');
         }
-        
-        // Advance to next segment
         flowSegIndex++;
         beginFlowSegment();
         return;
     }
     
-    // --- MANUAL MODE (Pomodoro) ---
     if (isWorkTime) {
-        console.log('Skipping work session');
         recordFlowBlockCompleted();
         playSound();
         isWorkTime = false;
         setupMode();
-        console.log('Switched to break mode');
     } else {
-        console.log('Skipping break session');
         playSound();
         isWorkTime = true;
         setupMode();
-        console.log('Switched to work mode');
     }
 }
 
@@ -856,6 +811,11 @@ boardData.forEach(col => {
         if (t.googleLink === undefined) t.googleLink = '';
         if (t.parentId === undefined) t.parentId = null;
         if (t.subtasks === undefined) t.subtasks = [];
+        if (t.isSubtask === undefined) t.isSubtask = false;
+        if (t.hasSubtasks === undefined) t.hasSubtasks = false;
+        if (t.collapsed === undefined) t.collapsed = false;
+        if (t.recurrence === undefined) t.recurrence = null;
+        if (t.lastRecurrenceDate === undefined) t.lastRecurrenceDate = null;
     });
 });
 saveBoardData();
@@ -924,7 +884,7 @@ function toggleDateGroup(key) {
     renderBoard();
 }
 
-// Autosuggest
+// ---------- Autosuggest ----------
 function setupAutosuggest(inputElement) {
     if (!inputElement) return;
     let timeout;
@@ -950,7 +910,245 @@ function setupAutosuggest(inputElement) {
     });
 }
 
-// ---------- Render Board ----------
+// ---------- Natural Language Task Creation ----------
+async function naturalLanguageAddTask(ci) {
+    const input = $(`nl-task-input-${ci}`);
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) {
+        alert('Please add your Gemini API key for natural language parsing.');
+        return;
+    }
+    
+    const prompt = `Parse this task into components: task name, time estimate (in minutes), deadline (if any). Return ONLY JSON: {"task":"name","minutes":number,"deadline":"YYYY-MM-DDTHH:mm" or null}. Input: "${text}"`;
+    
+    try {
+        const responseText = await callGemini(prompt);
+        const cleaned = responseText.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        
+        const col = boardData[ci];
+        const newTask = {
+            id: 't_' + Math.random().toString(36).substr(2,9),
+            text: parsed.task || text,
+            estimateMinutes: parsed.minutes || 15,
+            trackedSeconds: 0,
+            isTracking: false,
+            notes: '',
+            completed: false,
+            completedAt: null,
+            dateAdded: getTodayKey(),
+            breaks: [],
+            timeSegments: [],
+            deadlineTime: parsed.deadline || null,
+            googleLink: '',
+            startedAtIso: null,
+            completedAtIso: null,
+            parentId: null,
+            subtasks: [],
+            isSubtask: false,
+            hasSubtasks: false,
+            collapsed: false,
+            recurrence: null,
+            lastRecurrenceDate: null
+        };
+        col.tasks.push(newTask);
+        input.value = '';
+        saveBoardData();
+        renderBoard();
+        if (newTask.estimateMinutes <= 15) {
+            estimateTask(newTask);
+        }
+    } catch(e) {
+        alert('Could not parse natural language. Please try again.');
+        console.error(e);
+    }
+}
+
+// ---------- Recurring Tasks ----------
+function setupRecurringTasks() {
+    const today = getTodayKey();
+    boardData.forEach(col => {
+        col.tasks.forEach(task => {
+            if (!task.recurrence || task.completed) return;
+            
+            const shouldCreateNew = shouldRecurToday(task);
+            if (shouldCreateNew) {
+                const newTask = JSON.parse(JSON.stringify(task));
+                newTask.id = 't_' + Math.random().toString(36).substr(2,9);
+                newTask.completed = false;
+                newTask.completedAt = null;
+                newTask.completedAtIso = null;
+                newTask.dateAdded = today;
+                newTask.trackedSeconds = 0;
+                newTask.isTracking = false;
+                newTask.breaks = [];
+                newTask.timeSegments = [];
+                newTask.startedAtIso = null;
+                newTask._historyId = null;
+                newTask.lastRecurrenceDate = today;
+                delete newTask._historyId;
+                col.tasks.push(newTask);
+                task.lastRecurrenceDate = today;
+            }
+        });
+    });
+    saveBoardData();
+    renderBoard();
+}
+
+function shouldRecurToday(task) {
+    if (!task.recurrence) return false;
+    const today = getTodayKey();
+    if (task.lastRecurrenceDate === today) return false;
+    
+    const now = new Date();
+    const lastDate = task.lastRecurrenceDate ? new Date(task.lastRecurrenceDate) : null;
+    const taskDate = task.dateAdded ? new Date(task.dateAdded) : null;
+    
+    switch(task.recurrence) {
+        case 'daily':
+            const diffDays = lastDate ? Math.floor((now - lastDate) / 86400000) : 1;
+            return diffDays >= 1;
+        case 'weekly':
+            const diffWeeks = lastDate ? Math.floor((now - lastDate) / 604800000) : 1;
+            return diffWeeks >= 1 && now.getDay() === (taskDate ? taskDate.getDay() : 1);
+        case 'monthly':
+            const diffMonths = lastDate ? (now.getMonth() - lastDate.getMonth()) + (now.getFullYear() - lastDate.getFullYear()) * 12 : 1;
+            return diffMonths >= 1 && now.getDate() === (taskDate ? taskDate.getDate() : 1);
+        default:
+            return false;
+    }
+}
+
+// ---------- Voice Input ----------
+function startVoiceInput(ci) {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Voice input is not supported in this browser.');
+        return;
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    recognition.onstart = function() {
+        const btn = $(`voice-btn-${ci}`);
+        if (btn) btn.textContent = '🎙️ Listening...';
+    };
+    
+    recognition.onerror = function(event) {
+        const btn = $(`voice-btn-${ci}`);
+        if (btn) btn.textContent = '🎙️';
+        alert('Voice input error: ' + event.error);
+    };
+    
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        const input = $(`task-input-${ci}`);
+        if (input) {
+            input.value = transcript;
+            // Trigger natural language parsing
+            naturalLanguageAddTask(ci);
+        }
+        const btn = $(`voice-btn-${ci}`);
+        if (btn) btn.textContent = '🎙️';
+    };
+    
+    recognition.start();
+}
+
+// ---------- PDF Report ----------
+function generatePDFReport() {
+    const summaryBox = $('summary-content');
+    summaryBox.textContent = 'Generating PDF report...';
+    
+    // Create a printable version of the board
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+        alert('Please allow pop-ups to generate PDF reports.');
+        return;
+    }
+    
+    const today = new Date().toLocaleDateString();
+    let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Focus & Flow Report - ${today}</title>
+            <style>
+                body { font-family: Georgia, serif; padding: 40px; max-width: 1000px; margin: 0 auto; }
+                h1 { color: #ff3366; border-bottom: 2px solid #ff3366; padding-bottom: 10px; }
+                h2 { color: #ff3366; margin-top: 25px; }
+                .client-section { margin-bottom: 30px; }
+                .task-item { padding: 8px 0; border-bottom: 1px solid #eee; }
+                .task-done { text-decoration: line-through; color: #999; }
+                .task-meta { font-size: 0.85rem; color: #666; margin-left: 10px; }
+                .summary { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+                .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+                .stat { text-align: center; }
+                .stat-number { font-size: 2rem; font-weight: bold; color: #ff3366; }
+                .stat-label { font-size: 0.85rem; color: #666; }
+            </style>
+        </head>
+        <body>
+            <h1>Focus & Flow Report</h1>
+            <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+            <div class="summary">
+                <div class="summary-grid">
+                    <div class="stat"><div class="stat-number">${historyData.length}</div><div class="stat-label">Total Tasks</div></div>
+                    <div class="stat"><div class="stat-number">${getTodayCompleted()}</div><div class="stat-label">Completed Today</div></div>
+                    <div class="stat"><div class="stat-number">${flowBlocksCompleted}</div><div class="stat-label">Flow Sessions</div></div>
+                </div>
+            </div>
+    `;
+    
+    boardData.forEach(col => {
+        const openTasks = col.tasks.filter(t => !t.completed && !t.parentId);
+        const doneTasks = col.tasks.filter(t => t.completed && !t.parentId);
+        if (openTasks.length === 0 && doneTasks.length === 0) return;
+        html += `<div class="client-section"><h2>${escapeHTML(col.title)}</h2>`;
+        if (openTasks.length > 0) {
+            html += `<h3>Open Tasks</h3>`;
+            openTasks.forEach(t => {
+                html += `<div class="task-item">${escapeHTML(t.text)} <span class="task-meta">${t.estimateMinutes}m est</span></div>`;
+                const subtasks = col.tasks.filter(st => st.parentId === t.id);
+                subtasks.forEach(st => {
+                    html += `<div class="task-item" style="margin-left:24px;">↳ ${escapeHTML(st.text)} <span class="task-meta">${st.estimateMinutes}m est</span></div>`;
+                });
+            });
+        }
+        if (doneTasks.length > 0) {
+            html += `<h3>Completed</h3>`;
+            doneTasks.forEach(t => {
+                html += `<div class="task-item task-done">${escapeHTML(t.text)} <span class="task-meta">${t.trackedSeconds ? Math.round(t.trackedSeconds/60) : t.estimateMinutes}m</span></div>`;
+            });
+        }
+        html += `</div>`;
+    });
+    
+    html += `
+        </body>
+        </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+}
+
+function getTodayCompleted() {
+    const today = getTodayKey();
+    return historyData.filter(h => dateKeyFromISO(h.completedAt) === today).length;
+}
+
+// ---------- Render Board (with all new features) ----------
 function renderBoard() {
     const container = $('board-container');
     if (!container) return;
@@ -999,52 +1197,21 @@ function renderBoard() {
                 <button onclick="suggestColumnTimesAI(${colIndex})">Suggest Times (AI)</button>
                 <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow (AI)</button>
                 <button onclick="generateColumnCheckIn(${colIndex})">Daily Check-In (AI)</button>
+                <button onclick="generatePDFReport()">📄 PDF Report</button>
             </div>
 
             ${suggestionsHtml}
-
-            <ul class="task-list" ondragover="allowDrop(event)" ondrop="dropTask(event, ${colIndex})">
-                ${groupTasksByDate(col.tasks).map((group) => `
-                    <li class="date-group-header" onclick="toggleDateGroup('${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
-                    ${group.isCollapsed ? '' : group.items.map(({ task, originalIndex: taskIndex }) => `
-                        <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)} ${task.parentId ? 'subtask' : ''}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
-                            <div class="task-main-row">
-                                <div class="task-left">
-                                    <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
-                                    <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
-                                    ${task.parentId ? `<span class="subtask-badge">↳</span>` : ''}
-                                </div>
-                                <div class="task-actions">
-                                    ${task.deadlineTime ? 
-                                        `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${taskIndex})">📅 ${new Date(task.deadlineTime).toLocaleString()}</span>` 
-                                        : 
-                                        `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${taskIndex})">+ Deadline</button>`
-                                    }
-                                    ${getDeadlineBadge(task)}
-                                    <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
-                                    <button class="track-btn ${task.isTracking ? 'tracking' : ''}" id="track-btn-${colIndex}-${taskIndex}" onclick="toggleTrack(${colIndex}, ${taskIndex})">${task.isTracking ? '⏸' : '▶'} ${formatMinSec(task.trackedSeconds)}</button>
-                                    ${!task.completed ? `
-                                    <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">▲</button>
-                                    <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">▼</button>
-                                    ` : ''}
-                                    <button class="delete-btn" onclick="deleteTask(${colIndex}, ${taskIndex})">×</button>
-                                </div>
-                            </div>
-                            <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' •' : ''}</button>
-                            ${task.stagedEstimate ? `
-                            <div class="ai-suggestion-banner" style="margin-top:4px;">
-                                <span>AI suggests: <strong>${task.stagedEstimate} min</strong></span>
-                                <div><button onclick="applyTaskEstimate(${colIndex}, ${taskIndex})">Apply</button> <button onclick="dismissTaskEstimate(${colIndex}, ${taskIndex})">x</button></div>
-                            </div>` : ''}
-                        </li>
-                    `).join('')}
-                `).join('')}
-            </ul>
 
             <div class="task-input-group">
                 <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add a new task..." onkeypress="handleKeyPress(event, ${colIndex})">
                 <input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480">
                 <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
+                <button class="btn-secondary" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">🎙️</button>
+            </div>
+
+            <div class="nl-task-input-group" style="display:flex;gap:6px;margin-bottom:8px;">
+                <input type="text" class="task-input" id="nl-task-input-${colIndex}" placeholder="Natural language: 'Design homepage by Friday takes 2 hours'..." onkeypress="if(event.key==='Enter') naturalLanguageAddTask(${colIndex})">
+                <button class="add-task-btn" onclick="naturalLanguageAddTask(${colIndex})">✨ Smart</button>
             </div>
 
             <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (e.g. 'write script 25 mins')..."></textarea>
@@ -1056,6 +1223,110 @@ function renderBoard() {
                 <button onclick="dismissAllEstimates(${colIndex})">Dismiss All</button>
             </div>` : ''}
 
+            <ul class="task-list" ondragover="allowDrop(event)" ondrop="dropTask(event, ${colIndex})">
+                ${groupTasksByDate(col.tasks).map((group) => `
+                    <li class="date-group-header" onclick="toggleDateGroup('${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
+                    ${group.isCollapsed ? '' : group.items.map(({ task, originalIndex: taskIndex }) => {
+                        // Skip if this is a subtask (it will be rendered under its parent)
+                        if (task.parentId) return '';
+                        
+                        // Check if parent has subtasks and is collapsed
+                        const hasSubtasks = col.tasks.some(t => t.parentId === task.id);
+                        const isCollapsed = task.collapsed && hasSubtasks;
+                        
+                        // Render parent task
+                        let html = `
+                            <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
+                                <div class="task-main-row">
+                                    <div class="task-left">
+                                        <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
+                                        <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
+                                        ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">📋</span>` : ''}
+                                        ${task.recurrence ? `<span class="recurrence-badge">🔄 ${task.recurrence}</span>` : ''}
+                                    </div>
+                                    <div class="task-actions">
+                                        ${task.deadlineTime ? 
+                                            `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${taskIndex})">📅 ${new Date(task.deadlineTime).toLocaleString()}</span>` 
+                                            : 
+                                            `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${taskIndex})">+ Deadline</button>`
+                                        }
+                                        ${getDeadlineBadge(task)}
+                                        <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
+                                        ${!task.completed ? `
+                                        <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">▲</button>
+                                        <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">▼</button>
+                                        ` : ''}
+                                        <button class="delete-btn" onclick="deleteTask(${colIndex}, ${taskIndex})">×</button>
+                                    </div>
+                                </div>
+                                <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px;">
+                                    <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' •' : ''}</button>
+                                    ${hasSubtasks ? `
+                                        <button class="details-trigger-btn" onclick="toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isCollapsed ? '▶ Show' : '▼ Hide'} Subtasks</button>
+                                        <button class="details-trigger-btn" onclick="removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">🗑️ Remove All</button>
+                                    ` : ''}
+                                    ${!task.recurrence ? `
+                                        <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)" style="font-size:0.6rem;padding:1px 4px;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg);color:var(--text-color);">
+                                            <option value="">No Repeat</option>
+                                            <option value="daily">Daily</option>
+                                            <option value="weekly">Weekly</option>
+                                            <option value="monthly">Monthly</option>
+                                        </select>
+                                    ` : `
+                                        <span class="recurrence-badge" style="font-size:0.6rem;color:#888;">🔄 ${task.recurrence}</span>
+                                        <button class="details-trigger-btn" onclick="removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕</button>
+                                    `}
+                                </div>
+                                ${task.stagedEstimate ? `
+                                <div class="ai-suggestion-banner" style="margin-top:4px;">
+                                    <span>AI suggests: <strong>${task.stagedEstimate} min</strong></span>
+                                    <div><button onclick="applyTaskEstimate(${colIndex}, ${taskIndex})">Apply</button> <button onclick="dismissTaskEstimate(${colIndex}, ${taskIndex})">x</button></div>
+                                </div>` : ''}
+                            </li>
+                        `;
+                        
+                        // Add subtasks if any and not collapsed
+                        if (hasSubtasks && !isCollapsed) {
+                            const subtasks = col.tasks.filter(t => t.parentId === task.id);
+                            html += subtasks.map((subtask, subtaskIndex) => {
+                                const subIdx = col.tasks.indexOf(subtask);
+                                return `
+                                    <li class="task-item subtask ${subtask.completed ? 'completed' : ''} ${urgencyClassFor(subtask)}" 
+                                        id="task-${colIndex}-${subIdx}" 
+                                        draggable="${!subtask.completed}" 
+                                        ondragstart="dragStart(event, ${colIndex}, ${subIdx})"
+                                        style="margin-left:24px; border-left-color: var(--amber);">
+                                        <div class="task-main-row">
+                                            <div class="task-left">
+                                                <input type="checkbox" ${subtask.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${subIdx})">
+                                                <span class="subtask-indent">↳</span>
+                                                <input type="text" class="task-name-input subtask-name" value="${escapeHTML(subtask.text)}" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">
+                                            </div>
+                                            <div class="task-actions">
+                                                ${subtask.deadlineTime ? 
+                                                    `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${subIdx})">📅 ${new Date(subtask.deadlineTime).toLocaleString()}</span>` 
+                                                    : 
+                                                    `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`
+                                                }
+                                                ${getDeadlineBadge(subtask)}
+                                                <input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))">m
+                                                ${!subtask.completed ? `
+                                                <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, -1)">▲</button>
+                                                <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, 1)">▼</button>
+                                                ` : ''}
+                                                <button class="delete-btn" onclick="deleteTask(${colIndex}, ${subIdx})">×</button>
+                                            </div>
+                                        </div>
+                                        <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${subIdx})">Details${subtask.notes ? ' •' : ''}</button>
+                                    </li>
+                                `;
+                            }).join('');
+                        }
+                        
+                        return html;
+                    }).join('')}
+                `).join('')}
+            </ul>
             </div>
         `;
         container.appendChild(columnEl);
@@ -1066,6 +1337,148 @@ function renderBoard() {
     renderTimeCounter();
     renderInternalQueue();
     updateStreaksAndBadges();
+    updateDailyProgress();
+    updateFocusScore();
+}
+
+// ---------- Toggle subtasks collapse ----------
+function toggleSubtasksCollapse(ci, ti) {
+    const task = boardData[ci].tasks[ti];
+    task.collapsed = !task.collapsed;
+    saveBoardData();
+    renderBoard();
+}
+
+// ---------- Remove all subtasks ----------
+function removeAllSubtasks(ci, ti) {
+    const task = boardData[ci].tasks[ti];
+    if (!task.hasSubtasks) return;
+    if (!confirm(`Remove all subtasks from "${task.text}"?`)) return;
+    boardData[ci].tasks = boardData[ci].tasks.filter(t => t.parentId !== task.id);
+    task.hasSubtasks = false;
+    task.collapsed = false;
+    saveBoardData();
+    renderBoard();
+}
+
+// ---------- Set recurrence ----------
+function setRecurrence(ci, ti, value) {
+    const task = boardData[ci].tasks[ti];
+    task.recurrence = value || null;
+    task.lastRecurrenceDate = value ? getTodayKey() : null;
+    saveBoardData();
+    renderBoard();
+}
+
+function removeRecurrence(ci, ti) {
+    const task = boardData[ci].tasks[ti];
+    task.recurrence = null;
+    task.lastRecurrenceDate = null;
+    saveBoardData();
+    renderBoard();
+}
+
+// ---------- Daily Progress Bar ----------
+function updateDailyProgress() {
+    const progressEl = document.getElementById('daily-progress');
+    if (!progressEl) return;
+    
+    const todayKey = getTodayKey();
+    let totalEstimated = 0;
+    let totalTracked = 0;
+    
+    boardData.forEach(col => {
+        col.tasks.forEach(task => {
+            if (task.dateAdded === todayKey && !task.completed) {
+                totalEstimated += task.estimateMinutes;
+                totalTracked += Math.round(task.trackedSeconds / 60);
+            }
+        });
+    });
+    
+    const todayHistory = historyData.filter(h => dateKeyFromISO(h.completedAt) === todayKey);
+    const completedMinutes = todayHistory.reduce((a, h) => a + (h.actualMinutes || 0), 0);
+    totalTracked += completedMinutes;
+    
+    const percent = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
+    const remaining = Math.max(0, totalEstimated - totalTracked);
+    
+    progressEl.innerHTML = `
+        <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#888;">
+            <span>Today's Progress</span>
+            <span>${totalTracked}m / ${totalEstimated}m</span>
+            <span>${percent}%</span>
+        </div>
+        <div style="width:100%;height:6px;background:var(--border-color);border-radius:3px;margin-top:2px;">
+            <div style="width:${percent}%;height:100%;background:var(--cherry-red);border-radius:3px;transition:width 0.5s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#888;margin-top:2px;">
+            <span>${remaining > 0 ? remaining + 'm remaining' : '🎉 All done!'}</span>
+            <span>${completedMinutes}m completed</span>
+        </div>
+    `;
+}
+
+// ---------- Focus Score ----------
+function updateFocusScore() {
+    const scoreEl = document.getElementById('focus-score');
+    if (!scoreEl) return;
+    
+    const todayKey = getTodayKey();
+    const todayHistory = historyData.filter(h => dateKeyFromISO(h.completedAt) === todayKey);
+    
+    // Flow time score (percentage of estimated work time used)
+    let totalEstimated = 0;
+    let totalTracked = 0;
+    boardData.forEach(col => {
+        col.tasks.forEach(task => {
+            if (task.dateAdded === todayKey) {
+                totalEstimated += task.estimateMinutes;
+                totalTracked += Math.round(task.trackedSeconds / 60);
+            }
+        });
+    });
+    const historyMinutes = todayHistory.reduce((a, h) => a + (h.actualMinutes || 0), 0);
+    totalTracked += historyMinutes;
+    const flowScore = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
+    
+    // Completion score
+    const todayTasks = [];
+    boardData.forEach(col => {
+        col.tasks.forEach(task => {
+            if (task.dateAdded === todayKey) todayTasks.push(task);
+        });
+    });
+    const totalToday = todayTasks.length;
+    const completedToday = todayTasks.filter(t => t.completed).length;
+    const completionScore = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0;
+    
+    // Break efficiency score
+    const breakLog = storageGet('ff-break-log', []);
+    const todayBreaks = breakLog.filter(b => new Date(b.date).toLocaleDateString() === new Date().toLocaleDateString());
+    const breakScore = todayBreaks.length > 0 ? Math.min(100, Math.round(100 / (todayBreaks.length))) : 100;
+    
+    // Overall score
+    const overall = Math.round((flowScore * 0.5) + (completionScore * 0.3) + (breakScore * 0.2));
+    
+    let grade = '💪 Excellent';
+    let color = 'var(--green)';
+    if (overall < 30) { grade = '🌱 Starting'; color = '#888'; }
+    else if (overall < 50) { grade = '📈 Building'; color = 'var(--amber)'; }
+    else if (overall < 70) { grade = '🔥 Good'; color = 'var(--cherry-red)'; }
+    else if (overall < 90) { grade = '🌟 Great'; color = 'var(--cherry-red)'; }
+    
+    scoreEl.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:50px;height:50px;border-radius:50%;background:var(--input-bg);border:3px solid ${color};display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:${color};">
+                ${overall}
+            </div>
+            <div>
+                <div style="font-weight:700;color:${color};">${grade}</div>
+                <div style="font-size:0.65rem;color:#888;">${completedToday}/${totalToday} tasks · ${flowScore}% flow</div>
+            </div>
+        </div>
+    `;
 }
 
 // ---------- Column operations ----------
@@ -1208,11 +1621,25 @@ function addTask(ci) {
         id: 't_' + Math.random().toString(36).substr(2,9),
         text: text,
         estimateMinutes: estimate,
-        trackedSeconds: 0, isTracking: false, notes: '',
-        completed: false, completedAt: null, dateAdded: getTodayKey(),
-        breaks: [], timeSegments: [], deadlineTime: null, googleLink: '',
-        startedAtIso: null, completedAtIso: null,
-        parentId: null, subtasks: []
+        trackedSeconds: 0,
+        isTracking: false,
+        notes: '',
+        completed: false,
+        completedAt: null,
+        dateAdded: getTodayKey(),
+        breaks: [],
+        timeSegments: [],
+        deadlineTime: null,
+        googleLink: '',
+        startedAtIso: null,
+        completedAtIso: null,
+        parentId: null,
+        subtasks: [],
+        isSubtask: false,
+        hasSubtasks: false,
+        collapsed: false,
+        recurrence: null,
+        lastRecurrenceDate: null
     };
     col.tasks.push(task);
     input.value = '';
@@ -1257,11 +1684,27 @@ function addPastedTasks(ci) {
         let finalMins = minutes || 15;
         return {
             id: 't_' + Math.random().toString(36).substr(2,9),
-            text: text, estimateMinutes: finalMins, trackedSeconds: 0,
-            isTracking: false, notes: '', completed: false, completedAt: null,
-            dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null, googleLink: '',
-            startedAtIso: null, completedAtIso: null,
-            parentId: null, subtasks: []
+            text: text,
+            estimateMinutes: finalMins,
+            trackedSeconds: 0,
+            isTracking: false,
+            notes: '',
+            completed: false,
+            completedAt: null,
+            dateAdded: getTodayKey(),
+            breaks: [],
+            timeSegments: [],
+            deadlineTime: null,
+            googleLink: '',
+            startedAtIso: null,
+            completedAtIso: null,
+            parentId: null,
+            subtasks: [],
+            isSubtask: false,
+            hasSubtasks: false,
+            collapsed: false,
+            recurrence: null,
+            lastRecurrenceDate: null
         };
     });
 
@@ -1411,11 +1854,27 @@ function acceptAISuggestion(ci, sIdx) {
     const s = boardData[ci].aiSuggestions[sIdx];
     boardData[ci].tasks.unshift({
         id: 't_' + Math.random().toString(36).substr(2,9),
-        text: s.task, estimateMinutes: s.minutes, trackedSeconds: 0,
-        isTracking: false, notes: 'Suggested by AI', completed: false, completedAt: null,
-        dateAdded: getTodayKey(), breaks: [], timeSegments: [], deadlineTime: null, googleLink: '',
-        startedAtIso: null, completedAtIso: null,
-        parentId: null, subtasks: []
+        text: s.task,
+        estimateMinutes: s.minutes,
+        trackedSeconds: 0,
+        isTracking: false,
+        notes: 'Suggested by AI',
+        completed: false,
+        completedAt: null,
+        dateAdded: getTodayKey(),
+        breaks: [],
+        timeSegments: [],
+        deadlineTime: null,
+        googleLink: '',
+        startedAtIso: null,
+        completedAtIso: null,
+        parentId: null,
+        subtasks: [],
+        isSubtask: false,
+        hasSubtasks: false,
+        collapsed: false,
+        recurrence: null,
+        lastRecurrenceDate: null
     });
     boardData[ci].aiSuggestions.splice(sIdx, 1);
     if(boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
@@ -1523,39 +1982,146 @@ async function suggestTimeFromDetails() {
 }
 
 async function breakdownTask() {
-    if (!openDetailsRef) return;
+    if (!openDetailsRef) {
+        alert('No task selected.');
+        return;
+    }
+    
     const { ci, ti } = openDetailsRef;
     const task = boardData[ci].tasks[ti];
-    const apiKey = storageGet('gemini_api_key', null);
-    if (!apiKey) { alert('Add Gemini API key.'); return; }
-    const prompt = `Break this task into 2-5 subtasks with time estimates and brief notes. Return JSON array: [{"text":"subtask name","minutes":15,"notes":"optional"}]. Task: "${task.text}" Notes: "${task.notes || 'none'}"`;
-    try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        });
-        const data = await res.json();
-        const raw = data.candidates[0].content.parts[0].text;
-        const cleaned = raw.replace(/```json|```/g, '').trim();
-        const subtasks = JSON.parse(cleaned);
-        subtasks.forEach(st => {
-            boardData[ci].tasks.push({
-                id: 't_' + Math.random().toString(36).substr(2,9),
-                text: st.text,
-                estimateMinutes: st.minutes || 15,
-                trackedSeconds: 0, isTracking: false,
-                notes: st.notes || 'Subtasks of "' + task.text + '"',
-                completed: false, completedAt: null, dateAdded: getTodayKey(),
-                breaks: [], timeSegments: [], deadlineTime: null, googleLink: '',
-                startedAtIso: null, completedAtIso: null,
-                parentId: task.id, subtasks: []
-            });
-        });
+    
+    // Check if task already has subtasks
+    const existingSubtasks = boardData[ci].tasks.filter(t => t.parentId === task.id);
+    if (existingSubtasks.length > 0) {
+        if (!confirm(`This task already has ${existingSubtasks.length} subtask(s). Generate new ones? This will replace them.`)) {
+            return;
+        }
+        boardData[ci].tasks = boardData[ci].tasks.filter(t => t.parentId !== task.id);
+        task.hasSubtasks = false;
+        task.collapsed = false;
         saveBoardData();
         renderBoard();
+    }
+    
+    const apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) {
+        alert('Please add your Gemini API key in the AI settings (gear icon or footer).');
+        return;
+    }
+    
+    const prompt = `You are a project management expert. Analyze this task and determine if it should be broken down into subtasks.
+
+Task: "${task.text}"
+Additional notes: "${task.notes || 'none'}"
+
+RULES:
+1. ONLY break down if the task is large enough to warrant subtasks (15+ minutes estimated, or clearly has multiple steps).
+2. If the task is simple and doesn't need breaking down, return: {"subtasks": []}
+3. If breaking down, provide 2-8 specific, actionable subtasks with realistic time estimates.
+4. Each subtask should be a discrete, completable action.
+5. Subtasks should flow logically from start to finish.
+
+Return ONLY JSON with this structure:
+{
+  "subtasks": [
+    {"text": "Subtask description", "minutes": 15, "notes": "optional context"},
+    {"text": "Another subtask", "minutes": 30, "notes": "optional"}
+  ]
+}`;
+
+    try {
+        const summaryBox = $('summary-content');
+        summaryBox.textContent = '🧠 AI is analyzing and breaking down your task...';
+        
+        const responseText = await callGemini(prompt);
+        const cleaned = responseText.replace(/```json|```/g, '').trim();
+        let result = JSON.parse(cleaned);
+        
+        let subtasks = [];
+        if (Array.isArray(result)) {
+            subtasks = result;
+        } else if (result.subtasks && Array.isArray(result.subtasks)) {
+            subtasks = result.subtasks;
+        } else if (result.tasks && Array.isArray(result.tasks)) {
+            subtasks = result.tasks;
+        } else {
+            const keys = Object.keys(result);
+            for (let key of keys) {
+                if (Array.isArray(result[key])) {
+                    subtasks = result[key];
+                    break;
+                }
+            }
+        }
+        
+        if (!subtasks || subtasks.length === 0) {
+            const summaryBox2 = $('summary-content');
+            summaryBox2.textContent = `💡 "${task.text}" doesn't need breaking down – it's simple enough as a single task.`;
+            alert(`💡 "${task.text}" doesn't need breaking down – it's simple enough as a single task.`);
+            closeDetailsModal();
+            return;
+        }
+        
+        if (subtasks.length > 8) {
+            subtasks = subtasks.slice(0, 8);
+        }
+        
+        subtasks = subtasks.filter(st => st.text && st.text.trim().length > 0);
+        
+        if (subtasks.length === 0) {
+            throw new Error('AI didn't return valid subtasks.');
+        }
+        
+        let createdCount = 0;
+        subtasks.forEach((st) => {
+            if (st.text && st.text.trim()) {
+                boardData[ci].tasks.push({
+                    id: 't_' + Math.random().toString(36).substr(2,9),
+                    text: st.text.trim(),
+                    estimateMinutes: Math.max(1, st.minutes || 15),
+                    trackedSeconds: 0,
+                    isTracking: false,
+                    notes: st.notes || 'Subtask of "' + task.text + '"',
+                    completed: false,
+                    completedAt: null,
+                    dateAdded: getTodayKey(),
+                    breaks: [],
+                    timeSegments: [],
+                    deadlineTime: null,
+                    googleLink: '',
+                    startedAtIso: null,
+                    completedAtIso: null,
+                    parentId: task.id,
+                    subtasks: [],
+                    isSubtask: true,
+                    hasSubtasks: false,
+                    collapsed: false,
+                    recurrence: null,
+                    lastRecurrenceDate: null
+                });
+                createdCount++;
+            }
+        });
+        
+        task.hasSubtasks = true;
+        task.collapsed = false;
+        
+        saveBoardData();
+        renderBoard();
+        renderInternalQueue();
         closeDetailsModal();
-        alert('Subtask(s) created in the same column.');
-    } catch(e) { alert('AI breakdown error: '+e.message); }
+        
+        const summaryBox2 = $('summary-content');
+        summaryBox2.textContent = `✅ Task broken down into ${createdCount} subtask(s). They've been added to the same column and will appear in your flow sequence.`;
+        
+        alert(`✨ ${createdCount} subtask(s) created! They will appear indented under the parent task and in your flow sequence.`);
+        
+    } catch (e) {
+        alert('AI breakdown error: ' + e.message);
+        console.error('Breakdown error details:', e);
+        const summaryBox = $('summary-content');
+        summaryBox.textContent = '❌ Error breaking down task: ' + e.message;
+    }
 }
 
 // ---------- Streaks & Badges ----------
@@ -1660,142 +2226,6 @@ function updateStreaksAndBadges() {
     }
 }
 
-// ---------- Ambient Sound ----------
-let ambientContext = null;
-let ambientGain = null;
-let ambientSource = null;
-let ambientType = 'off';
-let ambientNodes = {};
-
-function createAmbientSound(type) {
-    if (ambientContext) {
-        ambientContext.close();
-        ambientContext = null;
-        ambientNodes = {};
-    }
-    if (type === 'off' || !type) return;
-    ambientContext = new (window.AudioContext || window.webkitAudioContext)();
-    ambientGain = ambientContext.createGain();
-    ambientGain.gain.setValueAtTime(0.15, ambientContext.currentTime);
-    ambientGain.connect(ambientContext.destination);
-
-    if (type === 'rain') {
-        const bufferSize = 2 * ambientContext.sampleRate;
-        const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
-        const data = buffer.getChannelData(0);
-        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-        for (let i = 0; i < bufferSize; i++) {
-            const white = Math.random() * 2 - 1;
-            b0 = 0.99886 * b0 + white * 0.0555179;
-            b1 = 0.99332 * b1 + white * 0.0750759;
-            b2 = 0.96900 * b2 + white * 0.1538520;
-            b3 = 0.86650 * b3 + white * 0.3104856;
-            b4 = 0.55000 * b4 + white * 0.5329522;
-            b5 = -0.7616 * b5 - white * 0.0168980;
-            data[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-            data[i] *= 0.11;
-            b6 = white * 0.115926;
-        }
-        const source = ambientContext.createBufferSource();
-        source.buffer = buffer;
-        source.loop = true;
-        const filter = ambientContext.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 800;
-        filter.Q.value = 1;
-        source.connect(filter);
-        filter.connect(ambientGain);
-        source.start();
-        ambientNodes.source = source;
-    } else if (type === 'waves') {
-        const bufferSize = 2 * ambientContext.sampleRate;
-        const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            const t = i / ambientContext.sampleRate;
-            const wave = 0.3 * Math.sin(t * 0.5) + 0.1 * Math.sin(t * 0.8 + 1.2) + 0.05 * Math.sin(t * 1.2 + 0.7);
-            const noise = (Math.random() * 2 - 1) * 0.05;
-            data[i] = wave + noise;
-        }
-        const source = ambientContext.createBufferSource();
-        source.buffer = buffer;
-        source.loop = true;
-        const filter = ambientContext.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 150;
-        filter.Q.value = 0.5;
-        source.connect(filter);
-        filter.connect(ambientGain);
-        source.start();
-        ambientNodes.source = source;
-    } else if (type === 'forest') {
-        const source = ambientContext.createBufferSource();
-        const bufferSize = 4 * ambientContext.sampleRate;
-        const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            const t = i / ambientContext.sampleRate;
-            let sample = 0;
-            const chirp = Math.floor(Math.random() * 5) === 0 ? 0.8 * Math.sin(2 * Math.PI * (600 + Math.random() * 400) * t) * Math.exp(-10 * (t % 0.1)) : 0;
-            sample = chirp * 0.2 + (Math.random() * 2 - 1) * 0.02;
-            data[i] = sample;
-        }
-        source.buffer = buffer;
-        source.loop = true;
-        const filter = ambientContext.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.value = 1000;
-        filter.Q.value = 0.8;
-        source.connect(filter);
-        filter.connect(ambientGain);
-        source.start();
-        ambientNodes.source = source;
-    } else if (type === 'coffee') {
-        const source = ambientContext.createBufferSource();
-        const bufferSize = 2 * ambientContext.sampleRate;
-        const buffer = ambientContext.createBuffer(1, bufferSize, ambientContext.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            const t = i / ambientContext.sampleRate;
-            const rumble = 0.2 * Math.sin(t * 0.3) + 0.1 * Math.sin(t * 0.7 + 0.5);
-            const clatter = Math.random() > 0.995 ? 0.5 * (Math.random() * 2 - 1) : 0;
-            data[i] = rumble + clatter * 0.1;
-        }
-        source.buffer = buffer;
-        source.loop = true;
-        const filter = ambientContext.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 200;
-        filter.Q.value = 0.5;
-        source.connect(filter);
-        filter.connect(ambientGain);
-        source.start();
-        ambientNodes.source = source;
-    }
-}
-
-function toggleAmbientSound() {
-    const sel = document.getElementById('ambient-sound-select');
-    if (!sel) return;
-    const type = sel.value;
-    if (type === 'off') {
-        if (ambientContext) ambientContext.close();
-        ambientContext = null;
-        return;
-    }
-    createAmbientSound(type);
-}
-function changeAmbientSound(value) {
-    ambientType = value;
-    if (value === 'off') {
-        if (ambientContext) ambientContext.close();
-        ambientContext = null;
-    } else {
-        createAmbientSound(value);
-    }
-    storageSet('ff-ambient-sound', value);
-}
-
 // ---------- Keyboard Shortcuts ----------
 document.addEventListener('keydown', function(e) {
     if (e.altKey && e.shiftKey) {
@@ -1813,6 +2243,15 @@ document.addEventListener('keydown', function(e) {
             case 'b': toggleBreak(); e.preventDefault(); break;
             case 'q': toggleDarkMode(); e.preventDefault(); break;
             case 'x': skipCurrentSegment(); e.preventDefault(); break;
+            case 'v': {
+                const firstVoiceBtn = document.querySelector('[id^="voice-btn-"]');
+                if (firstVoiceBtn) {
+                    const ci = parseInt(firstVoiceBtn.id.split('-')[2]);
+                    startVoiceInput(ci);
+                }
+                e.preventDefault();
+                break;
+            }
         }
     }
 });
@@ -1960,20 +2399,26 @@ function renderDailyRecap() {
     const todayBreaks = breakLog.filter(b => new Date(b.date).toLocaleDateString() === todayDateStr);
     breakMinutesToday += todayBreaks.reduce((a, b) => a + b.durationMinutes, 0);
 
-    box.innerHTML = `<ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
-        <li><strong>${todaysHistory.length}</strong> task(s) finished</li>
-        <li><strong>${openFromToday}</strong> still open</li>
-        <li><strong>${totalActual} min</strong> logged work</li>
-        <li><strong>${breakMinutesToday} min</strong> breaks/away</li>
-        <li><strong>${clockedMinutesToday} min</strong> clocked in</li>
-    </ul>`;
+    box.innerHTML = `
+        <div id="daily-progress" style="margin-bottom:8px;"></div>
+        <div id="focus-score" style="margin-bottom:8px;"></div>
+        <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
+            <li><strong>${todaysHistory.length}</strong> task(s) finished</li>
+            <li><strong>${openFromToday}</strong> still open</li>
+            <li><strong>${totalActual} min</strong> logged work</li>
+            <li><strong>${breakMinutesToday} min</strong> breaks/away</li>
+            <li><strong>${clockedMinutesToday} min</strong> clocked in</li>
+        </ul>
+    `;
+    updateDailyProgress();
+    updateFocusScore();
 }
 
 function computeColumnTimeline(standardBreakMinutes) {
     let grandWork = 0;
     const perColumn = boardData.map((col) => {
         let colWork = 0, colTotalWithBreaks = 0;
-        const openTasks = col.tasks.filter((t) => !t.completed);
+        const openTasks = col.tasks.filter((t) => !t.completed && !t.parentId);
         openTasks.forEach((task, i) => {
             const { chunks, bonusBreakMinutes } = buildChunks(Math.max(1, task.estimateMinutes || 15));
             const taskWork = chunks.reduce((a, b) => a + b, 0);
@@ -2023,36 +2468,11 @@ function renderTimeCounter() {
         <p style="font-weight:700;">All done by ${formatTimeInZone(grandDone, tz)} (${tz})</p>`;
 }
 
-let trackTickCount = 0;
-function tickTracking() {
-    let anyTracking = false;
-    boardData.forEach((col, ci) => {
-        col.tasks.forEach((task, ti) => {
-            if (task.isTracking && !task.completed) {
-                anyTracking = true;
-                task.trackedSeconds++;
-                const btn = $(`track-btn-${ci}-${ti}`);
-                if (btn) btn.textContent = `⏸ ${formatMinSec(task.trackedSeconds)}`;
-                const li = $(`task-${ci}-${ti}`);
-                if (li) {
-                    li.classList.remove('time-ok', 'time-warn', 'time-over');
-                    const cls = urgencyClassFor(task);
-                    if (cls) li.classList.add(cls);
-                }
-            }
-        });
-    });
-    if (anyTracking) {
-        trackTickCount++;
-        if (trackTickCount % 10 === 0) saveBoardData();
-    }
-}
-
 function updateAdaptiveHacks() {
     const box = $('adaptive-hacks');
     if (!box) return;
     let totalEstimate = 0, openTasks = 0;
-    boardData.forEach(col => col.tasks.forEach(t => { if (!t.completed) { totalEstimate += (t.estimateMinutes || 0); openTasks++; } }));
+    boardData.forEach(col => col.tasks.forEach(t => { if (!t.completed && !t.parentId) { totalEstimate += (t.estimateMinutes || 0); openTasks++; } }));
     const workMin = Math.round((workDuration || 1500) / 60);
     const sessions = openTasks > 0 ? Math.ceil(totalEstimate / workMin) : 0;
     box.innerHTML = `<ul>
@@ -2101,6 +2521,81 @@ function importAllDataJSON(event) {
     event.target.value = '';
 }
 
+// ---------- Push Notifications ----------
+async function sendNotification(title, body) {
+    if (!appSettings.notificationsEnabled) return;
+    if (!('Notification' in window) || Notification.permission === 'denied') return;
+    if (Notification.permission === 'default') {
+        await Notification.requestPermission();
+    }
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: 'icon-192.png' });
+    }
+}
+
+function checkForNotifications() {
+    // Check for tasks due within 1 hour
+    const now = new Date();
+    boardData.forEach(col => {
+        col.tasks.forEach(task => {
+            if (task.deadlineTime && !task.completed) {
+                const deadline = new Date(task.deadlineTime);
+                const diff = (deadline - now) / 3600000; // hours
+                if (diff < 1 && diff > 0) {
+                    sendNotification('⏰ Deadline Approaching', `"${task.text}" is due within 1 hour.`);
+                }
+            }
+        });
+    });
+}
+
+// ---------- Calendar Sync ----------
+function syncWithCalendar() {
+    if (!('calendar' in navigator)) {
+        alert('Calendar sync is not supported in this browser. Please use Chrome or Edge.');
+        return;
+    }
+    
+    // Request calendar permission
+    navigator.calendar.requestPermission().then(result => {
+        if (result === 'granted') {
+            // Find tasks with deadlines
+            const tasksWithDeadlines = [];
+            boardData.forEach(col => {
+                col.tasks.forEach(task => {
+                    if (task.deadlineTime && !task.completed) {
+                        tasksWithDeadlines.push({
+                            title: task.text,
+                            startDate: new Date(task.deadlineTime),
+                            notes: task.notes || ''
+                        });
+                    }
+                });
+            });
+            
+            if (tasksWithDeadlines.length === 0) {
+                alert('No tasks with deadlines to sync.');
+                return;
+            }
+            
+            // Create calendar events
+            tasksWithDeadlines.forEach(task => {
+                navigator.calendar.createEvent({
+                    title: task.title,
+                    startDate: task.startDate,
+                    notes: task.notes
+                }).catch(err => console.error('Calendar error:', err));
+            });
+            
+            alert(`✅ Synced ${tasksWithDeadlines.length} task(s) to your calendar.`);
+        } else {
+            alert('Calendar permission denied. Please enable in browser settings.');
+        }
+    }).catch(() => {
+        alert('Calendar sync requires Chrome or Edge browser.');
+    });
+}
+
 // ---------- Init ----------
 function initApp() {
     applySettings();
@@ -2111,14 +2606,16 @@ function initApp() {
         const now = new Date();
         if (now.getHours() === 0 && now.getMinutes() === 0) {
             adjustTasksForMidnight();
+            setupRecurringTasks();
         }
     }, 60000);
+    
+    // Check for notifications every 5 minutes
+    setInterval(checkForNotifications, 300000);
 
     const key = storageGet('gemini_api_key', '');
     if ($('gemini-api-key')) $('gemini-api-key').value = key;
     if ($('gemini-api-key-modal')) $('gemini-api-key-modal').value = key;
-    const fm = $('focus-mode-toggle');
-    if (fm) fm.checked = !!appSettings.focusMode;
 
     setFlowControlsVisible(false);
     renderClockCard();
@@ -2128,14 +2625,15 @@ function initApp() {
     renderEstimateLog();
     updateDisplay();
     startQuoteRotation();
-
-    const soundSel = $('ambient-sound-select');
-    if (soundSel) {
-        const saved = storageGet('ff-ambient-sound', 'off');
-        soundSel.value = saved;
-        if (saved !== 'off') createAmbientSound(saved);
-    }
     renderDailyRecap();
+    
+    // Setup recurring tasks on load
+    setupRecurringTasks();
+    
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
 }
 
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
@@ -2143,14 +2641,6 @@ function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, tag => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[tag]||tag)); }
 
 // ---------- Task callbacks ----------
-function toggleTrack(ci, ti) {
-    boardData[ci].tasks[ti].isTracking = !boardData[ci].tasks[ti].isTracking;
-    if (boardData[ci].tasks[ti].isTracking && !boardData[ci].tasks[ti].startedAtIso) {
-        boardData[ci].tasks[ti].startedAtIso = new Date().toISOString();
-    }
-    saveBoardData(); renderBoard();
-}
-
 let pendingCompletion = null;
 function toggleTask(ci, ti) {
     const task = boardData[ci].tasks[ti];
@@ -2189,8 +2679,11 @@ function confirmCompletion() {
 function cancelCompletion() { pendingCompletion = null; $('completion-overlay').style.display = 'none'; renderBoard(); }
 function finalizeTaskCompletion(ci, ti, actualSeconds) {
     const task = boardData[ci].tasks[ti];
-    task.completed = true; task.isTracking = false; task.trackedSeconds = actualSeconds;
-    task.completedAt = Date.now(); task.completedAtIso = new Date().toISOString();
+    task.completed = true;
+    task.isTracking = false;
+    task.trackedSeconds = actualSeconds;
+    task.completedAt = Date.now();
+    task.completedAtIso = new Date().toISOString();
     if(task.startedAtIso) task.timeSegments.push({start: task.startedAtIso, end: task.completedAtIso});
 
     const historyId = `h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -2198,16 +2691,32 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
     const totalBreaks = task.breaks.reduce((acc, b) => acc + (b.durationMinutes || 0), 0);
     let breaksStr = task.breaks.length ? `[Breaks: ${task.breaks.map(b=>b.reason).join(', ')}] ` : '';
     historyData.unshift({
-        _id: historyId, client: boardData[ci].title, task: task.text,
-        estimateMinutes: task.estimateMinutes, actualMinutes: Math.round(actualSeconds / 60),
+        _id: historyId,
+        client: boardData[ci].title,
+        task: task.text,
+        estimateMinutes: task.estimateMinutes,
+        actualMinutes: Math.round(actualSeconds / 60),
         breakMinutes: totalBreaks,
-        notes: breaksStr + (task.notes || 'No notes'), completedAt: task.completedAtIso
+        notes: breaksStr + (task.notes || 'No notes'),
+        completedAt: task.completedAtIso
     });
     if (historyData.length > 500) historyData.pop();
     rememberTaskTime(task.text, Math.round(actualSeconds / 60));
-    saveBoardData(); renderBoard(); renderEstimateLog(); renderDailyRecap(); renderInternalQueue();
+    saveBoardData();
+    renderBoard();
+    renderEstimateLog();
+    renderDailyRecap();
+    renderInternalQueue();
 }
-function deleteTask(ci, ti) { boardData[ci].tasks.splice(ti, 1); saveBoardData(); renderBoard(); renderInternalQueue(); }
+function deleteTask(ci, ti) { 
+    const task = boardData[ci].tasks[ti];
+    // Also remove any subtasks
+    boardData[ci].tasks = boardData[ci].tasks.filter(t => t.parentId !== task.id);
+    boardData[ci].tasks.splice(ti, 1);
+    saveBoardData();
+    renderBoard();
+    renderInternalQueue();
+}
 
 function rememberTaskTime(text, minutes) {
     const key = normalizeTaskName(text);
@@ -2218,5 +2727,71 @@ function rememberTaskTime(text, minutes) {
     taskTimeMemory[key] = entry;
     storageSet('ff-task-time-memory', taskTimeMemory);
 }
+
+// Track time in background (hidden tracker)
+let backgroundTracker = { active: false, startTime: null, taskId: null, interval: null };
+
+function startBackgroundTracking(taskId) {
+    if (backgroundTracker.active) return;
+    backgroundTracker.active = true;
+    backgroundTracker.startTime = Date.now();
+    backgroundTracker.taskId = taskId;
+    backgroundTracker.interval = setInterval(() => {
+        // Find the task and update tracked time
+        let found = false;
+        boardData.forEach(col => {
+            col.tasks.forEach(task => {
+                if (task.id === backgroundTracker.taskId && !task.completed) {
+                    task.trackedSeconds += 1;
+                    found = true;
+                }
+            });
+        });
+        if (!found) {
+            stopBackgroundTracking();
+        }
+    }, 1000);
+}
+
+function stopBackgroundTracking() {
+    if (backgroundTracker.interval) {
+        clearInterval(backgroundTracker.interval);
+        backgroundTracker.interval = null;
+    }
+    backgroundTracker.active = false;
+    backgroundTracker.taskId = null;
+    backgroundTracker.startTime = null;
+}
+
+// Override addFiveMinutes to start/stop background tracking as needed
+const originalAddFiveMinutes = addFiveMinutes;
+addFiveMinutes = function() {
+    // If we're in a flow work segment, track it
+    if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
+        const task = currentFlowSegment().entry.task;
+        if (task && !task.completed) {
+            startBackgroundTracking(task.id);
+        }
+    }
+    originalAddFiveMinutes();
+};
+
+// Modify toggleTimer to handle background tracking
+const originalToggleTimer = toggleTimer;
+toggleTimer = function() {
+    if (!isRunning) {
+        // Starting timer
+        if (timerMode === 'flow' && currentFlowSegment() && currentFlowSegment().type === 'work') {
+            const task = currentFlowSegment().entry.task;
+            if (task && !task.completed) {
+                startBackgroundTracking(task.id);
+            }
+        }
+    } else {
+        // Pausing timer - stop background tracking
+        stopBackgroundTracking();
+    }
+    originalToggleTimer();
+};
 
 document.addEventListener('DOMContentLoaded', initApp);
