@@ -41,22 +41,25 @@ function populateHeaderClockSelects() {
     try { zones = Intl.supportedValuesOf('timeZone'); }
     catch (e) { zones = ['UTC', 'Africa/Lagos', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Australia/Sydney']; }
 
-    // Sort zones alphabetically for better search
     zones.sort();
 
-    ['clock-tz-1', 'clock-tz-2', 'clock-tz-3'].forEach(function(id, i) {
-        var sel = document.getElementById(id);
-        if (!sel) return;
-        // Clear and populate
-        sel.innerHTML = zones.map(function(z) {
-            return '<option value="' + z + '" ' + (z === headerClockZones[i] ? 'selected' : '') + '>' + z + '</option>';
+    // Populate the datalist
+    var datalist = document.getElementById('tz-datalist');
+    if (datalist) {
+        datalist.innerHTML = zones.map(function(z) {
+            return '<option value="' + z + '">';
         }).join('');
-        // Enable search by adding a datalist? Actually we need to use a combobox.
-        // Instead of a datalist, we can use a select with search input above it.
-        // But simpler: use a select with a filter input that hides options.
-        // We'll implement a custom filter in the next step.
+    }
+
+    // Set initial values for the three clock inputs
+    var inputs = ['clock-tz-1', 'clock-tz-2', 'clock-tz-3'];
+    inputs.forEach(function(id, i) {
+        var input = document.getElementById(id);
+        if (input) {
+            input.value = headerClockZones[i] || '';
+            input.setAttribute('list', 'tz-datalist');
+        }
     });
-    // We'll add a filter input for each select using a wrapper.
 }
 
 function updateHeaderClockZone(slot, tz) {
@@ -64,6 +67,9 @@ function updateHeaderClockZone(slot, tz) {
     headerClockZones[slot - 1] = tz;
     storageSet('ff-header-clock-zones', headerClockZones);
     updateClocks();
+    // Also update the input value if it was cleared or changed
+    var input = document.getElementById('clock-tz-' + slot);
+    if (input) input.value = tz;
 }
 
 function updateClocks() {
@@ -2603,13 +2609,10 @@ function computeColumnTimeline(standardBreakMinutes) {
 }
 
 function getSelectedTimezone() { return storageGet('ff-timezone', Intl.DateTimeFormat().resolvedOptions().timeZone); }
-function updateTimezone(tz) { storageSet('ff-timezone', tz); renderTimeCounter(); }
-function populateTimezoneSelect() {
-    var sel = $('timezone-select');
-    if (!sel) return;
-    var zones; try { zones = Intl.supportedValuesOf('timeZone'); } catch(e){ zones = ['UTC','Africa/Lagos','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Europe/Paris','Asia/Dubai','Asia/Kolkata','Asia/Shanghai','Australia/Sydney']; }
-    var current = getSelectedTimezone();
-    sel.innerHTML = zones.map(function(z) { return '<option value="' + z + '" ' + (z === current ? 'selected' : '') + '>' + z + '</option>'; }).join('');
+function updateTimezone(tz) {
+    if (!tz || tz.trim() === '') return;
+    storageSet('ff-timezone', tz);
+    renderTimeCounter();
 }
 function formatTimeInZone(date, tz) { return date.toLocaleTimeString('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit' }); }
 function renderTimeCounter() {

@@ -212,6 +212,34 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
     background-color: var(--card-bg); padding: 1rem 1.5rem; border-radius: 20px;
     box-shadow: var(--shadow); border: 2px solid var(--border-color);
 }
+/* Searchable Clock Inputs */
+.clock-tz-input {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--cherry-red);
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 4px;
+    outline: none;
+    max-width: 120px;
+    font-family: Georgia, serif;
+    width: 100%;
+    box-sizing: border-box;
+}
+.clock-tz-input:focus {
+    border-color: var(--cherry-hover);
+}
+.clock-tz-input::placeholder {
+    color: #aaa;
+    font-weight: 400;
+    font-size: 0.55rem;
+}
+datalist {
+    background: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
 .timer-card { text-align: center; }
 
 #mode-indicator { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px; color: var(--cherry-red); }
