@@ -324,10 +324,15 @@ button:active { transform: scale(0.96); }
 .task-list { list-style: none; padding: 0; margin: 0; flex: 1; overflow-y: auto; max-height: 280px; }
 
 .task-item {
-    background-color: var(--input-bg); border: 1px solid var(--border-color);
-    border-left: 4px solid var(--border-color); border-radius: 10px;
-    margin-bottom: 0.4rem; padding: 0.4rem 0.6rem; font-size: 0.8rem;
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--border-color);
+    border-radius: 10px;
+    margin-bottom: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
     transition: border-color 0.2s ease;
+    overflow: visible; /* ensure text isn't clipped */
 }
 .task-item.time-ok { border-left-color: var(--green); }
 .task-item.time-warn { border-left-color: var(--amber); }
@@ -345,13 +350,14 @@ button:active { transform: scale(0.96); }
     font-family: Georgia, serif;
     font-weight: 600;
     color: var(--text-color);
-    font-size: 0.8rem;  /* or 0.85rem – your choice */
+    font-size: 0.85rem; /* slightly smaller */
     outline: none;
-    min-width: 50px;
+    min-width: 0; /* allows shrinking */
     word-wrap: break-word;
-    white-space: normal;  /* ← this is the key line */
+    white-space: normal;
     line-height: 1.4;
-    max-width: 100%;      /* optional but helpful */
+    max-width: 100%; /* prevent overflow */
+    overflow-wrap: break-word;
 }
 .task-estimate-input { width: 36px; padding: 1px; font-family: Georgia, serif; font-weight: 700; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color); font-size: 0.7rem; }
 
@@ -562,13 +568,8 @@ button:active { transform: scale(0.96); }
     align-items: center;
     gap: 6px;
     flex: 1;
-    min-width: 0;        /* ← crucial */
-    overflow: hidden;    /* ← prevents text from pushing outside */
-}
-.task-name-input {
-    font-size: 0.95rem !important; /* larger, more readable */
-    min-width: 60px;
-    flex: 1;
+    min-width: 0; /* prevents flex overflow */
+    overflow: hidden;
 }
 .task-controls-row {
     display: flex;

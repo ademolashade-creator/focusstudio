@@ -1428,7 +1428,6 @@ function renderBoard() {
                             ${deadlineHtml}
                             ${getDeadlineBadge(task)}
                             <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
-                            <button class="track-btn ${task.isTracking ? 'tracking' : ''}" id="track-btn-${colIndex}-${taskIndex}" onclick="toggleTrack(${colIndex}, ${taskIndex})">${task.isTracking ? '⏸' : '▶'} ${formatMinSec(task.trackedSeconds)}</button>
                             ${!task.completed ? `
                             <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">▲</button>
                             <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">▼</button>
@@ -1545,7 +1544,6 @@ function renderBoard() {
 
     </div>
 `;
-
         container.appendChild(columnEl);
         var input = document.getElementById('task-input-' + colIndex);
         if (input) setupAutosuggest(input);
