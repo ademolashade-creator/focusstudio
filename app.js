@@ -1373,177 +1373,179 @@ function renderBoard() {
         }
 
         columnEl.innerHTML = `
-            <div class="column-header-row">
-                <button class="icon-btn" onclick="toggleColumnCollapse(${colIndex})" title="${col.collapsed ? 'Expand' : 'Collapse'}">${col.collapsed ? '▸' : '▾'}</button>
-                <input type="text" class="column-header-input" value="${escapeHTML(col.title)}" oninput="updateColumnTitle(${colIndex}, this.value)" placeholder="Project / Client Name">
-                <div class="column-header-actions" style="display:flex;align-items:center;gap:4px;">
-                    <label style="font-size:0.65rem;display:flex;align-items:center;gap:2px;color:#888;">
-                        <input type="checkbox" ${col.notesRequired ? 'checked' : ''} onchange="toggleNotesRequired(${colIndex}, this.checked)" title="Require notes for each task in this column">
-                        Notes
-                    </label>
-                    <button class="icon-btn" onclick="moveColumn(${colIndex}, -1)">◀</button>
-                    <button class="icon-btn" onclick="moveColumn(${colIndex}, 1)">▶</button>
-                    <button class="delete-btn" onclick="deleteColumn(${colIndex})">×</button>
-                </div>
-            </div>
+    <div class="column-header-row">
+        <button class="icon-btn" onclick="toggleColumnCollapse(${colIndex})" title="${col.collapsed ? 'Expand' : 'Collapse'}">${col.collapsed ? '▸' : '▾'}</button>
+        <input type="text" class="column-header-input" value="${escapeHTML(col.title)}" oninput="updateColumnTitle(${colIndex}, this.value)" placeholder="Project / Client Name">
+        <div class="column-header-actions" style="display:flex;align-items:center;gap:4px;">
+            <label style="font-size:0.65rem;display:flex;align-items:center;gap:2px;color:#888;">
+                <input type="checkbox" ${col.notesRequired ? 'checked' : ''} onchange="toggleNotesRequired(${colIndex}, this.checked)" title="Require notes for each task in this column">
+                Notes
+            </label>
+            <button class="icon-btn" onclick="moveColumn(${colIndex}, -1)">◀</button>
+            <button class="icon-btn" onclick="moveColumn(${colIndex}, 1)">▶</button>
+            <button class="delete-btn" onclick="deleteColumn(${colIndex})">×</button>
+        </div>
+    </div>
 
-            <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
+    <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
 
-            <div class="ai-batch-actions">
-                <button onclick="suggestColumnTimesAI(${colIndex})">Suggest Times (AI)</button>
-                <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow (AI)</button>
-                <button onclick="generateColumnCheckIn(${colIndex})">Daily Check-In (AI)</button>
-                <button onclick="generatePDFReport()">📄 PDF Report</button>
-            </div>
+    <!-- TASK LIST FIRST -->
+    <ul class="task-list" ondragover="allowDrop(event)" ondrop="dropTask(event, ${colIndex})">
+        ${groupTasksByDate(col.tasks).map((group) => `
+            <li class="date-group-header" onclick="toggleDateGroup('${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
+            ${group.isCollapsed ? '' : group.items.map(({ task, originalIndex: taskIndex }) => {
+                if (task.parentId) return '';
 
-            ${suggestionsHtml}
+                const hasSubtasks = col.tasks.some(t => t.parentId === task.id);
+                const isSubtaskCollapsed = task.collapsedControls || false;
+                const isParentCollapsed = task.collapsed || false;
 
-            <div class="task-input-group">
-                <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add a new task..." onkeypress="handleKeyPress(event, ${colIndex})">
-                <input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480">
-                <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
-                <button class="btn-secondary" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">🎙️</button>
-            </div>
+                let deadlineHtml = '';
+                if (task.deadlineTime) {
+                    deadlineHtml = `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${taskIndex})">📅 ${new Date(task.deadlineTime).toLocaleString()}</span>`;
+                } else {
+                    deadlineHtml = `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${taskIndex})">+ Deadline</button>`;
+                }
 
-            <div class="nl-task-input-group" style="display:flex;gap:6px;margin-bottom:8px;">
-                <input type="text" class="task-input" id="nl-task-input-${colIndex}" placeholder="Natural language: 'Design homepage by Friday takes 2 hours'..." onkeypress="if(event.key==='Enter') naturalLanguageAddTask(${colIndex})">
-                <button class="add-task-btn" onclick="naturalLanguageAddTask(${colIndex})">✨ Smart</button>
-            </div>
+                let html = `
+                    <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
+                        <div class="task-top-row">
+                            <div class="task-checkbox-name">
+                                <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
+                                <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
+                                ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">📋</span>` : ''}
+                                ${task.recurrence ? `<span class="recurrence-badge">🔄 ${task.recurrence}</span>` : ''}
+                            </div>
+                            <div class="task-top-actions">
+                                <button class="collapse-toggle-btn" onclick="toggleTaskCollapse(${colIndex}, ${taskIndex})" title="${isSubtaskCollapsed ? 'Expand' : 'Collapse'} controls">
+                                    ${isSubtaskCollapsed ? '▶' : '▼'}
+                                </button>
+                                <button class="delete-btn" onclick="deleteTask(${colIndex}, ${taskIndex})">×</button>
+                            </div>
+                        </div>
 
-            <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (e.g. 'write script 25 mins')..."></textarea>
-            <button class="add-task-btn" style="width:100%;margin-bottom:0.6rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
+                        <div class="task-controls-row" style="${isSubtaskCollapsed ? 'display:none;' : ''}">
+                            ${deadlineHtml}
+                            ${getDeadlineBadge(task)}
+                            <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
+                            <button class="track-btn ${task.isTracking ? 'tracking' : ''}" id="track-btn-${colIndex}-${taskIndex}" onclick="toggleTrack(${colIndex}, ${taskIndex})">${task.isTracking ? '⏸' : '▶'} ${formatMinSec(task.trackedSeconds)}</button>
+                            ${!task.completed ? `
+                            <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">▲</button>
+                            <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">▼</button>
+                            ` : ''}
+                            <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' •' : ''}</button>
+                            ${hasSubtasks ? `
+                                <button class="details-trigger-btn" onclick="toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? '▶ Show' : '▼ Hide'} Subtasks</button>
+                                <button class="details-trigger-btn" onclick="removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">🗑️ Remove All</button>
+                            ` : ''}
+                            ${!task.recurrence ? `
+                                <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)" style="font-size:0.6rem;padding:1px 4px;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg);color:var(--text-color);">
+                                    <option value="">No Repeat</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            ` : `
+                                <span class="recurrence-badge" style="font-size:0.6rem;color:#888;">🔄 ${task.recurrence}</span>
+                                <button class="details-trigger-btn" onclick="removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕</button>
+                            `}
+                        </div>
 
-            ${col.tasks.some(t=>t.stagedEstimate) ? `
-            <div class="ai-batch-actions" style="margin-top:10px;">
-                <button onclick="applyAllEstimates(${colIndex})" style="background:var(--cherry-red);color:white;">Apply All Times</button>
-                <button onclick="dismissAllEstimates(${colIndex})">Dismiss All</button>
-            </div>` : ''}
+                        ${task.stagedEstimate ? `
+                        <div class="ai-suggestion-banner" style="margin-top:4px;">
+                            <span>AI suggests: <strong>${task.stagedEstimate} min</strong></span>
+                            <div><button onclick="applyTaskEstimate(${colIndex}, ${taskIndex})">Apply</button> <button onclick="dismissTaskEstimate(${colIndex}, ${taskIndex})">x</button></div>
+                        </div>` : ''}
 
-            <ul class="task-list" ondragover="allowDrop(event)" ondrop="dropTask(event, ${colIndex})">
-                ${groupTasksByDate(col.tasks).map((group) => `
-                    <li class="date-group-header" onclick="toggleDateGroup('${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
-                    ${group.isCollapsed ? '' : group.items.map(({ task, originalIndex: taskIndex }) => {
-                        if (task.parentId) return '';
+                        ${hasSubtasks && !isParentCollapsed ? `
+                            <ul class="subtask-list" style="list-style:none;padding:0;margin:0;margin-top:4px;border-left:2px solid var(--amber);padding-left:12px;">
+                                ${col.tasks.filter(t => t.parentId === task.id).map((subtask) => {
+                                    const subIdx = col.tasks.indexOf(subtask);
+                                    const isSubtaskCollapsed2 = subtask.collapsedControls || false;
+                                    return `
+                                        <li class="task-item subtask ${subtask.completed ? 'completed' : ''} ${urgencyClassFor(subtask)}" 
+                                            id="task-${colIndex}-${subIdx}" 
+                                            draggable="${!subtask.completed}" 
+                                            ondragstart="dragStart(event, ${colIndex}, ${subIdx})"
+                                            style="margin-left:0; border-left-color: var(--amber);">
+                                            <div class="task-top-row">
+                                                <div class="task-checkbox-name">
+                                                    <input type="checkbox" ${subtask.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${subIdx})">
+                                                    <span class="subtask-indent">↳</span>
+                                                    <input type="text" class="task-name-input subtask-name" value="${escapeHTML(subtask.text)}" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">
+                                                </div>
+                                                <div class="task-top-actions">
+                                                    <button class="collapse-toggle-btn" onclick="toggleTaskCollapse(${colIndex}, ${subIdx})" title="${isSubtaskCollapsed2 ? 'Expand' : 'Collapse'} controls">
+                                                        ${isSubtaskCollapsed2 ? '▶' : '▼'}
+                                                    </button>
+                                                    <button class="delete-btn" onclick="deleteTask(${colIndex}, ${subIdx})">×</button>
+                                                </div>
+                                            </div>
+                                            <div class="task-controls-row" style="${isSubtaskCollapsed2 ? 'display:none;' : ''}">
+                                                ${subtask.deadlineTime ? 
+                                                    `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${subIdx})">📅 ${new Date(subtask.deadlineTime).toLocaleString()}</span>` 
+                                                    : 
+                                                    `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`
+                                                }
+                                                ${getDeadlineBadge(subtask)}
+                                                <input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))">m
+                                                ${!subtask.completed ? `
+                                                <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, -1)">▲</button>
+                                                <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, 1)">▼</button>
+                                                ` : ''}
+                                                <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${subIdx})">Details${subtask.notes ? ' •' : ''}</button>
+                                            </div>
+                                            ${subtask.stagedEstimate ? `
+                                            <div class="ai-suggestion-banner" style="margin-top:4px;">
+                                                <span>AI suggests: <strong>${subtask.stagedEstimate} min</strong></span>
+                                                <div><button onclick="applyTaskEstimate(${colIndex}, ${subIdx})">Apply</button> <button onclick="dismissTaskEstimate(${colIndex}, ${subIdx})">x</button></div>
+                                            </div>` : ''}
+                                        </li>
+                                    `;
+                                }).join('')}
+                            </ul>
+                        ` : ''}
+                    </li>
+                `;
+                return html;
+            }).join('')}
+        `).join('')}
+    </ul>
 
-                        const hasSubtasks = col.tasks.some(t => t.parentId === task.id);
-                        const isSubtaskCollapsed = task.collapsedControls || false;
-                        const isParentCollapsed = task.collapsed || false;
+    <!-- CONTROLS AT THE BOTTOM -->
+    <div class="ai-batch-actions">
+        <button onclick="suggestColumnTimesAI(${colIndex})">Suggest Times (AI)</button>
+        <button onclick="optimizeColumnFlowAI(${colIndex})">Optimize Flow (AI)</button>
+        <button onclick="generateColumnCheckIn(${colIndex})">Daily Check-In (AI)</button>
+        <button onclick="generatePDFReport()">📄 PDF Report</button>
+    </div>
 
-                        // Build deadline HTML
-                        let deadlineHtml = '';
-                        if (task.deadlineTime) {
-                            deadlineHtml = `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${taskIndex})">📅 ${new Date(task.deadlineTime).toLocaleString()}</span>`;
-                        } else {
-                            deadlineHtml = `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${taskIndex})">+ Deadline</button>`;
-                        }
+    ${suggestionsHtml}
 
-                        let html = `
-                            <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
-                                <div class="task-top-row">
-                                    <div class="task-checkbox-name">
-                                        <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
-                                        <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
-                                        ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">📋</span>` : ''}
-                                        ${task.recurrence ? `<span class="recurrence-badge">🔄 ${task.recurrence}</span>` : ''}
-                                    </div>
-                                    <div class="task-top-actions">
-                                        <button class="collapse-toggle-btn" onclick="toggleTaskCollapse(${colIndex}, ${taskIndex})" title="${isSubtaskCollapsed ? 'Expand' : 'Collapse'} controls">
-                                            ${isSubtaskCollapsed ? '▶' : '▼'}
-                                        </button>
-                                        <button class="delete-btn" onclick="deleteTask(${colIndex}, ${taskIndex})">×</button>
-                                    </div>
-                                </div>
+    <div class="task-input-group">
+        <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add a new task..." onkeypress="handleKeyPress(event, ${colIndex})">
+        <input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480">
+        <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
+        <button class="btn-secondary" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">🎙️</button>
+    </div>
 
-                                <div class="task-controls-row" style="${isSubtaskCollapsed ? 'display:none;' : ''}">
-                                    ${deadlineHtml}
-                                    ${getDeadlineBadge(task)}
-                                    <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
-                                    <button class="track-btn ${task.isTracking ? 'tracking' : ''}" id="track-btn-${colIndex}-${taskIndex}" onclick="toggleTrack(${colIndex}, ${taskIndex})">${task.isTracking ? '⏸' : '▶'} ${formatMinSec(task.trackedSeconds)}</button>
-                                    ${!task.completed ? `
-                                    <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">▲</button>
-                                    <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">▼</button>
-                                    ` : ''}
-                                    <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' •' : ''}</button>
-                                    ${hasSubtasks ? `
-                                        <button class="details-trigger-btn" onclick="toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? '▶ Show' : '▼ Hide'} Subtasks</button>
-                                        <button class="details-trigger-btn" onclick="removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">🗑️ Remove All</button>
-                                    ` : ''}
-                                    ${!task.recurrence ? `
-                                        <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)" style="font-size:0.6rem;padding:1px 4px;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg);color:var(--text-color);">
-                                            <option value="">No Repeat</option>
-                                            <option value="daily">Daily</option>
-                                            <option value="weekly">Weekly</option>
-                                            <option value="monthly">Monthly</option>
-                                        </select>
-                                    ` : `
-                                        <span class="recurrence-badge" style="font-size:0.6rem;color:#888;">🔄 ${task.recurrence}</span>
-                                        <button class="details-trigger-btn" onclick="removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕</button>
-                                    `}
-                                </div>
+    <div class="nl-task-input-group" style="display:flex;gap:6px;margin-bottom:8px;">
+        <input type="text" class="task-input" id="nl-task-input-${colIndex}" placeholder="Natural language: 'Design homepage by Friday takes 2 hours'..." onkeypress="if(event.key==='Enter') naturalLanguageAddTask(${colIndex})">
+        <button class="add-task-btn" onclick="naturalLanguageAddTask(${colIndex})">✨ Smart</button>
+    </div>
 
-                                ${task.stagedEstimate ? `
-                                <div class="ai-suggestion-banner" style="margin-top:4px;">
-                                    <span>AI suggests: <strong>${task.stagedEstimate} min</strong></span>
-                                    <div><button onclick="applyTaskEstimate(${colIndex}, ${taskIndex})">Apply</button> <button onclick="dismissTaskEstimate(${colIndex}, ${taskIndex})">x</button></div>
-                                </div>` : ''}
+    <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (e.g. 'write script 25 mins')..."></textarea>
+    <button class="add-task-btn" style="width:100%;margin-bottom:0.6rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
 
-                                ${hasSubtasks && !isParentCollapsed ? `
-                                    <ul class="subtask-list" style="list-style:none;padding:0;margin:0;margin-top:4px;border-left:2px solid var(--amber);padding-left:12px;">
-                                        ${col.tasks.filter(t => t.parentId === task.id).map((subtask) => {
-                                            const subIdx = col.tasks.indexOf(subtask);
-                                            const isSubtaskCollapsed2 = subtask.collapsedControls || false;
-                                            return `
-                                                <li class="task-item subtask ${subtask.completed ? 'completed' : ''} ${urgencyClassFor(subtask)}" 
-                                                    id="task-${colIndex}-${subIdx}" 
-                                                    draggable="${!subtask.completed}" 
-                                                    ondragstart="dragStart(event, ${colIndex}, ${subIdx})"
-                                                    style="margin-left:0; border-left-color: var(--amber);">
-                                                    <div class="task-top-row">
-                                                        <div class="task-checkbox-name">
-                                                            <input type="checkbox" ${subtask.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${subIdx})">
-                                                            <span class="subtask-indent">↳</span>
-                                                            <input type="text" class="task-name-input subtask-name" value="${escapeHTML(subtask.text)}" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">
-                                                        </div>
-                                                        <div class="task-top-actions">
-                                                            <button class="collapse-toggle-btn" onclick="toggleTaskCollapse(${colIndex}, ${subIdx})" title="${isSubtaskCollapsed2 ? 'Expand' : 'Collapse'} controls">
-                                                                ${isSubtaskCollapsed2 ? '▶' : '▼'}
-                                                            </button>
-                                                            <button class="delete-btn" onclick="deleteTask(${colIndex}, ${subIdx})">×</button>
-                                                        </div>
-                                                    </div>
-                                                    <div class="task-controls-row" style="${isSubtaskCollapsed2 ? 'display:none;' : ''}">
-                                                        ${subtask.deadlineTime ? 
-                                                            `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${subIdx})">📅 ${new Date(subtask.deadlineTime).toLocaleString()}</span>` 
-                                                            : 
-                                                            `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`
-                                                        }
-                                                        ${getDeadlineBadge(subtask)}
-                                                        <input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))">m
-                                                        ${!subtask.completed ? `
-                                                        <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, -1)">▲</button>
-                                                        <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, 1)">▼</button>
-                                                        ` : ''}
-                                                        <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${subIdx})">Details${subtask.notes ? ' •' : ''}</button>
-                                                    </div>
-                                                    ${subtask.stagedEstimate ? `
-                                                    <div class="ai-suggestion-banner" style="margin-top:4px;">
-                                                        <span>AI suggests: <strong>${subtask.stagedEstimate} min</strong></span>
-                                                        <div><button onclick="applyTaskEstimate(${colIndex}, ${subIdx})">Apply</button> <button onclick="dismissTaskEstimate(${colIndex}, ${subIdx})">x</button></div>
-                                                    </div>` : ''}
-                                                </li>
-                                            `;
-                                        }).join('')}
-                                    </ul>
-                                ` : ''}
-                            </li>
-                        `;
+    ${col.tasks.some(t=>t.stagedEstimate) ? `
+    <div class="ai-batch-actions" style="margin-top:10px;">
+        <button onclick="applyAllEstimates(${colIndex})" style="background:var(--cherry-red);color:white;">Apply All Times</button>
+        <button onclick="dismissAllEstimates(${colIndex})">Dismiss All</button>
+    </div>` : ''}
 
-                        return html;
-                    }).join('')}
-                `).join('')}
-            </ul>
-            </div>
-        `;
+    </div>
+`;
+
         container.appendChild(columnEl);
         var input = document.getElementById('task-input-' + colIndex);
         if (input) setupAutosuggest(input);

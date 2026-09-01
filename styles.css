@@ -339,8 +339,19 @@ button:active { transform: scale(0.96); }
 .task-item input[type="checkbox"] { accent-color: var(--cherry-red); cursor: pointer; }
 
 .task-name-input {
-    flex: 1; background: transparent; border: none; font-family: Georgia, serif;
-    font-weight: 600; color: var(--text-color); font-size: 0.8rem; outline: none; min-width: 50px;
+    flex: 1;
+    background: transparent;
+    border: none;
+    font-family: Georgia, serif;
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 0.8rem;  /* or 0.85rem – your choice */
+    outline: none;
+    min-width: 50px;
+    word-wrap: break-word;
+    white-space: normal;  /* ← this is the key line */
+    line-height: 1.4;
+    max-width: 100%;      /* optional but helpful */
 }
 .task-estimate-input { width: 36px; padding: 1px; font-family: Georgia, serif; font-weight: 700; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color); font-size: 0.7rem; }
 
@@ -551,7 +562,8 @@ button:active { transform: scale(0.96); }
     align-items: center;
     gap: 6px;
     flex: 1;
-    min-width: 0; /* prevents overflow */
+    min-width: 0;        /* ← crucial */
+    overflow: hidden;    /* ← prevents text from pushing outside */
 }
 .task-name-input {
     font-size: 0.95rem !important; /* larger, more readable */
