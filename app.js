@@ -1,13 +1,23 @@
-// ---------- Storage ----------
+// ---------- Storage with Incognito / Fallback Support ----------
+const memoryStore = {};
+
 function storageGet(key, fallback) {
     try {
         const raw = localStorage.getItem(key);
         return raw ? JSON.parse(raw) : fallback;
-    } catch (e) { return fallback; }
+    } catch (e) {
+        // Fallback to in-memory storage if localStorage is blocked (e.g. Incognito)
+        return memoryStore[key] !== undefined ? memoryStore[key] : fallback;
+    }
 }
+
 function storageSet(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); }
-    catch (e) { console.error('Could not save', key, e); }
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+        // Fallback to in-memory storage if localStorage throws an error
+        memoryStore[key] = value;
+    }
 }
 const $ = (id) => document.getElementById(id);
 
