@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus & Flow Studio</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <meta name="theme-color" content="#ff3366">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Focus & Flow">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="styles-new.css?v=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(var reg of registrations) reg.unregister();
+            });
+        }
+        if ('caches' in window) {
+            caches.keys().then(function(names) {
+                for (var name of names) caches.delete(name);
+            });
+        }
+    </script>
+</head>
+<body>
+
+<header>
+    <div class="header-top">
+        <h1 class="editable-title" contenteditable="true" id="app-title" onblur="saveAppName(this.textContent)">Focus & Flow Studio</h1>
+        <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">🌙</button>
+    </div>
+    <p class="tagline">Curate your day, honor your energy, and master your workflow.</p>
+    <div id="quote-banner" class="quote-banner">✨ “Focus is the art of knowing what to ignore.” — James Clear</div>
+
+    <!-- Attendance + buttons -->
+    <div class="attendance-container">
+        <div class="attendance-card">
+            <div class="attendance-header">
+                <span class="attendance-title">⏰ Attendance</span>
+                <span id="attendance-status" class="attendance-status off-duty">Off Duty</span>
+                <span style="display:flex;gap:6px;">
+                    <button class="btn-secondary btn-small" id="break-btn" onclick="toggleBreak()">☕ Break</button>
+                    <button class="btn-secondary btn-small" id="clock-btn" onclick="toggleClock()">Clock In</button>
+                </span>
+            </div>
+            <div class="attendance-body">
+                <div class="attendance-row">
+                    <div class="attendance-field">
+                        <label>Scheduled In</label>
+                        <input type="time" id="scheduled-in" class="attendance-time-input" value="09:00" onchange="saveAttendanceSettings()">
+                    </div>
+                    <div class="attendance-field">
+                        <label>Scheduled Out</label>
+                        <input type="time" id="scheduled-out" class="attendance-time-input" value="17:00" onchange="saveAttendanceSettings()">
+                    </div>
+                </div>
+                <div class="attendance-row">
+                    <div class="attendance-field">
+                        <label>Actual In</label>
+                        <div class="attendance-time-display" id="actual-in-display">--:--</div>
+                    </div>
+                    <div class="attendance-field">
+                        <label>Actual Out</label>
+                        <div class="attendance-time-display" id="actual-out-display">--:--</div>
+                    </div>
+                </div>
+                <div class="attendance-row">
+                    <div class="attendance-field">
+                        <label>Today's Hours</label>
+                        <div class="attendance-time-display" id="today-hours">0h 0m</div>
+                    </div>
+                    <div class="attendance-field">
+                        <label>Status</label>
+                        <div class="attendance-time-display" id="attendance-summary">Not clocked in</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+   <!-- Clocks (dropdowns) -->
+<div class="clocks-bar">
+    <div class="clock-item">
+        <div class="clock-label">Date</div>
+        <div class="date-display" id="date-display">--/--/----</div>
+    </div>
+    <div class="clock-item">
+        <div class="clock-label">
+            <select class="clock-tz-select" id="clock-tz-1" onchange="updateHeaderClockZone(1, this.value)"></select>
+        </div>
+        <div class="clock-time" id="clock-wat">--:--:--</div>
+    </div>
+    <div class="clock-item">
+        <div class="clock-label">
+            <select class="clock-tz-select" id="clock-tz-2" onchange="updateHeaderClockZone(2, this.value)"></select>
+        </div>
+        <div class="clock-time" id="clock-est">--:--:--</div>
+    </div>
+    <div class="clock-item">
+        <div class="clock-label">
+            <select class="clock-tz-select" id="clock-tz-3" onchange="updateHeaderClockZone(3, this.value)"></select>
+        </div>
+        <div class="clock-time" id="clock-mst">--:--:--</div>
+    </div>
+</div>
+   </header>
+
+<div class="board-area">
+    <div class="board-container" id="board-container">
+        <div class="timer-card">
+            <div id="mode-indicator">Work Time</div>
+            <div class="timer-display" id="time-display">25:00</div>
+            <div class="progress-bar-container"><div class="progress-bar" id="progress-bar"></div></div>
+
+            <div class="controls">
+                <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
+                <button id="reset-btn" onclick="resetTimer()">Restart</button>
+                <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
+                <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes">+5 min</button>
+                <button class="btn-secondary" onclick="skipCurrentSegment()" title="Skip segment">⏭ Skip</button>
+            </div>
+
+            <div class="internal-queue-container">
+                <div class="queue-header">Internal Flow Sequence <span style="font-weight:400;font-size:0.65rem;color:#888;">(drag to reorder)</span></div>
+                <ul class="internal-queue" id="internal-flow-queue"></ul>
+            </div>
+
+            <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
+            <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
+
+            <div class="settings compact">
+                <div class="setting-row">
+                    <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
+                    <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
+                </div>
+                <details style="margin-top:4px;">
+                    <summary style="font-size:0.7rem;color:#888;cursor:pointer;">Keyboard Shortcuts</summary>
+                    <div style="font-size:0.7rem;padding:4px;background:var(--input-bg);border-radius:6px;border:1px solid var(--border-color);">
+                        <div>Alt+Shift+S – Start/Pause Timer</div>
+                        <div>Alt+Shift+R – Reset Timer</div>
+                        <div>Alt+Shift+F – Start Flow</div>
+                        <div>Alt+Shift+A – Add Task (in focused column)</div>
+                        <div>Alt+Shift+C – Clock In/Out</div>
+                        <div>Alt+Shift+B – Break</div>
+                        <div>Alt+Shift+Q – Toggle Dark Mode</div>
+                        <div>Alt+Shift+X – Skip Segment</div>
+                        <div>Alt+Shift+V – Voice Input</div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem;">
+        <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/8 columns</span>
+        <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
+    </div>
+</div>
+
+<div class="top-section">
+    <div class="stats-card" style="flex:1 1 220px;">
+        <h3>Daily Recap</h3>
+        <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
+        <div id="streaks-badges" style="margin-top:8px;font-size:0.8rem;border-top:1px dashed var(--border-color);padding-top:6px;">
+            <span id="streak-display">🔥 Streak: 0 days</span>
+            <span id="badges-display" style="margin-left:10px;">🏆 Badges: none</span>
+        </div>
+    </div>
+
+    <div class="hacks-card" style="flex:1 1 220px;">
+        <h3>Adaptive Brain Engine</h3>
+        <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
+        <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
+    </div>
+
+    <div class="hacks-card" style="flex:1 1 220px;">
+        <h3>Time Counter</h3>
+        <div style="font-size:0.8rem;margin-bottom:6px;">
+            <label>Timezone <select id="timezone-select" onchange="updateTimezone(this.value)"></select></label>
+        </div>
+        <div class="hacks-content" id="time-counter-box">Add tasks to see your projected completion times.</div>
+    </div>
+</div>
+
+<div class="log-card">
+    <details open>
+        <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Estimate vs Actual — Rolling Log</summary>
+        <div class="log-content" id="estimate-log">Complete a tracked task to start your log.</div>
+    </details>
+</div>
+
+<div class="summary-container">
+    <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate (or already ran automatically if your API key is saved).</div>
+    <details open>
+        <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">AI Reports & Briefs</summary>
+        <div class="summary-header">
+            <h2 style="margin:0;">Monthly Summary & Client Report</h2>
+            <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
+            <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">📅 Download .ics</button>
+            <button class="ai-btn" onclick="generatePDFReport()" style="background:var(--amber);">📄 PDF Report</button>
+        </div>
+        <details style="margin-bottom:1rem;">
+            <summary style="font-size:0.75rem;color:#888;cursor:pointer;">AI settings (Gemini API key)</summary>
+            <div class="api-key-box" style="margin-top:6px;">
+                <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+            </div>
+        </details>
+        <div class="summary-content" id="summary-content">Click "Generate AI Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
+    </details>
+</div>
+
+<div class="discreet-card">
+    <details>
+        <summary style="font-weight:700;color:#888;cursor:pointer;">Backup & Restore Your Data</summary>
+        <p>Everything lives only in this browser. Export a copy, and import to restore.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-secondary" style="flex:1;" onclick="exportAllDataJSON()">📥 Export All (JSON)</button>
+            <button class="btn-secondary" style="flex:1;" onclick="exportHistoryCSV()">📥 Export History (CSV)</button>
+            <button class="btn-secondary" style="flex:1;background:var(--cherry-red);color:white;" onclick="document.getElementById('import-file-input').click()">📤 Import JSON</button>
+            <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importAllDataJSON(event)">
+        </div>
+    </details>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="break-overlay">
+    <div class="modal-box">
+        <h2 style="color:var(--cherry-red);margin-top:0;">☕ Break Time</h2>
+        <p style="font-size:1.2rem;font-weight:700;">You have been away for: <br><span id="break-away-time" style="font-size:2rem;color:var(--text-color);">00:00</span></p>
+        <label style="font-size:0.8rem;font-weight:700;display:block;text-align:left;margin-bottom:4px;">Tag this break:</label>
+        <select id="break-reason-select" style="width:100%;padding:8px;margin-bottom:15px;border-radius:6px;">
+            <option value="Lunch">Lunch</option>
+            <option value="Meeting">Meeting</option>
+            <option value="Errand">Errand</option>
+            <option value="Rest">Rest</option>
+            <option value="Other">Other</option>
+        </select>
+        <button class="btn-primary" style="width:100%;" onclick="resumeFromBreak()">Resume Work</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="flow-break-overlay">
+    <div class="modal-box">
+        <h2 style="color:var(--cherry-red);margin-top:0;">Session Paused</h2>
+        <p style="font-size:1.2rem;font-weight:700;">You have been away for: <br><span id="flow-break-away-time" style="font-size:2rem;color:var(--text-color);">00:00</span></p>
+        <label style="font-size:0.8rem;font-weight:700;display:block;text-align:left;margin-bottom:4px;">Tag this break:</label>
+        <select id="flow-break-reason-select" style="width:100%;padding:8px;margin-bottom:15px;border-radius:6px;">
+            <option value="Interruption">Interruption</option>
+            <option value="Lunch">Lunch</option>
+            <option value="Client Call">Client Call</option>
+            <option value="Rest">Rest / Break</option>
+        </select>
+        <button class="btn-primary" style="width:100%;" onclick="resumeFromFlowBreak()">Resume Work</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="end-session-overlay">
+    <div class="modal-box">
+        <p>End this session. Do you want to log what you've done so far, or throw it away with no credit?</p>
+        <div class="modal-actions">
+            <button class="btn-primary" onclick="endSessionLogProgress()">Log Progress</button>
+            <button class="btn-secondary" onclick="endSessionAbandon()">Abandon (No Credit)</button>
+        </div>
+        <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="closeEndSessionModal()">Cancel, Keep Going</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="completion-overlay">
+    <div class="modal-box">
+        <p>How long did <strong id="completion-task-name"></strong> actually take?</p>
+        <input type="number" id="completion-actual-input" min="1" max="600" style="width:100%;text-align:center;margin-bottom:10px;">
+        <div class="modal-actions">
+            <button class="btn-primary" onclick="confirmCompletion()">Confirm</button>
+            <button class="btn-secondary" onclick="cancelCompletion()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="details-overlay">
+    <div class="modal-box" style="text-align:left;">
+        <p style="text-align:center;"><strong id="details-task-name"></strong></p>
+        <label style="font-size:0.75rem;font-weight:700;">Notes</label>
+        <textarea id="details-notes-textarea" class="task-notes-textarea" rows="4" placeholder="Add extra task information/notes..." style="width:100%;margin-bottom:8px;"></textarea>
+        <label style="font-size:0.75rem;font-weight:700;">Google Doc / Reference Link</label>
+        <input type="url" id="details-link-input" class="task-notes-textarea" placeholder="Paste link here..." style="width:100%;margin-bottom:8px;">
+        <label style="font-size:0.75rem;font-weight:700;">Deadline</label>
+        <input type="datetime-local" id="details-deadline-input" style="width:100%;margin-bottom:8px;padding:4px;">
+        <p id="details-estimate-label" style="font-size:0.8rem;color:#888;margin:0 0 8px;"></p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn-secondary" style="flex:1;" onclick="suggestTimeFromDetails()">Suggest Time (AI)</button>
+            <button class="btn-secondary" style="flex:1;" onclick="breakdownTask()">Break Down (AI)</button>
+        </div>
+        <button class="btn-primary" style="width:100%;margin-top:8px;" onclick="closeDetailsModal()">Save & Close</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="api-modal">
+    <div class="modal-box">
+        <p>System Configuration</p>
+        <input type="password" id="gemini-api-key-modal" style="width:100%;padding:8px;margin-bottom:10px;" placeholder="Gemini API Key" oninput="saveApiKey(this.value)">
+        <button class="btn-primary" style="width:100%;" onclick="document.getElementById('api-modal').style.display='none'">Save & Close</button>
+    </div>
+</div>
+
+<script src="app.js?v=20250909"></script>
+<script>
+    // Re-declare functions to make them globally accessible
+    window.importAllDataJSON = importAllDataJSON;
+    window.exportAllDataJSON = exportAllDataJSON;
+    window.exportHistoryCSV = exportHistoryCSV;
+    window.toggleDarkMode = toggleDarkMode;
+    window.toggleBreak = toggleBreak;
+    window.toggleClock = toggleClock;
+    window.toggleTimer = toggleTimer;
+    window.resetTimer = resetTimer;
+    window.openEndSessionModal = openEndSessionModal;
+    window.closeEndSessionModal = closeEndSessionModal;
+    window.endSessionLogProgress = endSessionLogProgress;
+    window.endSessionAbandon = endSessionAbandon;
+    window.addFiveMinutes = addFiveMinutes;
+    window.skipCurrentSegment = skipCurrentSegment;
+    window.startFlow = startFlow;
+    window.startAIFlow = startAIFlow;
+    window.generateAISummary = generateAISummary;
+    window.generatePDFReport = generatePDFReport;
+    window.generateICS = generateICS;
+    window.reEstimateAllTasks = reEstimateAllTasks;
+    window.updateTimezone = updateTimezone;
+    window.addColumn = addColumn;
+    window.saveApiKey = saveApiKey;
+    window.handleKeyPress = handleKeyPress;
+    window.breakdownTask = breakdownTask;
+    window.suggestTimeFromDetails = suggestTimeFromDetails;
+    window.openDetailsModal = openDetailsModal;
+    window.closeDetailsModal = closeDetailsModal;
+    window.toggleTask = toggleTask;
+    window.confirmCompletion = confirmCompletion;
+    window.cancelCompletion = cancelCompletion;
+    window.deleteTask = deleteTask;
+    window.updateTaskText = updateTaskText;
+    window.updateTaskEstimate = updateTaskEstimate;
+    window.moveTask = moveTask;
+    window.moveColumn = moveColumn;
+    window.deleteColumn = deleteColumn;
+    window.toggleColumnCollapse = toggleColumnCollapse;
+    window.toggleDateGroup = toggleDateGroup;
+    window.promptDeadline = promptDeadline;
+    window.acceptAISuggestion = acceptAISuggestion;
+    window.dismissAISuggestion = dismissAISuggestion;
+    window.suggestColumnTimesAI = suggestColumnTimesAI;
+    window.optimizeColumnFlowAI = optimizeColumnFlowAI;
+    window.applyTaskEstimate = applyTaskEstimate;
+    window.dismissTaskEstimate = dismissTaskEstimate;
+    window.applyAllEstimates = applyAllEstimates;
+    window.dismissAllEstimates = dismissAllEstimates;
+    window.generateColumnCheckIn = generateColumnCheckIn;
+    window.startVoiceInput = startVoiceInput;
+    window.naturalLanguageAddTask = naturalLanguageAddTask;
+    window.setRecurrence = setRecurrence;
+    window.removeRecurrence = removeRecurrence;
+    window.toggleSubtasksCollapse = toggleSubtasksCollapse;
+    window.removeAllSubtasks = removeAllSubtasks;
+    window.saveAttendanceSettings = saveAttendanceSettings;
+    window.queueDragStart = queueDragStart;
+    window.queueDragOver = queueDragOver;
+    window.queueDragLeave = queueDragLeave;
+    window.queueDrop = queueDrop;
+    window.dragStart = dragStart;
+    window.allowDrop = allowDrop;
+    window.dropTask = dropTask;
+    window.updateColumnTitle = updateColumnTitle;
+    window.addTask = addTask;
+    window.addPastedTasks = addPastedTasks;
+    window.toggleNotesRequired = toggleNotesRequired;
+    window.updateHeaderClockZone = updateHeaderClockZone;
+    window.rotateQuote = rotateQuote;
+</script>
+</body>
+</html>

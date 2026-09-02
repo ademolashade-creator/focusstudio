@@ -67,14 +67,11 @@ function updateClocks() {
         dateEl.textContent = `${dd}/${mm}/${now.getFullYear()}`;
     }
 
-    // Helper to safely get time string
     function safeTimeString(tz) {
         try {
-            // Check if the timezone is valid
             const test = new Date().toLocaleString('en-US', { timeZone: tz });
             return now.toLocaleTimeString('en-US', { timeZone: tz, hour12: true });
         } catch (e) {
-            // Fallback to UTC if invalid
             return now.toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: true });
         }
     }
@@ -875,7 +872,6 @@ function updateAttendanceDisplay() {
         }
 
     } else if (todayEntry && todayEntry.clockOut) {
-        // Clocked out
         statusEl.textContent = 'Clocked Out';
         statusEl.className = 'attendance-status off-duty';
 
@@ -916,7 +912,6 @@ function updateAttendanceDisplay() {
         if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
         if (summaryEl) summaryEl.textContent = 'Not clocked out';
     } else {
-        // Not clocked in today
         statusEl.textContent = 'Off Duty';
         statusEl.className = 'attendance-status off-duty';
         if (actualInEl) actualInEl.textContent = '--:--';
@@ -938,7 +933,6 @@ function updateAttendanceDisplay() {
     }
 }
 
-// ---------- Render Clock Card ----------
 function renderClockCard() {
     var btn = document.getElementById('clock-btn');
     if (!btn) return;
@@ -984,7 +978,6 @@ function formatDateKey(dateKey) {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// ---------- Format minutes to hours/minutes ----------
 function formatHoursMinutes(totalMinutes) {
     if (totalMinutes < 60) return totalMinutes + 'm';
     var hours = Math.floor(totalMinutes / 60);
@@ -992,14 +985,12 @@ function formatHoursMinutes(totalMinutes) {
     return hours + 'h ' + mins + 'm';
 }
 
-// ---------- Midnight adjustment: move unfinished tasks to today ----------
 function adjustTasksForMidnight() {
     var today = getTodayKey();
     var changed = false;
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
             if (!task.completed && task.dateAdded !== today) {
-                // Move to today and mark as carried over
                 task.dateAdded = today;
                 task.carriedOver = true;
                 task.originalDate = task.originalDate || task.dateAdded;
@@ -1037,7 +1028,10 @@ boardData.forEach(function(col) {
         if (t.collapsed === undefined) t.collapsed = false;
         if (t.recurrence === undefined) t.recurrence = null;
         if (t.lastRecurrenceDate === undefined) t.lastRecurrenceDate = null;
-        if (t.collapsedControls === undefined) t.collapsedControls = false;
+        
+        // Ensure ALL tasks default to collapsed controls to save visual space
+        if (t.collapsedControls === undefined) t.collapsedControls = true; 
+        
         if (t.carriedOver === undefined) t.carriedOver = false;
         if (t.originalDate === undefined) t.originalDate = null;
     });
@@ -1110,7 +1104,6 @@ function toggleDateGroup(key) {
     renderBoard();
 }
 
-// ---------- Autosuggest ----------
 function setupAutosuggest(inputElement) {
     if (!inputElement) return;
     var timeout;
@@ -1138,7 +1131,6 @@ function setupAutosuggest(inputElement) {
     });
 }
 
-// ---------- Natural Language Task Creation ----------
 async function naturalLanguageAddTask(ci) {
     var input = document.getElementById('nl-task-input-' + ci);
     if (!input) return;
@@ -1180,7 +1172,7 @@ async function naturalLanguageAddTask(ci) {
             isSubtask: false,
             hasSubtasks: false,
             collapsed: false,
-            collapsedControls: false,
+            collapsedControls: true, // Default collapsed
             recurrence: null,
             lastRecurrenceDate: null,
             carriedOver: false,
@@ -1199,7 +1191,6 @@ async function naturalLanguageAddTask(ci) {
     }
 }
 
-// ---------- Recurring Tasks ----------
 function setupRecurringTasks() {
     var today = getTodayKey();
     boardData.forEach(function(col) {
@@ -1255,7 +1246,6 @@ function shouldRecurToday(task) {
     }
 }
 
-// ---------- Voice Input ----------
 function startVoiceInput(ci) {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         alert('Voice input is not supported in this browser.');
@@ -1270,7 +1260,7 @@ function startVoiceInput(ci) {
 
     recognition.onstart = function() {
         var btn = document.getElementById('voice-btn-' + ci);
-        if (btn) btn.textContent = '🎙️ Listening...';
+        if (btn) btn.textContent = '🎙️...';
     };
 
     recognition.onerror = function(event) {
@@ -1293,7 +1283,6 @@ function startVoiceInput(ci) {
     recognition.start();
 }
 
-// ---------- PDF Report ----------
 function generatePDFReport() {
     var summaryBox = $('summary-content');
     summaryBox.textContent = 'Generating PDF report...';
@@ -1377,12 +1366,10 @@ function getTodayCompleted() {
     return historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === today; }).length;
 }
 
-// ---------- Render Board ----------
-// Preserve scroll positions when re-rendering
+// Preserve scroll positions
 var scrollPositions = {};
 
 function renderBoard() {
-    // Save scroll positions of task lists
     document.querySelectorAll('.task-list').forEach(function(list, idx) {
         scrollPositions['list-' + idx] = list.scrollTop;
     });
@@ -1455,14 +1442,14 @@ function renderBoard() {
                         <div class="task-top-row">
                             <div class="task-checkbox-name">
                                 <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
-                                <input type="text" class="task-name-input" value="${escapeHTML(task.text)}" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">
+                                <textarea class="task-name-input" rows="1" oninput="this.style.height='';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.text)}</textarea>
                                 ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">📋</span>` : ''}
                                 ${task.recurrence ? `<span class="recurrence-badge">🔄 ${task.recurrence}</span>` : ''}
                                 ${carriedOverBadge}
                             </div>
                             <div class="task-top-actions">
-                                <button class="collapse-toggle-btn" onclick="toggleTaskCollapse(${colIndex}, ${taskIndex})" title="${isSubtaskCollapsed ? 'Expand' : 'Collapse'} controls">
-                                    ${isSubtaskCollapsed ? '▶' : '▼'}
+                                <button class="collapse-toggle-btn" style="background:none;border:none;cursor:pointer;color:#888;font-size:0.6rem;" onclick="toggleTaskCollapse(${colIndex}, ${taskIndex})" title="${isSubtaskCollapsed ? 'Expand' : 'Collapse'} controls">
+                                    ${isSubtaskCollapsed ? '▼' : '▲'}
                                 </button>
                                 <button class="delete-btn" onclick="deleteTask(${colIndex}, ${taskIndex})">×</button>
                             </div>
@@ -1482,14 +1469,13 @@ function renderBoard() {
                                 <button class="details-trigger-btn" onclick="removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">🗑️ Remove All</button>
                             ` : ''}
                             ${!task.recurrence ? `
-                                <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)" style="font-size:0.6rem;padding:1px 4px;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg);color:var(--text-color);">
+                                <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)">
                                     <option value="">No Repeat</option>
                                     <option value="daily">Daily</option>
                                     <option value="weekly">Weekly</option>
                                     <option value="monthly">Monthly</option>
                                 </select>
                             ` : `
-                                <span class="recurrence-badge" style="font-size:0.6rem;color:#888;">🔄 ${task.recurrence}</span>
                                 <button class="details-trigger-btn" onclick="removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕</button>
                             `}
                         </div>
@@ -1515,11 +1501,11 @@ function renderBoard() {
                                                 <div class="task-checkbox-name">
                                                     <input type="checkbox" ${subtask.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${subIdx})">
                                                     <span class="subtask-indent">↳</span>
-                                                    <input type="text" class="task-name-input subtask-name" value="${escapeHTML(subtask.text)}" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">
+                                                    <textarea class="task-name-input subtask-name" rows="1" oninput="this.style.height='';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">${escapeHTML(subtask.text)}</textarea>
                                                 </div>
                                                 <div class="task-top-actions">
-                                                    <button class="collapse-toggle-btn" onclick="toggleTaskCollapse(${colIndex}, ${subIdx})" title="${isSubtaskCollapsed2 ? 'Expand' : 'Collapse'} controls">
-                                                        ${isSubtaskCollapsed2 ? '▶' : '▼'}
+                                                    <button class="collapse-toggle-btn" style="background:none;border:none;cursor:pointer;color:#888;font-size:0.6rem;" onclick="toggleTaskCollapse(${colIndex}, ${subIdx})" title="${isSubtaskCollapsed2 ? 'Expand' : 'Collapse'} controls">
+                                                        ${isSubtaskCollapsed2 ? '▼' : '▲'}
                                                     </button>
                                                     <button class="delete-btn" onclick="deleteTask(${colIndex}, ${subIdx})">×</button>
                                                 </div>
@@ -1565,19 +1551,25 @@ function renderBoard() {
     ${suggestionsHtml}
 
     <div class="task-input-group">
-        <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add a new task..." onkeypress="handleKeyPress(event, ${colIndex})">
+        <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add task..." onkeypress="handleKeyPress(event, ${colIndex})">
         <input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480">
         <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
         <button class="btn-secondary" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">🎙️</button>
     </div>
 
-    <div class="nl-task-input-group" style="display:flex;gap:6px;margin-bottom:8px;">
-        <input type="text" class="task-input" id="nl-task-input-${colIndex}" placeholder="Natural language: 'Design homepage by Friday takes 2 hours'..." onkeypress="if(event.key==='Enter') naturalLanguageAddTask(${colIndex})">
-        <button class="btn-secondary" onclick="naturalLanguageAddTask(${colIndex})" style="padding:0.2rem 0.5rem;font-size:0.7rem;">✨ Smart</button>
-    </div>
-
-    <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (e.g. 'write script 25 mins')..."></textarea>
-    <button class="add-task-btn" style="width:auto;margin-bottom:0.6rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
+    <details style="margin-bottom:0.6rem; border:1px solid var(--border-color); border-radius:8px; padding:6px; background:var(--card-bg);">
+        <summary style="font-size:0.75rem; font-weight:600; color:#888; cursor:pointer; outline:none; user-select:none;">
+            ⚙️ Advanced Add (Bulk Paste & AI)
+        </summary>
+        <div style="margin-top:8px;">
+            <div class="nl-task-input-group" style="display:flex;gap:6px;margin-bottom:8px;">
+                <input type="text" class="task-input" id="nl-task-input-${colIndex}" placeholder="Natural language (e.g. 'Read 20 mins')..." onkeypress="if(event.key==='Enter') naturalLanguageAddTask(${colIndex})">
+                <button class="btn-secondary" onclick="naturalLanguageAddTask(${colIndex})" style="padding:0; min-width:60px; font-size:0.7rem;">✨ Smart</button>
+            </div>
+            <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (separated by line)..."></textarea>
+            <button class="add-task-btn" style="width:100%;margin-bottom:0.2rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
+        </div>
+    </details>
 
     ${col.tasks.some(t=>t.stagedEstimate) ? `
     <div class="ai-batch-actions" style="margin-top:10px;">
@@ -1598,16 +1590,22 @@ function renderBoard() {
     updateDailyProgress();
     updateFocusScore();
 
-    // Restore scroll positions
     document.querySelectorAll('.task-list').forEach(function(list, idx) {
         var key = 'list-' + idx;
         if (scrollPositions[key] !== undefined) {
             list.scrollTop = scrollPositions[key];
         }
     });
+
+    // Force textareas to correctly fit their content immediately
+    setTimeout(function() {
+        document.querySelectorAll('.task-name-input').forEach(function(el) {
+            el.style.height = '';
+            el.style.height = el.scrollHeight + 'px';
+        });
+    }, 0);
 }
 
-// ---------- Toggle task controls collapse ----------
 function toggleTaskCollapse(ci, ti) {
     var task = boardData[ci].tasks[ti];
     task.collapsedControls = !task.collapsedControls;
@@ -1615,7 +1613,6 @@ function toggleTaskCollapse(ci, ti) {
     renderBoard();
 }
 
-// ---------- Column operations ----------
 function moveColumn(ci, dir) {
     var target = ci + dir;
     if (target < 0 || target >= boardData.length) return;
@@ -1634,7 +1631,6 @@ function toggleColumnCollapse(ci) {
     renderBoard();
 }
 
-// ---------- Toggle subtasks collapse (parent task) ----------
 function toggleSubtasksCollapse(ci, ti) {
     var task = boardData[ci].tasks[ti];
     task.collapsed = !task.collapsed;
@@ -1663,7 +1659,6 @@ function toggleNotesRequired(colIndex, checked) {
     renderBoard();
 }
 
-// ---------- Drag and drop for tasks ----------
 var dragContext = null;
 function dragStart(e, ci, ti) {
     dragContext = { ci: ci, ti: ti };
@@ -1702,7 +1697,6 @@ function dropTask(e, targetColIndex) {
     renderBoard();
 }
 
-// ---------- Other column helpers ----------
 function promptDeadline(ci, ti) {
     var task = boardData[ci].tasks[ti];
     var input = document.createElement('input');
@@ -1721,7 +1715,6 @@ function promptDeadline(ci, ti) {
     input.focus();
 }
 
-// ---------- Remove all subtasks ----------
 function removeAllSubtasks(ci, ti) {
     var task = boardData[ci].tasks[ti];
     if (!task.hasSubtasks) return;
@@ -1733,7 +1726,6 @@ function removeAllSubtasks(ci, ti) {
     renderBoard();
 }
 
-// ---------- Set recurrence ----------
 function setRecurrence(ci, ti, value) {
     var task = boardData[ci].tasks[ti];
     task.recurrence = value || null;
@@ -1750,7 +1742,6 @@ function removeRecurrence(ci, ti) {
     renderBoard();
 }
 
-// ---------- Daily Progress Bar ----------
 function updateDailyProgress() {
     var progressEl = document.getElementById('daily-progress');
     if (!progressEl) return;
@@ -1791,7 +1782,6 @@ function updateDailyProgress() {
     `;
 }
 
-// ---------- Focus Score ----------
 function updateFocusScore() {
     var scoreEl = document.getElementById('focus-score');
     if (!scoreEl) return;
@@ -1799,7 +1789,6 @@ function updateFocusScore() {
     var todayKey = getTodayKey();
     var todayHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
 
-    // total estimated for tasks that are today's and not completed
     var totalEstimated = 0;
     var totalTracked = 0;
     boardData.forEach(function(col) {
@@ -1810,13 +1799,11 @@ function updateFocusScore() {
             }
         });
     });
-    // add completed tasks of today
     var completedMinutes = todayHistory.reduce(function(a, h) { return a + (h.actualMinutes || 0); }, 0);
     totalTracked += completedMinutes;
 
     var flowScore = totalEstimated > 0 ? Math.min(100, Math.round((totalTracked / totalEstimated) * 100)) : 0;
 
-    // completion ratio among tasks added today
     var todayTasks = [];
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
@@ -1853,7 +1840,6 @@ function updateFocusScore() {
     `;
 }
 
-// ---------- Task estimate helpers ----------
 function normalizeTaskName(text) {
     return text.trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -1895,7 +1881,6 @@ async function estimateTask(task) {
     }
 }
 
-// ---------- Add task (single) ----------
 function addTask(ci) {
     var input = document.getElementById('task-input-' + ci);
     var estInput = document.getElementById('task-est-' + ci);
@@ -1929,7 +1914,7 @@ function addTask(ci) {
         isSubtask: false,
         hasSubtasks: false,
         collapsed: false,
-        collapsedControls: false,
+        collapsedControls: true, // Default collapsed
         recurrence: null,
         lastRecurrenceDate: null,
         carriedOver: false,
@@ -1945,7 +1930,6 @@ function addTask(ci) {
     }
 }
 
-// ---------- Bulk paste ----------
 function parseTimeFromLine(line) {
     var re = /(\d+(?:\.\d+)?)\s*(hours|hour|hrs|hr|minutes|minute|mins|min|seconds|second|secs|sec)\b/i;
     var match = line.match(re);
@@ -1997,7 +1981,7 @@ function addPastedTasks(ci) {
             isSubtask: false,
             hasSubtasks: false,
             collapsed: false,
-            collapsedControls: false,
+            collapsedControls: true, // Default collapsed
             recurrence: null,
             lastRecurrenceDate: null,
             carriedOver: false,
@@ -2022,7 +2006,6 @@ function updateTaskEstimate(ci, ti, v) {
     if (isNaN(v) || v < 1) v = 1;
     boardData[ci].tasks[ti].estimateMinutes = v;
     saveBoardData();
-    // preserve scroll
     var listEl = document.getElementById('task-' + ci + '-' + ti);
     if (listEl) {
         var list = listEl.closest('.task-list');
@@ -2060,7 +2043,6 @@ function moveTask(ci, ti, dir) {
     }
 }
 
-// ---------- AI Functions ----------
 function cleanEmDashes(text) {
     return text.replace(/[\u2014\u2013]|--/g, ', ');
 }
@@ -2186,6 +2168,7 @@ function acceptAISuggestion(ci, sIdx) {
         isSubtask: false,
         hasSubtasks: false,
         collapsed: false,
+        collapsedControls: true, // Default collapsed
         recurrence: null,
         lastRecurrenceDate: null
     });
@@ -2252,7 +2235,6 @@ function maybeAutoGenerateSummary() {
     if (apiKey) generateAISummary(true);
 }
 
-// ---------- Task Details Modal ----------
 var openDetailsRef = null;
 function openDetailsModal(ci, ti) {
     openDetailsRef = { ci: ci, ti: ti };
@@ -2396,6 +2378,7 @@ async function breakdownTask() {
                     isSubtask: true,
                     hasSubtasks: false,
                     collapsed: false,
+                    collapsedControls: true, // Default collapsed
                     recurrence: null,
                     lastRecurrenceDate: null
                 });
@@ -2424,7 +2407,6 @@ async function breakdownTask() {
     }
 }
 
-// ---------- Streaks & Badges ----------
 function updateStreaksAndBadges() {
     var streakEl = document.getElementById('streak-display');
     var badgesEl = document.getElementById('badges-display');
@@ -2526,7 +2508,6 @@ function updateStreaksAndBadges() {
     }
 }
 
-// ---------- Keyboard Shortcuts ----------
 document.addEventListener('keydown', function(e) {
     if (e.altKey && e.shiftKey) {
         switch(e.key.toLowerCase()) {
@@ -2556,7 +2537,6 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// ---------- Start AI Flow ----------
 async function startAIFlow() {
     var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) {
@@ -2637,7 +2617,6 @@ async function startAIFlow() {
     }
 }
 
-// ---------- Re-estimate all tasks ----------
 async function reEstimateAllTasks() {
     var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key.'); return; }
@@ -2664,7 +2643,6 @@ async function reEstimateAllTasks() {
     } catch(e) { alert('AI error'); }
 }
 
-// ---------- Render functions ----------
 function renderEstimateLog() {
     var logBox = $('estimate-log');
     if (!logBox) return;
@@ -2796,7 +2774,6 @@ function updateAdaptiveHacks() {
     box.innerHTML = '<ul><li><strong>Active Load:</strong> ' + formatHoursMinutes(totalEstimate) + ' across ' + openTasks + ' task(s)' + (sessions ? ' — roughly ' + sessions + ' focus session(s).' : '.') + '</li><li><strong>Timer Flash:</strong> 3 min left warning.</li></ul>';
 }
 
-// ---------- Export/Import ----------
 function exportAllDataJSON() {
     var data = {
         appSettings: appSettings,
@@ -2854,7 +2831,6 @@ function importAllDataJSON(event) {
     event.target.value = '';
 }
 
-// ---------- Push Notifications ----------
 async function sendNotification(title, body) {
     if (!appSettings.notificationsEnabled) return;
     if (!('Notification' in window) || Notification.permission === 'denied') return;
@@ -2881,7 +2857,6 @@ function checkForNotifications() {
     });
 }
 
-// ---------- Calendar Sync ----------
 function generateICS() {
     var events = [];
     boardData.forEach(function(col) {
@@ -2919,13 +2894,11 @@ function generateICS() {
     URL.revokeObjectURL(a.href);
 }
 
-// ---------- Init ----------
 function initApp() {
     applySettings();
     updateClocks();
     setInterval(updateClocks, 1000);
 
-    // Simple tick tracking for stopwatch
     setInterval(function() {
         var anyTracking = false;
         boardData.forEach(function(col, ci) {
@@ -2939,7 +2912,6 @@ function initApp() {
             });
         });
         if (anyTracking) {
-            // save occasionally
             if (Math.random() < 0.1) saveBoardData();
         }
     }, 1000);
@@ -2984,15 +2956,12 @@ function initApp() {
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
-
-    console.log('Focus & Flow Studio initialized successfully.');
 }
 
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, function(tag) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[tag] || tag; }); }
 
-// ---------- Task callbacks ----------
 var pendingCompletion = null;
 function toggleTask(ci, ti) {
     var task = boardData[ci].tasks[ti];
