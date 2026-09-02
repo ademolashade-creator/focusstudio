@@ -100,6 +100,16 @@ const quotes = [
     "You don't have to be extreme, just consistent. — Unknown",
     "The quality of your work is a reflection of the quality of your focus. — Unknown",
     "Do not let what you cannot do interfere with what you can do. — John Wooden"
+    "Write to be understood, clear, and concise. Don't try to impress. — William Zinsser",
+    "The most valuable asset on a blank page is a single declarative sentence. — Joan Didion",
+    "Marketing is no longer about the stuff that you make, but about the stories you tell. — Seth Godin",
+    "Content is king, but context is God. — Gary Vaynerchuk",
+    "An unsent message never caused a crisis. Think twice before pressing send.",
+    "Simplicity is the ultimate sophistication. — Leonardo da Vinci",
+    "Action is the foundational key to all success. — Pablo Picasso",
+    "Good writing is essentially rewriting. — E.B. White",
+    "Make your customer the hero of your stories. — Ann Handley",
+    "Listen with the intent to understand, not the intent to reply. — Stephen Covey"
 ];
 let quoteInterval = null;
 function rotateQuote() {
