@@ -134,6 +134,12 @@
             <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
             <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
 
+            <!-- Time Counter Relocated Here -->
+            <div class="timer-time-counter-box" style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border-color);font-size:0.8rem;">
+                <div style="font-weight:700;margin-bottom:4px;color:var(--cherry-red);">⏱ Projected Completion</div>
+                <div id="time-counter-box">Add tasks to see your projected completion times.</div>
+            </div>
+
             <div class="settings compact">
                 <div class="setting-row">
                     <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
@@ -161,16 +167,32 @@
         <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
     </div>
 </div>
-
-<div class="top-section">
-    <div class="stats-card" style="flex:1 1 220px;">
-        <h3>Daily Recap</h3>
-        <div class="hacks-content" id="daily-recap-box">Complete a task or clock in to see today's recap.</div>
-        <div id="streaks-badges" style="margin-top:8px;font-size:0.8rem;border-top:1px dashed var(--border-color);padding-top:6px;">
-            <span id="streak-display">🔥 Streak: 0 days</span>
-            <span id="badges-display" style="margin-left:10px;">🏆 Badges: none</span>
-        </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem;">
+        <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/8 columns</span>
+        <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
     </div>
+</div>
+
+<div class="top-section" style="display:flex; flex-direction:column; gap:12px;">
+    <div class="hacks-card wide-card" style="width:100%; padding:14px 18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px; margin-bottom:10px;">
+            <h3 style="margin:0; font-size:1rem; color:var(--cherry-red);">🧠 Adaptive Brain Engine & Daily Activity Feed</h3>
+            <div id="streaks-badges" style="font-size:0.8rem;">
+                <span id="streak-display">🔥 Streak: 0 days</span>
+                <span id="badges-display" style="margin-left:10px;">🏆 Badges: none</span>
+            </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:16px;">
+            <div style="flex:1; min-width:280px;" id="adaptive-hacks">Analyzing your current task load...</div>
+            <div style="flex:1; min-width:280px; border-left:1px dashed var(--border-color); padding-left:16px;" id="daily-recap-box">
+    <div id="daily-progress" style="margin-bottom:8px;"></div>
+    <div id="focus-score" style="margin-bottom:8px;"></div>
+    <div id="daily-recap-content">Complete a task or clock in to see today's recap.</div>
+</div>
+        </div>
+        <button class="btn-secondary" style="width:100%; margin-top:10px;" onclick="reEstimateAllTasks()">Re-estimate All Tasks (AI)</button>
+    </div>
+</div>
 
     <div class="hacks-card" style="flex:1 1 220px;">
         <h3>Adaptive Brain Engine</h3>
@@ -228,6 +250,21 @@
 </div>
 
 <!-- Modals -->
+<div class="modal-overlay" id="lateness-overlay">
+    <div class="modal-box">
+        <h2 style="color:var(--amber);margin-top:0;">⚠️ Late Clock-In Notice</h2>
+        <p style="font-size:0.95rem;">You are clocking in past your scheduled start time (<span id="scheduled-in-target">09:00</span>). Please log a reason for lateness:</p>
+        <select id="lateness-reason-select" style="width:100%;padding:8px;margin-bottom:12px;border-radius:6px;">
+            <option value="Traffic / Transit Delay">Traffic / Transit Delay</option>
+            <option value="Overslept">Overslept</option>
+            <option value="Personal / Family Matter">Personal / Family Matter</option>
+            <option value="Health / Feeling Unwell">Health / Feeling Unwell</option>
+            <option value="Other">Other</option>
+        </select>
+        <input type="text" id="lateness-notes-input" placeholder="Optional notes on lateness..." style="width:100%;padding:8px;margin-bottom:15px;border-radius:6px;border:1px solid var(--border-color);background:var(--input-bg);color:var(--text-color);">
+        <button class="btn-primary" style="width:100%;" onclick="confirmLatenessAndClockIn()">Confirm & Clock In</button>
+    </div>
+</div>
 <div class="modal-overlay" id="break-overlay">
     <div class="modal-box">
         <h2 style="color:var(--cherry-red);margin-top:0;">☕ Break Time</h2>

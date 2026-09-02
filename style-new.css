@@ -846,3 +846,58 @@ button:active { transform: scale(0.96); }
 .task-input-group .btn-secondary { 
     height: 1.9rem !important; 
 }
+/* Reduce task font size by 1 point and align actions */
+.task-item {
+    font-size: 0.85rem !important;
+}
+.task-name-input {
+    font-size: 0.85rem !important;
+}
+.task-main-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+.task-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.task-bottom-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+}
+
+/* Prevent layout jumping on subtasks/details toggle */
+.task-item details, .task-item .details-trigger-btn {
+    transition: none !important;
+}
+.column-body {
+    min-height: 120px;
+}
+
+/* Wider, shorter bottom cards */
+.wide-card {
+    min-height: auto;
+    border-radius: 10px;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color);
+}
+
+/* Exciting countdown styling */
+.clockout-countdown {
+    font-weight: 700;
+    color: var(--green);
+    animation: pulse-glow 2s infinite;
+}
+@keyframes pulse-glow {
+    0% { opacity: 0.8; }
+    50% { opacity: 1; text-shadow: 0 0 8px rgba(40,167,69,0.4); }
+    100% { opacity: 0.8; }
+}

@@ -704,263 +704,135 @@ function finishSessionCleanup(label) {
     updateAdaptiveHacks();
 }
 
-// ---------- Clock In / Out (with Attendance System) ----------
-var clockState = storageGet('ff-clock-state', { 
-    clockedIn: false, 
-    startedAt: null,
-    scheduledIn: '09:00',
-    scheduledOut: '17:00',
-    attendanceLog: []
-});
-
-var clockLog = storageGet('ff-clock-log', []);
-
-function toggleClock() {
-    var btn = $('clock-btn');
-    var now = new Date();
-    var timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    var dateString = now.toLocaleDateString();
-
-    if (clockState.clockedIn) {
-        var durationMs = Date.now() - clockState.startedAt;
-        var durationMinutes = Math.max(1, Math.round(durationMs / 60000));
-        var hours = Math.floor(durationMinutes / 60);
-        var mins = durationMinutes % 60;
-
-        var scheduledIn = clockState.scheduledIn || '09:00';
-        var scheduledOut = clockState.scheduledOut || '17:00';
-
-        var nowMinutes = now.getHours() * 60 + now.getMinutes();
-        var scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
-
-        var isLate = nowMinutes > scheduledOutMinutes + 5;
-        var isEarly = nowMinutes < scheduledOutMinutes - 5;
-
-        var logEntry = {
-            date: dateString,
-            dateKey: getTodayKey(),
-            clockIn: new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            clockOut: timeString,
-            durationMinutes: durationMinutes,
-            scheduledIn: scheduledIn,
-            scheduledOut: scheduledOut,
-            status: isLate ? 'Late' : isEarly ? 'Early' : 'On Time',
-            isLate: isLate,
-            isEarly: isEarly
-        };
-
-        clockLog.unshift(logEntry);
-        if (clockLog.length > 100) clockLog.pop();
-        storageSet('ff-clock-log', clockLog);
-
-        if (!clockState.attendanceLog) clockState.attendanceLog = [];
-        clockState.attendanceLog.unshift(logEntry);
-        if (clockState.attendanceLog.length > 365) clockState.attendanceLog.pop();
-
-        clockState = { 
-            clockedIn: false, 
-            startedAt: null,
-            scheduledIn: clockState.scheduledIn || '09:00',
-            scheduledOut: clockState.scheduledOut || '17:00',
-            attendanceLog: clockState.attendanceLog || []
-        };
-        storageSet('ff-clock-state', clockState);
-
-        btn.textContent = 'Clock In';
-        btn.classList.remove('active', 'clocking-out');
-
-        updateAttendanceDisplay();
-        renderDailyRecap();
-
-        var statusMsg = isLate ? '⚠️ Clocked out LATE' : isEarly ? '✅ Clocked out EARLY' : '✅ Clocked out ON TIME';
-        var durationMsg = hours + 'h ' + mins + 'm worked today.';
-        var summaryBox = $('summary-content');
-        if (summaryBox) {
-            summaryBox.textContent = '⏰ ' + statusMsg + ' — ' + durationMsg;
-        }
-
-        if (confirm('Clocked Out at ' + timeString + '. ' + durationMsg + '\n\nGenerate a Daily Check-Out Brief?')) {
-            generateDailyCheckOut();
-        }
-
-        sendNotification('Clocked Out', 'Worked ' + hours + 'h ' + mins + 'm. ' + statusMsg);
-
-    } else {
-        clockState = { 
-            clockedIn: true, 
-            startedAt: Date.now(),
-            scheduledIn: clockState.scheduledIn || '09:00',
-            scheduledOut: clockState.scheduledOut || '17:00',
-            attendanceLog: clockState.attendanceLog || []
-        };
-        storageSet('ff-clock-state', clockState);
-
-        btn.textContent = 'Clock Out';
-        btn.classList.add('active');
-
-        var scheduledIn2 = clockState.scheduledIn || '09:00';
-        var scheduledInMinutes2 = parseInt(scheduledIn2.split(':')[0]) * 60 + parseInt(scheduledIn2.split(':')[1]);
-        var nowMinutes2 = now.getHours() * 60 + now.getMinutes();
-        var isLate2 = nowMinutes2 > scheduledInMinutes2 + 5;
-
-        if (isLate2) {
-            btn.classList.add('clocking-out');
-            var lateMins = nowMinutes2 - scheduledInMinutes2;
-            var summaryBox2 = $('summary-content');
-            if (summaryBox2) {
-                summaryBox2.textContent = '⏰ Clocked in ' + lateMins + ' minutes LATE at ' + timeString + '.';
-            }
-        } else {
-            var summaryBox3 = $('summary-content');
-            if (summaryBox3) {
-                summaryBox3.textContent = '✅ Clocked in ON TIME at ' + timeString + '.';
-            }
-        }
-
-        updateAttendanceDisplay();
-        renderDailyRecap();
-        sendNotification('Clocked In', 'Started work at ' + timeString);
-    }
-
-    updateAttendanceDisplay();
-}
+// ---------- Clock In / Clock Out & Attendance ----------
+let attendanceSettings = storageGet('ff-attendance-settings', { scheduledIn: '09:00', scheduledOut: '17:00' });
+let clockState = storageGet('ff-clock-state', { clockedIn: false, startedAt: null, latenessReason: null });
+let clockLog = storageGet('ff-clock-log', []);
 
 function saveAttendanceSettings() {
-    var scheduledIn = document.getElementById('scheduled-in') ? document.getElementById('scheduled-in').value : '09:00';
-    var scheduledOut = document.getElementById('scheduled-out') ? document.getElementById('scheduled-out').value : '17:00';
-
-    clockState.scheduledIn = scheduledIn;
-    clockState.scheduledOut = scheduledOut;
-    storageSet('ff-clock-state', clockState);
-    updateAttendanceDisplay();
+    attendanceSettings.scheduledIn = $('scheduled-in')?.value || '09:00';
+    attendanceSettings.scheduledOut = $('scheduled-out')?.value || '17:00';
+    storageSet('ff-attendance-settings', attendanceSettings);
+    renderAttendanceCard();
 }
 
-function updateAttendanceDisplay() {
-    var statusEl = document.getElementById('attendance-status');
-    var actualInEl = document.getElementById('actual-in-display');
-    var actualOutEl = document.getElementById('actual-out-display');
-    var todayHoursEl = document.getElementById('today-hours');
-    var summaryEl = document.getElementById('attendance-summary');
+function toggleClock() {
+    if (clockState.clockedIn) {
+        const durationMs = Date.now() - clockState.startedAt;
+        const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+        const todayStr = new Date().toLocaleDateString();
+        
+        clockLog.unshift({
+            date: todayStr,
+            clockIn: new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            clockOut: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            durationMinutes,
+            latenessReason: clockState.latenessReason || 'On Time'
+        });
+        if (clockLog.length > 50) clockLog.pop();
+        
+        clockState = { clockedIn: false, startedAt: null, latenessReason: null };
+        storageSet('ff-clock-state', clockState);
+        storageSet('ff-clock-log', clockLog);
+        renderAttendanceCard();
+    } else {
+        const now = new Date();
+        const [schedHour, schedMin] = attendanceSettings.scheduledIn.split(':').map(Number);
+        const schedDate = new Date(now);
+        schedDate.setHours(schedHour, schedMin, 0, 0);
 
-    if (!statusEl) return;
+        if (now > schedDate) {
+            $('scheduled-in-target').textContent = attendanceSettings.scheduledIn;
+            $('lateness-overlay').style.display = 'flex';
+            return;
+        }
+        executeClockIn(null);
+    }
+}
 
-    var now = new Date();
-    var todayKey = getTodayKey();
-    var todayDateStr = now.toLocaleDateString();
+function confirmLatenessAndClockIn() {
+    const reason = $('lateness-reason-select').value;
+    const notes = $('lateness-notes-input').value.trim();
+    const fullReason = notes ? `${reason} (${notes})` : reason;
+    $('lateness-overlay').style.display = 'none';
+    executeClockIn(fullReason);
+}
 
-    var todayLog = clockLog.filter(function(l) { return l.dateKey === todayKey || l.date === todayDateStr; });
-    var todayEntry = todayLog.length > 0 ? todayLog[0] : null;
+function executeClockIn(latenessReason) {
+    clockState = { clockedIn: true, startedAt: Date.now(), latenessReason: latenessReason || 'On Time' };
+    storageSet('ff-clock-state', clockState);
+    renderAttendanceCard();
+}
+
+function renderAttendanceCard() {
+    const btn = $('clock-btn');
+    const statusEl = $('attendance-status');
+    const actualInDisplay = $('actual-in-display');
+    const actualOutDisplay = $('actual-out-display');
+    const todayHoursEl = $('today-hours');
+    const summaryEl = $('attendance-summary');
+    
+    if ($('scheduled-in')) $('scheduled-in').value = attendanceSettings.scheduledIn;
+    if ($('scheduled-out')) $('scheduled-out').value = attendanceSettings.scheduledOut;
+
+    const todayStr = new Date().toLocaleDateString();
+    const todaysLogs = clockLog.filter(c => c.date === todayStr);
+    
+    let totalMinutesToday = todaysLogs.reduce((a, c) => a + c.durationMinutes, 0);
+    let firstInTime = todaysLogs.length > 0 ? todaysLogs[todaysLogs.length - 1].clockIn : '--:--';
+    let lastOutTime = todaysLogs.length > 0 ? todaysLogs[0].clockOut : '--:--';
 
     if (clockState.clockedIn) {
-        statusEl.textContent = 'On Duty';
-        statusEl.className = 'attendance-status on-duty';
-
-        if (actualInEl) {
-            var clockInTime = todayEntry ? todayEntry.clockIn : new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            actualInEl.textContent = clockInTime || '--:--';
-        }
-        if (actualOutEl) actualOutEl.textContent = 'In progress';
-
-        var diffMs = Date.now() - clockState.startedAt;
-        var minutes = Math.round(diffMs / 60000);
-        var hours = Math.floor(minutes / 60);
-        var mins = minutes % 60;
-        if (todayHoursEl) todayHoursEl.textContent = hours + 'h ' + mins + 'm (in progress)';
-
-        if (summaryEl) {
-            var scheduledOut = clockState.scheduledOut || '17:00';
-            var scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
-            var nowMinutes = now.getHours() * 60 + now.getMinutes();
-            var remainingMinutes = scheduledOutMinutes - nowMinutes;
-            if (remainingMinutes > 0) {
-                var remHours = Math.floor(remainingMinutes / 60);
-                var remMins = remainingMinutes % 60;
-                summaryEl.textContent = 'Clock out in ' + remHours + 'h ' + remMins + 'm';
-                summaryEl.className = 'attendance-time-display';
-            } else if (remainingMinutes === 0) {
-                summaryEl.textContent = '⏰ Time to clock out!';
-                summaryEl.className = 'attendance-time-display late-text';
-            } else {
-                var overdue = Math.abs(remainingMinutes);
-                var overHours = Math.floor(overdue / 60);
-                var overMins = overdue % 60;
-                summaryEl.textContent = '⚠️ Overdue by ' + overHours + 'h ' + overMins + 'm';
-                summaryEl.className = 'attendance-time-display late-text';
-            }
-        }
-
-    } else if (todayEntry && todayEntry.clockOut) {
-        statusEl.textContent = 'Clocked Out';
-        statusEl.className = 'attendance-status off-duty';
-
-        if (actualInEl) actualInEl.textContent = todayEntry.clockIn || '--:--';
-        if (actualOutEl) actualOutEl.textContent = todayEntry.clockOut || '--:--';
-
-        if (todayEntry.durationMinutes) {
-            var hours = Math.floor(todayEntry.durationMinutes / 60);
-            var mins = todayEntry.durationMinutes % 60;
-            if (todayHoursEl) todayHoursEl.textContent = hours + 'h ' + mins + 'm';
-        } else {
-            if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
-        }
-
-        if (summaryEl) {
-            var scheduledOut2 = todayEntry.scheduledOut || '17:00';
-            var scheduledOutMinutes2 = parseInt(scheduledOut2.split(':')[0]) * 60 + parseInt(scheduledOut2.split(':')[1]);
-            var actualOutMinutes = parseInt(todayEntry.clockOut.split(':')[0]) * 60 + parseInt(todayEntry.clockOut.split(':')[1]);
-            var diff = actualOutMinutes - scheduledOutMinutes2;
-
-            if (todayEntry.isLate) {
-                summaryEl.textContent = '⚠️ ' + Math.abs(diff) + ' min late';
-                summaryEl.className = 'attendance-time-display late-text';
-            } else if (todayEntry.isEarly) {
-                summaryEl.textContent = '✅ ' + Math.abs(diff) + ' min early';
-                summaryEl.className = 'attendance-time-display early-text';
-            } else {
-                summaryEl.textContent = '✅ On time';
-                summaryEl.className = 'attendance-time-display';
-            }
-        }
-
-    } else if (todayEntry && todayEntry.clockIn) {
-        statusEl.textContent = 'Clocked In';
-        statusEl.className = 'attendance-status on-duty';
-        if (actualInEl) actualInEl.textContent = todayEntry.clockIn || '--:--';
-        if (actualOutEl) actualOutEl.textContent = '--:--';
-        if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
-        if (summaryEl) summaryEl.textContent = 'Not clocked out';
-    } else {
-        statusEl.textContent = 'Off Duty';
-        statusEl.className = 'attendance-status off-duty';
-        if (actualInEl) actualInEl.textContent = '--:--';
-        if (actualOutEl) actualOutEl.textContent = '--:--';
-        if (todayHoursEl) todayHoursEl.textContent = '0h 0m';
-        if (summaryEl) summaryEl.textContent = 'Not clocked in today';
-    }
-
-    var btn = document.getElementById('clock-btn');
-    if (btn) {
-        if (clockState.clockedIn) {
+        if (btn) {
             btn.textContent = 'Clock Out';
             btn.classList.add('active');
-            btn.classList.remove('clocking-out');
-        } else {
+        }
+        if (statusEl) {
+            statusEl.textContent = 'On Duty';
+            statusEl.className = 'attendance-status on-duty';
+        }
+        firstInTime = new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const activeMinutes = Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
+        totalMinutesToday += activeMinutes;
+        lastOutTime = 'Running...';
+    } else {
+        if (btn) {
             btn.textContent = 'Clock In';
-            btn.classList.remove('active', 'clocking-out');
+            btn.classList.remove('active');
+        }
+        if (statusEl) {
+            statusEl.textContent = 'Off Duty';
+            statusEl.className = 'attendance-status off-duty';
         }
     }
-}
 
-function renderClockCard() {
-    var btn = document.getElementById('clock-btn');
-    if (!btn) return;
-    if (clockState.clockedIn) {
-        btn.textContent = 'Clock Out';
-        btn.classList.add('active');
-        btn.classList.remove('clocking-out');
-    } else {
-        btn.textContent = 'Clock In';
-        btn.classList.remove('active', 'clocking-out');
+    if (actualInDisplay) actualInDisplay.textContent = firstInTime;
+    if (actualOutDisplay) actualOutDisplay.textContent = lastOutTime;
+
+    const hrs = Math.floor(totalMinutesToday / 60);
+    const mins = totalMinutesToday % 60;
+    if (todayHoursEl) todayHoursEl.textContent = `${hrs}h ${mins}m`;
+
+    if (summaryEl) {
+        if (clockState.clockedIn && clockState.latenessReason !== 'On Time') {
+            summaryEl.innerHTML = `<span style="color:var(--amber);">⚠️ Late: ${escapeHTML(clockState.latenessReason)}</span>`;
+        } else if (clockState.clockedIn) {
+            const [outH, outM] = attendanceSettings.scheduledOut.split(':').map(Number);
+            const targetOut = new Date();
+            targetOut.setHours(outH, outM, 0, 0);
+            const diffMs = targetOut - Date.now();
+            if (diffMs > 0) {
+                const remH = Math.floor(diffMs / 3600000);
+                const remM = Math.floor((diffMs % 3600000) / 60000);
+                summaryEl.innerHTML = `<span class="clockout-countdown">⏳ ${remH}h ${remM}m to clock-out</span>`;
+            } else {
+                summaryEl.innerHTML = `<span style="color:var(--green);">✅ Shift complete / Overtime</span>`;
+            }
+        } else if (todaysLogs.length > 0) {
+            summaryEl.textContent = 'Shift completed today';
+        } else {
+            summaryEl.textContent = 'Not clocked in yet';
+        }
     }
     renderDailyRecap();
 }
@@ -2671,8 +2543,8 @@ function renderEstimateLog() {
 }
 
 function renderDailyRecap() {
-    var box = $('daily-recap-box');
-    if (!box) return;
+    var contentBox = $('daily-recap-content');
+    if (!contentBox) return;
     var todayKey = getTodayKey();
     var todayDateStr = new Date().toLocaleDateString();
     var todaysHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
@@ -2686,9 +2558,7 @@ function renderDailyRecap() {
     var todayBreaks = breakLog.filter(function(b) { return new Date(b.date).toLocaleDateString() === todayDateStr; });
     breakMinutesToday += todayBreaks.reduce(function(a, b) { return a + b.durationMinutes; }, 0);
 
-    box.innerHTML = `
-        <div id="daily-progress" style="margin-bottom:8px;"></div>
-        <div id="focus-score" style="margin-bottom:8px;"></div>
+    contentBox.innerHTML = `
         <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
             <li><strong>${todaysHistory.length}</strong> task(s) finished</li>
             <li><strong>${openFromToday}</strong> still open</li>
@@ -2904,7 +2774,7 @@ function initApp() {
     applySettings();
     updateClocks();
     setInterval(updateClocks, 1000);
-    adjustTasksForMidnight();
+    if (typeof adjustTasksForMidnight === 'function') adjustTasksForMidnight();
 
     setInterval(function() {
         var anyTracking = false;
@@ -2926,12 +2796,14 @@ function initApp() {
     setInterval(function() {
         var now = new Date();
         if (now.getHours() === 0 && now.getMinutes() === 0) {
-            adjustTasksForMidnight();
-            setupRecurringTasks();
+            if (typeof adjustTasksForMidnight === 'function') adjustTasksForMidnight();
+            if (typeof setupRecurringTasks === 'function') setupRecurringTasks();
         }
     }, 60000);
 
-    setInterval(checkForNotifications, 300000);
+    if (typeof checkForNotifications === 'function') {
+        setInterval(checkForNotifications, 300000);
+    }
 
     var key = storageGet('gemini_api_key', '');
     var keyInput = document.getElementById('gemini-api-key');
@@ -2940,25 +2812,20 @@ function initApp() {
     if (keyInputModal) keyInputModal.value = key;
 
     setFlowControlsVisible(false);
-    renderClockCard();
+
+    // Initial render and 15-second refresh for live countdowns & state tracking
+    renderAttendanceCard();
+    setInterval(renderAttendanceCard, 15000);
+
     populateHeaderClockSelects();
     populateTimezoneSelect();
     renderBoard();
     renderEstimateLog();
     updateDisplay();
-    startQuoteRotation();
+    if (typeof startQuoteRotation === 'function') startQuoteRotation();
     renderDailyRecap();
 
-    setupRecurringTasks();
-
-    var scheduledIn = clockState.scheduledIn || '09:00';
-    var scheduledOut = clockState.scheduledOut || '17:00';
-    var inEl = document.getElementById('scheduled-in');
-    var outEl = document.getElementById('scheduled-out');
-    if (inEl) inEl.value = scheduledIn;
-    if (outEl) outEl.value = scheduledOut;
-    updateAttendanceDisplay();
-    setInterval(updateAttendanceDisplay, 30000);
+    if (typeof setupRecurringTasks === 'function') setupRecurringTasks();
 
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
