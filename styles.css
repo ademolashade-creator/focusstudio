@@ -442,7 +442,7 @@ button:active { transform: scale(0.96); }
     background: var(--input-bg);
     color: var(--text-color);
     font-family: var(--font-family);
-    min-height: 1.8rem; /* changed from 2.5rem – much shorter */
+    min-height: 2.2rem; /* changed from 2.5rem – much shorter */
 }
 
 .paste-area-actions {
