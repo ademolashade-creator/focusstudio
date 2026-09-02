@@ -841,14 +841,12 @@ function updateAttendanceDisplay() {
         }
         if (actualOutEl) actualOutEl.textContent = 'In progress';
 
-        // Elapsed time so far
         var diffMs = Date.now() - clockState.startedAt;
         var minutes = Math.round(diffMs / 60000);
         var hours = Math.floor(minutes / 60);
         var mins = minutes % 60;
         if (todayHoursEl) todayHoursEl.textContent = hours + 'h ' + mins + 'm (in progress)';
 
-        // Countdown to scheduled out
         if (summaryEl) {
             var scheduledOut = clockState.scheduledOut || '17:00';
             var scheduledOutMinutes = parseInt(scheduledOut.split(':')[0]) * 60 + parseInt(scheduledOut.split(':')[1]);
@@ -1029,7 +1027,6 @@ boardData.forEach(function(col) {
         if (t.recurrence === undefined) t.recurrence = null;
         if (t.lastRecurrenceDate === undefined) t.lastRecurrenceDate = null;
         
-        // Ensure ALL tasks default to collapsed controls to save visual space
         if (t.collapsedControls === undefined) t.collapsedControls = true; 
         
         if (t.carriedOver === undefined) t.carriedOver = false;
@@ -1068,7 +1065,7 @@ function formatMinSec(totalSeconds) {
 }
 
 var _toggledDateGroups = {};
-function groupTasksByDate(tasks) {
+function groupTasksByDate(tasks, colIndex) {
     var groups = {};
     tasks.forEach(function(task, originalIndex) {
         var key = task.dateAdded || getTodayKey();
@@ -1084,8 +1081,9 @@ function groupTasksByDate(tasks) {
     var yesterday = getYesterdayKey();
 
     return Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); }).map(function(key) {
+        var groupKey = colIndex + '-' + key;
         var isCollapsed = (key !== today && key !== yesterday);
-        if (_toggledDateGroups[key] !== undefined) isCollapsed = _toggledDateGroups[key];
+        if (_toggledDateGroups[groupKey] !== undefined) isCollapsed = _toggledDateGroups[groupKey];
         return {
             dateKey: key,
             dateLabel: formatDateKey(key),
@@ -1095,12 +1093,13 @@ function groupTasksByDate(tasks) {
     });
 }
 
-function toggleDateGroup(key) {
+function toggleDateGroup(colIndex, key) {
+    var groupKey = colIndex + '-' + key;
     var today = getTodayKey();
     var yesterday = getYesterdayKey();
     var isCurrentlyCollapsed = (key !== today && key !== yesterday);
-    if (_toggledDateGroups[key] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[key];
-    _toggledDateGroups[key] = !isCurrentlyCollapsed;
+    if (_toggledDateGroups[groupKey] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[groupKey];
+    _toggledDateGroups[groupKey] = !isCurrentlyCollapsed;
     renderBoard();
 }
 
@@ -1172,7 +1171,7 @@ async function naturalLanguageAddTask(ci) {
             isSubtask: false,
             hasSubtasks: false,
             collapsed: false,
-            collapsedControls: true, // Default collapsed
+            collapsedControls: true,
             recurrence: null,
             lastRecurrenceDate: null,
             carriedOver: false,
@@ -1385,7 +1384,6 @@ function renderBoard() {
         var columnEl = document.createElement('div');
         columnEl.className = 'task-column';
         columnEl.dataset.colIndex = colIndex;
-        var openCount = col.tasks.filter(function(t) { return !t.completed; }).length;
 
         var suggestionsHtml = '';
         if (col.aiSuggestions) {
@@ -1416,8 +1414,8 @@ function renderBoard() {
     <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
 
     <ul class="task-list" ondragover="allowDrop(event)" ondrop="dropTask(event, ${colIndex})">
-        ${groupTasksByDate(col.tasks).map((group) => `
-            <li class="date-group-header" onclick="toggleDateGroup('${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
+        ${groupTasksByDate(col.tasks, colIndex).map((group) => `
+            <li class="date-group-header" onclick="toggleDateGroup(${colIndex}, '${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '▸' : '▾'}</li>
             ${group.isCollapsed ? '' : group.items.map(({ task, originalIndex: taskIndex }) => {
                 if (task.parentId) return '';
 
@@ -1437,7 +1435,7 @@ function renderBoard() {
                     carriedOverBadge = `<span class="carried-over-badge" title="Carried over from ${task.originalDate || 'previous day'}">⏳ Carried</span>`;
                 }
 
-                let html = `
+                return `
                     <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
                         <div class="task-top-row">
                             <div class="task-checkbox-name">
@@ -1476,7 +1474,7 @@ function renderBoard() {
                                     <option value="monthly">Monthly</option>
                                 </select>
                             ` : `
-                                <button class="details-trigger-btn" onclick="removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕</button>
+                                <button class="details-trigger-btn" onclick="removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕ Repeat</button>
                             `}
                         </div>
 
@@ -1511,11 +1509,7 @@ function renderBoard() {
                                                 </div>
                                             </div>
                                             <div class="task-controls-row" style="${isSubtaskCollapsed2 ? 'display:none;' : ''}">
-                                                ${subtask.deadlineTime ? 
-                                                    `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${subIdx})">📅 ${new Date(subtask.deadlineTime).toLocaleString()}</span>` 
-                                                    : 
-                                                    `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`
-                                                }
+                                                ${subtask.deadlineTime ? `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${subIdx})">📅 ${new Date(subtask.deadlineTime).toLocaleString()}</span>` : `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`}
                                                 ${getDeadlineBadge(subtask)}
                                                 <input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))">m
                                                 ${!subtask.completed ? `
@@ -1524,11 +1518,6 @@ function renderBoard() {
                                                 ` : ''}
                                                 <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${subIdx})">Details${subtask.notes ? ' •' : ''}</button>
                                             </div>
-                                            ${subtask.stagedEstimate ? `
-                                            <div class="ai-suggestion-banner" style="margin-top:4px;">
-                                                <span>AI suggests: <strong>${subtask.stagedEstimate} min</strong></span>
-                                                <div><button onclick="applyTaskEstimate(${colIndex}, ${subIdx})">Apply</button> <button onclick="dismissTaskEstimate(${colIndex}, ${subIdx})">x</button></div>
-                                            </div>` : ''}
                                         </li>
                                     `;
                                 }).join('')}
@@ -1536,7 +1525,6 @@ function renderBoard() {
                         ` : ''}
                     </li>
                 `;
-                return html;
             }).join('')}
         `).join('')}
     </ul>
@@ -1550,11 +1538,15 @@ function renderBoard() {
 
     ${suggestionsHtml}
 
-    <div class="task-input-group">
+    <div class="task-input-group" style="display: flex; flex-direction: column; gap: 6px;">
         <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add task..." onkeypress="handleKeyPress(event, ${colIndex})">
-        <input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480">
-        <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
-        <button class="btn-secondary" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">🎙️</button>
+        <div style="display: flex; gap: 6px; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 2px; font-size: 0.75rem; color: #888; font-weight: 600;">
+                <input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480">m
+            </div>
+            <button class="add-task-btn" onclick="addTask(${colIndex})" style="flex: 1;">Add</button>
+            <button class="btn-secondary" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">🎙️</button>
+        </div>
     </div>
 
     <details style="margin-bottom:0.6rem; border:1px solid var(--border-color); border-radius:8px; padding:6px; background:var(--card-bg);">
@@ -1571,18 +1563,13 @@ function renderBoard() {
         </div>
     </details>
 
-    ${col.tasks.some(t=>t.stagedEstimate) ? `
-    <div class="ai-batch-actions" style="margin-top:10px;">
-        <button onclick="applyAllEstimates(${colIndex})" style="background:var(--cherry-red);color:white;">Apply All Times</button>
-        <button onclick="dismissAllEstimates(${colIndex})">Dismiss All</button>
-    </div>` : ''}
-
     </div>
 `;
         container.appendChild(columnEl);
         var input = document.getElementById('task-input-' + colIndex);
         if (input) setupAutosuggest(input);
     });
+    
     updateAdaptiveHacks();
     renderTimeCounter();
     renderInternalQueue();
@@ -1597,7 +1584,6 @@ function renderBoard() {
         }
     });
 
-    // Force textareas to correctly fit their content immediately
     setTimeout(function() {
         document.querySelectorAll('.task-name-input').forEach(function(el) {
             el.style.height = '';
@@ -1914,7 +1900,7 @@ function addTask(ci) {
         isSubtask: false,
         hasSubtasks: false,
         collapsed: false,
-        collapsedControls: true, // Default collapsed
+        collapsedControls: true,
         recurrence: null,
         lastRecurrenceDate: null,
         carriedOver: false,
@@ -1981,7 +1967,7 @@ function addPastedTasks(ci) {
             isSubtask: false,
             hasSubtasks: false,
             collapsed: false,
-            collapsedControls: true, // Default collapsed
+            collapsedControls: true,
             recurrence: null,
             lastRecurrenceDate: null,
             carriedOver: false,
@@ -2168,7 +2154,7 @@ function acceptAISuggestion(ci, sIdx) {
         isSubtask: false,
         hasSubtasks: false,
         collapsed: false,
-        collapsedControls: true, // Default collapsed
+        collapsedControls: true,
         recurrence: null,
         lastRecurrenceDate: null
     });
@@ -2378,7 +2364,7 @@ async function breakdownTask() {
                     isSubtask: true,
                     hasSubtasks: false,
                     collapsed: false,
-                    collapsedControls: true, // Default collapsed
+                    collapsedControls: true,
                     recurrence: null,
                     lastRecurrenceDate: null
                 });
@@ -2898,6 +2884,7 @@ function initApp() {
     applySettings();
     updateClocks();
     setInterval(updateClocks, 1000);
+    adjustTasksForMidnight();
 
     setInterval(function() {
         var anyTracking = false;
