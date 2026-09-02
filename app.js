@@ -109,7 +109,7 @@ const quotes = [
     "Success is the sum of small efforts repeated day in and day out. — Robert Collier",
     "You don't have to be extreme, just consistent. — Unknown",
     "The quality of your work is a reflection of the quality of your focus. — Unknown",
-    "Do not let what you cannot do interfere with what you can do. — John Wooden"
+    "Do not let what you cannot do interfere with what you can do. — John Wooden",
     "Write to be understood, clear, and concise. Don't try to impress. — William Zinsser",
     "The most valuable asset on a blank page is a single declarative sentence. — Joan Didion",
     "Marketing is no longer about the stuff that you make, but about the stories you tell. — Seth Godin",
