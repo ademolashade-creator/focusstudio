@@ -6,7 +6,6 @@ function storageGet(key, fallback) {
         const raw = localStorage.getItem(key);
         return raw ? JSON.parse(raw) : fallback;
     } catch (e) {
-        // Fallback to in-memory storage if localStorage is blocked (e.g. Incognito)
         return memoryStore[key] !== undefined ? memoryStore[key] : fallback;
     }
 }
@@ -15,11 +14,26 @@ function storageSet(key, value) {
     try {
         localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-        // Fallback to in-memory storage if localStorage throws an error
         memoryStore[key] = value;
     }
 }
 const $ = (id) => document.getElementById(id);
+
+// ---------- Scroll Position Helper ----------
+var scrollPositions = {};
+function saveScrollPositions() {
+    document.querySelectorAll('.task-list').forEach(function(list, idx) {
+        scrollPositions['list-' + idx] = list.scrollTop;
+    });
+}
+function restoreScrollPositions() {
+    document.querySelectorAll('.task-list').forEach(function(list, idx) {
+        var key = 'list-' + idx;
+        if (scrollPositions[key] !== undefined) {
+            list.scrollTop = scrollPositions[key];
+        }
+    });
+}
 
 // ---------- App settings ----------
 let appSettings = storageGet('ff-app-settings', { 
@@ -79,7 +93,6 @@ function updateClocks() {
 
     function safeTimeString(tz) {
         try {
-            const test = new Date().toLocaleString('en-US', { timeZone: tz });
             return now.toLocaleTimeString('en-US', { timeZone: tz, hour12: true });
         } catch (e) {
             return now.toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: true });
@@ -341,11 +354,11 @@ function runTick() {
         timeLeft--;
         updateDisplay();
         const inWorkSegment = timerMode === 'flow' ? (currentFlowSegment() && currentFlowSegment().type === 'work') : isWorkTime;
-        if (inWorkSegment && timeLeft === 180) playSound();
+        if (inWorkSegment && timeLeft === 180) announce("Three minutes remaining");
     } else if (timerMode === 'flow') {
         advanceFlow();
     } else {
-        playSound();
+        announce(isWorkTime ? "Work segment complete. Take a break." : "Break complete. Back to work.");
         if (isWorkTime) recordFlowBlockCompleted();
         isWorkTime = !isWorkTime;
         setupMode();
@@ -423,17 +436,31 @@ function getPrioritizedOpenTasks() {
     });
 
     openEntries.sort(function(a, b) {
+        var nowMs = Date.now();
+        var aDeadMs = a.task.deadlineTime ? new Date(a.task.deadlineTime).getTime() : Infinity;
+        var bDeadMs = b.task.deadlineTime ? new Date(b.task.deadlineTime).getTime() : Infinity;
+
+        // Due within 1 hour or overdue ALWAYS jump to top
+        var aUrgent = aDeadMs < nowMs + 3600000; 
+        var bUrgent = bDeadMs < nowMs + 3600000;
+
+        if (aUrgent && !bUrgent) return -1;
+        if (!aUrgent && bUrgent) return 1;
+        if (aUrgent && bUrgent) return aDeadMs - bDeadMs;
+
+        // Fallback to manual queue arrangement
         var idxA = customQueueOrder.indexOf(a.task.id);
         var idxB = customQueueOrder.indexOf(b.task.id);
         if (idxA !== -1 && idxB !== -1) return idxA - idxB;
         if (idxA !== -1) return -1;
         if (idxB !== -1) return 1;
 
-        if (a.task.deadlineTime && !b.task.deadlineTime) return -1;
-        if (!a.task.deadlineTime && b.task.deadlineTime) return 1;
-        if (a.task.deadlineTime && b.task.deadlineTime) {
-            return new Date(a.task.deadlineTime) - new Date(b.task.deadlineTime);
-        }
+        // General deadlines further out
+        if (aDeadMs !== Infinity && bDeadMs === Infinity) return -1;
+        if (aDeadMs === Infinity && bDeadMs !== Infinity) return 1;
+        if (aDeadMs !== Infinity && bDeadMs !== Infinity) return aDeadMs - bDeadMs;
+
+        // Default order
         if (a.ci !== b.ci) return a.ci - b.ci;
         return a.ti - b.ti;
     });
@@ -555,17 +582,16 @@ function beginFlowSegment() {
         modeIndicator.textContent = 'Flow: ' + seg.entry.task.text;
         progressBar.style.backgroundColor = 'var(--cherry-red)';
         if (!seg.entry.task.startedAtIso) seg.entry.task.startedAtIso = new Date().toISOString();
-        announce('Work');
+        announce('Work time started.');
     } else {
         modeIndicator.textContent = 'Flow: Break';
         progressBar.style.backgroundColor = 'var(--green)';
-        announce('Break');
+        announce('Take a break.');
     }
     updateDisplay();
 }
 
 function advanceFlow() {
-    playSound();
     var seg = currentFlowSegment();
     if (seg && seg.type === 'work') {
         seg.entry.actualSecondsSoFar += seg.minutes * 60 + flowExtraSeconds;
@@ -718,23 +744,16 @@ function saveAttendanceSettings() {
 
 function toggleClock() {
     if (clockState.clockedIn) {
-        const durationMs = Date.now() - clockState.startedAt;
-        const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
-        const todayStr = new Date().toLocaleDateString();
-        
-        clockLog.unshift({
-            date: todayStr,
-            clockIn: new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            clockOut: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            durationMinutes,
-            latenessReason: clockState.latenessReason || 'On Time'
-        });
-        if (clockLog.length > 50) clockLog.pop();
-        
-        clockState = { clockedIn: false, startedAt: null, latenessReason: null };
-        storageSet('ff-clock-state', clockState);
-        storageSet('ff-clock-log', clockLog);
-        renderAttendanceCard();
+        const now = new Date();
+        const [outH, outM] = attendanceSettings.scheduledOut.split(':').map(Number);
+        const targetOut = new Date(now);
+        targetOut.setHours(outH, outM, 0, 0);
+
+        if (now < targetOut) {
+            $('early-clockout-overlay').style.display = 'flex';
+        } else {
+            openDailyWrapUp();
+        }
     } else {
         const now = new Date();
         const [schedHour, schedMin] = attendanceSettings.scheduledIn.split(':').map(Number);
@@ -750,6 +769,41 @@ function toggleClock() {
     }
 }
 
+function proceedEarlyClockOut() {
+    $('early-clockout-overlay').style.display = 'none';
+    openDailyWrapUp();
+}
+
+function cancelEarlyClockOut() {
+    $('early-clockout-overlay').style.display = 'none';
+}
+
+function openDailyWrapUp() {
+    $('daily-wrapup-overlay').style.display = 'flex';
+    $('wrapup-content').value = ''; 
+}
+
+function closeDailyWrapUp() {
+    $('daily-wrapup-overlay').style.display = 'none';
+}
+
+async function generateWrapUpBrief() {
+    var summaryBox = $('wrapup-content');
+    summaryBox.value = 'Generating...';
+    var todayKey = getTodayKey();
+    var todaysHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
+    var apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) { summaryBox.value = "Please configure your Gemini API Key in the settings below."; return; }
+    
+    var prompt = 'Write a short, warm, professional daily check-out brief summarizing accomplishments today based on this data: ' + JSON.stringify(todaysHistory) + '. Use formal language. End on an encouraging note for tomorrow. Do not use em-dashes.';
+    try {
+        var result = await callGemini(prompt);
+        summaryBox.value = result;
+    } catch(e) {
+        summaryBox.value = 'Error: ' + e.message;
+    }
+}
+
 function confirmLatenessAndClockIn() {
     const reason = $('lateness-reason-select').value;
     const notes = $('lateness-notes-input').value.trim();
@@ -762,6 +816,41 @@ function executeClockIn(latenessReason) {
     clockState = { clockedIn: true, startedAt: Date.now(), latenessReason: latenessReason || 'On Time' };
     storageSet('ff-clock-state', clockState);
     renderAttendanceCard();
+}
+
+function finalizeClockOut() {
+    const durationMs = Date.now() - clockState.startedAt;
+    const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+    const todayStr = new Date().toLocaleDateString();
+
+    clockLog.unshift({
+        date: todayStr,
+        clockIn: new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        clockOut: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        durationMinutes: durationMinutes,
+        latenessReason: clockState.latenessReason || 'On Time',
+        wrapUpBrief: $('wrapup-content').value
+    });
+    if (clockLog.length > 50) clockLog.pop();
+
+    clockState = { clockedIn: false, startedAt: null, latenessReason: null };
+    storageSet('ff-clock-state', clockState);
+    storageSet('ff-clock-log', clockLog);
+    
+    closeDailyWrapUp();
+    renderAttendanceCard();
+}
+
+function parseTimeToMinutes(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
+    var match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+    if (!match) return 0;
+    var h = parseInt(match[1]);
+    var m = parseInt(match[2]);
+    var ampm = match[3] ? match[3].toUpperCase() : null;
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
 }
 
 function renderAttendanceCard() {
@@ -890,7 +979,9 @@ function adjustTasksForMidnight() {
     });
     if (changed) {
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
     }
 }
 
@@ -918,9 +1009,7 @@ boardData.forEach(function(col) {
         if (t.collapsed === undefined) t.collapsed = false;
         if (t.recurrence === undefined) t.recurrence = null;
         if (t.lastRecurrenceDate === undefined) t.lastRecurrenceDate = null;
-        
         if (t.collapsedControls === undefined) t.collapsedControls = true; 
-        
         if (t.carriedOver === undefined) t.carriedOver = false;
         if (t.originalDate === undefined) t.originalDate = null;
     });
@@ -986,6 +1075,7 @@ function groupTasksByDate(tasks, colIndex) {
 }
 
 function toggleDateGroup(colIndex, key) {
+    saveScrollPositions();
     var groupKey = colIndex + '-' + key;
     var today = getTodayKey();
     var yesterday = getYesterdayKey();
@@ -993,6 +1083,7 @@ function toggleDateGroup(colIndex, key) {
     if (_toggledDateGroups[groupKey] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[groupKey];
     _toggledDateGroups[groupKey] = !isCurrentlyCollapsed;
     renderBoard();
+    restoreScrollPositions();
 }
 
 function setupAutosuggest(inputElement) {
@@ -1072,7 +1163,9 @@ async function naturalLanguageAddTask(ci) {
         col.tasks.push(newTask);
         input.value = '';
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
         if (newTask.estimateMinutes <= 15) {
             estimateTask(newTask);
         }
@@ -1110,7 +1203,9 @@ function setupRecurringTasks() {
         });
     });
     saveBoardData();
+    saveScrollPositions();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function shouldRecurToday(task) {
@@ -1257,14 +1352,7 @@ function getTodayCompleted() {
     return historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === today; }).length;
 }
 
-// Preserve scroll positions
-var scrollPositions = {};
-
 function renderBoard() {
-    document.querySelectorAll('.task-list').forEach(function(list, idx) {
-        scrollPositions['list-' + idx] = list.scrollTop;
-    });
-
     var container = $('board-container');
     if (!container) return;
     container.querySelectorAll('.task-column').forEach(function(el) { el.remove(); });
@@ -1469,13 +1557,6 @@ function renderBoard() {
     updateDailyProgress();
     updateFocusScore();
 
-    document.querySelectorAll('.task-list').forEach(function(list, idx) {
-        var key = 'list-' + idx;
-        if (scrollPositions[key] !== undefined) {
-            list.scrollTop = scrollPositions[key];
-        }
-    });
-
     setTimeout(function() {
         document.querySelectorAll('.task-name-input').forEach(function(el) {
             el.style.height = '';
@@ -1485,13 +1566,16 @@ function renderBoard() {
 }
 
 function toggleTaskCollapse(ci, ti) {
+    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.collapsedControls = !task.collapsedControls;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function moveColumn(ci, dir) {
+    saveScrollPositions();
     var target = ci + dir;
     if (target < 0 || target >= boardData.length) return;
     var temp = boardData[ci];
@@ -1499,42 +1583,53 @@ function moveColumn(ci, dir) {
     boardData[target] = temp;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
 
 function toggleColumnCollapse(ci) {
+    saveScrollPositions();
     boardData[ci].collapsed = !boardData[ci].collapsed;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function toggleSubtasksCollapse(ci, ti) {
+    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.collapsed = !task.collapsed;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function addColumn() {
     if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
+    saveScrollPositions();
     boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function deleteColumn(ci) {
     if (boardData.length <= 1) { alert('Keep at least one column.'); return; }
     if (!confirm('Delete "' + boardData[ci].title + '"?')) return;
+    saveScrollPositions();
     boardData.splice(ci, 1);
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function toggleNotesRequired(colIndex, checked) {
+    saveScrollPositions();
     boardData[colIndex].notesRequired = checked;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 var dragContext = null;
@@ -1548,6 +1643,7 @@ function dropTask(e, targetColIndex) {
     e.preventDefault();
     document.querySelectorAll('.dragging').forEach(function(el) { el.classList.remove('dragging'); });
     if (!dragContext) return;
+    saveScrollPositions();
     var ci = dragContext.ci;
     var ti = dragContext.ti;
     var task = boardData[ci].tasks[ti];
@@ -1573,6 +1669,7 @@ function dropTask(e, targetColIndex) {
     dragContext = null;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function promptDeadline(ci, ti) {
@@ -1586,7 +1683,9 @@ function promptDeadline(ci, ti) {
     input.addEventListener('change', function() {
         task.deadlineTime = this.value || null;
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
     });
     var btn = document.querySelector('[onclick="promptDeadline(' + ci + ', ' + ti + ')"]');
     if (btn) btn.replaceWith(input);
@@ -1597,27 +1696,33 @@ function removeAllSubtasks(ci, ti) {
     var task = boardData[ci].tasks[ti];
     if (!task.hasSubtasks) return;
     if (!confirm('Remove all subtasks from "' + task.text + '"?')) return;
+    saveScrollPositions();
     boardData[ci].tasks = boardData[ci].tasks.filter(function(t) { return t.parentId !== task.id; });
     task.hasSubtasks = false;
     task.collapsed = false;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function setRecurrence(ci, ti, value) {
+    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.recurrence = value || null;
     task.lastRecurrenceDate = value ? getTodayKey() : null;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function removeRecurrence(ci, ti) {
+    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.recurrence = null;
     task.lastRecurrenceDate = null;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 function updateDailyProgress() {
@@ -1748,14 +1853,18 @@ async function estimateTask(task) {
     if (est) {
         task.estimateMinutes = est;
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
         return;
     }
     est = await getTaskEstimateFromAI(task.text, task.notes);
     if (est) {
         task.estimateMinutes = est;
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
     }
 }
 
@@ -1801,7 +1910,9 @@ function addTask(ci) {
     col.tasks.push(task);
     input.value = '';
     saveBoardData();
+    saveScrollPositions();
     renderBoard();
+    restoreScrollPositions();
 
     if (estimate <= 15) {
         estimateTask(task);
@@ -1870,7 +1981,9 @@ function addPastedTasks(ci) {
     col.tasks.push.apply(col.tasks, newTasks);
     textarea.value = '';
     saveBoardData();
+    saveScrollPositions();
     renderBoard();
+    restoreScrollPositions();
 
     newTasks.forEach(function(task) {
         if (task.estimateMinutes <= 15) {
@@ -1884,25 +1997,16 @@ function updateTaskEstimate(ci, ti, v) {
     if (isNaN(v) || v < 1) v = 1;
     boardData[ci].tasks[ti].estimateMinutes = v;
     saveBoardData();
-    var listEl = document.getElementById('task-' + ci + '-' + ti);
-    if (listEl) {
-        var list = listEl.closest('.task-list');
-        if (list) {
-            var scrollPos = list.scrollTop;
-            renderBoard();
-            list.scrollTop = scrollPos;
-            return;
-        }
-    }
+    saveScrollPositions();
     renderBoard();
+    restoreScrollPositions();
 }
 function moveTask(ci, ti, dir) {
+    saveScrollPositions();
     var tasks = boardData[ci].tasks;
     var task = tasks[ti];
     if (task.completed) return;
-    var listEl = document.getElementById('task-' + ci + '-' + ti);
-    var scrollPos = listEl ? listEl.closest('.task-list').scrollTop : 0;
-
+    
     var target = ti + dir;
     while (target >= 0 && target < tasks.length) {
         if (tasks[target].dateAdded === task.dateAdded && !tasks[target].completed) {
@@ -1911,10 +2015,7 @@ function moveTask(ci, ti, dir) {
             tasks[target] = temp;
             saveBoardData();
             renderBoard();
-            setTimeout(function() {
-                var newList = document.getElementById('task-' + ci + '-' + target);
-                if (newList) newList.closest('.task-list').scrollTop = scrollPos;
-            }, 0);
+            restoreScrollPositions();
             return;
         }
         target += dir;
@@ -1963,26 +2064,40 @@ async function suggestColumnTimesAI(ci) {
             if (task) task.stagedEstimate = Math.max(1, e.minutes);
         });
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
     } catch(e) { alert('AI error: ' + e.message); }
 }
 
 function applyTaskEstimate(ci, ti) {
+    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     if (task.stagedEstimate) { task.estimateMinutes = task.stagedEstimate; task.stagedEstimate = null; }
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
-function dismissTaskEstimate(ci, ti) { boardData[ci].tasks[ti].stagedEstimate = null; saveBoardData(); renderBoard(); }
+function dismissTaskEstimate(ci, ti) { 
+    saveScrollPositions(); 
+    boardData[ci].tasks[ti].stagedEstimate = null; 
+    saveBoardData(); 
+    renderBoard(); 
+    restoreScrollPositions(); 
+}
 function applyAllEstimates(ci) {
+    saveScrollPositions();
     boardData[ci].tasks.forEach(function(t) { if (t.stagedEstimate) { t.estimateMinutes = t.stagedEstimate; t.stagedEstimate = null; } });
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 function dismissAllEstimates(ci) {
+    saveScrollPositions();
     boardData[ci].tasks.forEach(function(t) { t.stagedEstimate = null; });
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 async function optimizeColumnFlowAI(ci) {
@@ -2019,11 +2134,14 @@ async function optimizeColumnFlowAI(ci) {
         }
 
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
     } catch(e) { alert('AI optimization error: ' + e.message); }
 }
 
 function acceptAISuggestion(ci, sIdx) {
+    saveScrollPositions();
     var s = boardData[ci].aiSuggestions[sIdx];
     boardData[ci].tasks.unshift({
         id: 't_' + Math.random().toString(36).substr(2,9),
@@ -2054,12 +2172,15 @@ function acceptAISuggestion(ci, sIdx) {
     if (boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 function dismissAISuggestion(ci, sIdx) {
+    saveScrollPositions();
     boardData[ci].aiSuggestions.splice(sIdx, 1);
     if (boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
 }
 
 async function generateColumnCheckIn(ci) {
@@ -2071,20 +2192,6 @@ async function generateColumnCheckIn(ci) {
         return;
     }
     var prompt = 'Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today for the project/client "' + boardData[ci].title + '" based on this task list: ' + JSON.stringify(openTasks) + '. Use formal language. Do not use em-dashes.';
-    try {
-        var result = await callGemini(prompt);
-        summaryBox.textContent = result;
-    } catch(e) {
-        summaryBox.textContent = 'Error: ' + e.message;
-    }
-}
-
-async function generateDailyCheckOut() {
-    var summaryBox = $('summary-content');
-    summaryBox.textContent = 'Generating check-out brief...';
-    var todayKey = getTodayKey();
-    var todaysHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
-    var prompt = 'Act as a world-class formal assistant. Write a short, warm, professional daily check-out brief summarizing accomplishments today based on this data: ' + JSON.stringify(todaysHistory) + '. Use formal language. End on an encouraging note for tomorrow. Do not use em-dashes.';
     try {
         var result = await callGemini(prompt);
         summaryBox.textContent = result;
@@ -2133,7 +2240,9 @@ function closeDetailsModal() {
         task.googleLink = document.getElementById('details-link-input').value;
         task.deadlineTime = document.getElementById('details-deadline-input').value || null;
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
     }
     openDetailsRef = null;
     document.getElementById('details-overlay').style.display = 'none';
@@ -2155,7 +2264,14 @@ async function suggestTimeFromDetails() {
         var data = await res.json();
         var raw = data.candidates[0].content.parts[0].text;
         var num = parseInt(raw.match(/\d+/)[0]);
-        if (num) { task.estimateMinutes = Math.max(1, num); saveBoardData(); renderBoard(); document.getElementById('details-estimate-label').textContent = 'Est: ' + task.estimateMinutes + ' min'; }
+        if (num) { 
+            task.estimateMinutes = Math.max(1, num); 
+            saveBoardData(); 
+            saveScrollPositions();
+            renderBoard(); 
+            restoreScrollPositions();
+            document.getElementById('details-estimate-label').textContent = 'Est: ' + task.estimateMinutes + ' min'; 
+        }
     } catch(e) { alert('AI error'); }
 }
 
@@ -2178,7 +2294,9 @@ async function breakdownTask() {
         task.hasSubtasks = false;
         task.collapsed = false;
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
     }
 
     var apiKey = storageGet('gemini_api_key', null);
@@ -2268,7 +2386,9 @@ async function breakdownTask() {
         task.collapsed = false;
 
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
         renderInternalQueue();
         closeDetailsModal();
 
@@ -2305,10 +2425,13 @@ function updateStreaksAndBadges() {
         var day = checkDate.getDate();
         var key = year + '-' + month + '-' + day;
         var dow = checkDate.getDay();
+        
+        // Skip Weekends logic
         if (dow === 0 || dow === 6) {
             checkDate.setDate(checkDate.getDate() - 1);
             continue;
         }
+        
         if (completionDays.has(key)) {
             streak++;
             checkDate.setDate(checkDate.getDate() - 1);
@@ -2517,7 +2640,9 @@ async function reEstimateAllTasks() {
             if (task) task.estimateMinutes = Math.max(1, e.minutes);
         });
         saveBoardData();
+        saveScrollPositions();
         renderBoard();
+        restoreScrollPositions();
     } catch(e) { alert('AI error'); }
 }
 
@@ -2558,6 +2683,54 @@ function renderDailyRecap() {
     var todayBreaks = breakLog.filter(function(b) { return new Date(b.date).toLocaleDateString() === todayDateStr; });
     breakMinutesToday += todayBreaks.reduce(function(a, b) { return a + b.durationMinutes; }, 0);
 
+    // Build Chronological Timeline
+    var events = [];
+    
+    var todayLogs = clockLog.filter(c => c.date === todayDateStr);
+    todayLogs.forEach(log => {
+        events.push({ timeStr: log.clockIn, timeVal: parseTimeToMinutes(log.clockIn), text: 'Clocked In (' + log.latenessReason + ')', type: 'in' });
+        if (log.clockOut && log.clockOut !== '--:--') {
+            events.push({ timeStr: log.clockOut, timeVal: parseTimeToMinutes(log.clockOut), text: 'Clocked Out (' + log.durationMinutes + 'm total)', type: 'out' });
+        }
+    });
+    
+    if (clockState.clockedIn) {
+        var inTime = new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        events.push({ timeStr: inTime, timeVal: parseTimeToMinutes(inTime), text: 'Clocked In (' + clockState.latenessReason + ')', type: 'in' });
+    }
+
+    todaysHistory.forEach(h => {
+        var d = new Date(h.completedAt);
+        var timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        events.push({ timeStr: timeStr, timeVal: d.getHours()*60 + d.getMinutes(), text: 'Completed: ' + h.task, type: 'task' });
+    });
+
+    todayBreaks.forEach(b => {
+        var d = new Date(b.date);
+        var timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        events.push({ timeStr: timeStr, timeVal: d.getHours()*60 + d.getMinutes(), text: 'Break: ' + b.reason + ' (' + b.durationMinutes + 'm)', type: 'break' });
+    });
+
+    events.sort((a,b) => a.timeVal - b.timeVal);
+
+    var uniqueEvents = [];
+    events.forEach(e => {
+        if (!uniqueEvents.some(u => u.timeVal === e.timeVal && u.text === e.text)) {
+            uniqueEvents.push(e);
+        }
+    });
+
+    var timelineHtml = '<ul class="activity-timeline">';
+    if (uniqueEvents.length === 0) {
+        timelineHtml += '<li style="color:#888;font-size:0.75rem;">No activity logged yet today.</li>';
+    } else {
+        uniqueEvents.forEach(e => {
+            var iconClass = e.type === 'in' || e.type === 'out' ? 'in-out' : e.type === 'break' ? 'break' : 'task';
+            timelineHtml += `<li class="timeline-item ${iconClass}"><span class="timeline-time">${e.timeStr}</span> ${escapeHTML(e.text)}</li>`;
+        });
+    }
+    timelineHtml += '</ul>';
+
     contentBox.innerHTML = `
         <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
             <li><strong>${todaysHistory.length}</strong> task(s) finished</li>
@@ -2566,6 +2739,10 @@ function renderDailyRecap() {
             <li><strong>${formatHoursMinutes(breakMinutesToday)}</strong> breaks/away</li>
             <li><strong>${formatHoursMinutes(clockedMinutesToday)}</strong> clocked in</li>
         </ul>
+        <div style="margin-top:12px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+            <strong style="font-size:0.7rem;color:var(--cherry-red);text-transform:uppercase;">Activity Timeline</strong>
+            ${timelineHtml}
+        </div>
     `;
     updateDailyProgress();
     updateFocusScore();
@@ -2694,7 +2871,10 @@ function importAllDataJSON(event) {
             if (data.flowBlocksCompleted !== undefined) { flowBlocksCompleted = data.flowBlocksCompleted; localStorage.setItem('focus_daily_sessions', flowBlocksCompleted); }
             if (data.appSettings) { appSettings = data.appSettings; storageSet('ff-app-settings', appSettings); applySettings(); }
             if (data.taskTimeMemory) { taskTimeMemory = data.taskTimeMemory; storageSet('ff-task-time-memory', taskTimeMemory); }
+            
+            saveScrollPositions();
             renderBoard();
+            restoreScrollPositions();
             renderDailyRecap();
             renderEstimateLog();
             renderClockCard();
@@ -2725,7 +2905,7 @@ function checkForNotifications() {
             if (task.deadlineTime && !task.completed) {
                 var deadline = new Date(task.deadlineTime);
                 var diff = (deadline - now) / 3600000;
-                if (diff < 1 && diff > 0) {
+                if (diff <= 1 && diff > 0) {
                     sendNotification('⏰ Deadline Approaching', '"' + task.text + '" is due within 1 hour.');
                 }
             }
@@ -2775,6 +2955,15 @@ function initApp() {
     updateClocks();
     setInterval(updateClocks, 1000);
     if (typeof adjustTasksForMidnight === 'function') adjustTasksForMidnight();
+    
+    if (clockState.clockedIn && clockState.startedAt) {
+        let startD = new Date(clockState.startedAt).toDateString();
+        let nowD = new Date().toDateString();
+        if (startD !== nowD) {
+            clockState = { clockedIn: false, startedAt: null, latenessReason: null };
+            storageSet('ff-clock-state', clockState);
+        }
+    }
 
     setInterval(function() {
         var anyTracking = false;
@@ -2802,7 +2991,7 @@ function initApp() {
     }, 60000);
 
     if (typeof checkForNotifications === 'function') {
-        setInterval(checkForNotifications, 300000);
+        setInterval(checkForNotifications, 300000); 
     }
 
     var key = storageGet('gemini_api_key', '');
@@ -2813,13 +3002,16 @@ function initApp() {
 
     setFlowControlsVisible(false);
 
-    // Initial render and 15-second refresh for live countdowns & state tracking
     renderAttendanceCard();
     setInterval(renderAttendanceCard, 15000);
 
     populateHeaderClockSelects();
     populateTimezoneSelect();
+    
+    saveScrollPositions();
     renderBoard();
+    restoreScrollPositions();
+    
     renderEstimateLog();
     updateDisplay();
     if (typeof startQuoteRotation === 'function') startQuoteRotation();
@@ -2838,6 +3030,7 @@ function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, function(tag) 
 
 var pendingCompletion = null;
 function toggleTask(ci, ti) {
+    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     if (task.completed) {
         task.completed = false;
@@ -2850,12 +3043,14 @@ function toggleTask(ci, ti) {
         }
         saveBoardData();
         renderBoard();
+        restoreScrollPositions();
         renderEstimateLog();
         return;
     }
     if (boardData[ci].notesRequired && (!task.notes || task.notes.trim() === '')) {
         alert("This column requires notes! Please add notes via Details before completing.");
         renderBoard();
+        restoreScrollPositions();
         return;
     }
     if (task.trackedSeconds === 0) {
@@ -2869,6 +3064,7 @@ function toggleTask(ci, ti) {
 }
 function confirmCompletion() {
     if (!pendingCompletion) return;
+    saveScrollPositions();
     var colIndex = pendingCompletion.colIndex;
     var taskIndex = pendingCompletion.taskIndex;
     var task = boardData[colIndex].tasks[taskIndex];
@@ -2880,7 +3076,9 @@ function confirmCompletion() {
 function cancelCompletion() {
     pendingCompletion = null;
     document.getElementById('completion-overlay').style.display = 'none';
+    saveScrollPositions();
     renderBoard();
+    restoreScrollPositions();
 }
 function finalizeTaskCompletion(ci, ti, actualSeconds) {
     var task = boardData[ci].tasks[ti];
@@ -2909,16 +3107,19 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
     rememberTaskTime(task.text, Math.round(actualSeconds / 60));
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
     renderEstimateLog();
     renderDailyRecap();
     renderInternalQueue();
 }
 function deleteTask(ci, ti) {
+    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     boardData[ci].tasks = boardData[ci].tasks.filter(function(t) { return t.parentId !== task.id; });
     boardData[ci].tasks.splice(ti, 1);
     saveBoardData();
     renderBoard();
+    restoreScrollPositions();
     renderInternalQueue();
 }
 

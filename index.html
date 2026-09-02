@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="style-new.css?v=3">
+    <link rel="stylesheet" href="style-new.css?v=4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <script>
@@ -252,6 +252,31 @@
         <button class="btn-primary" style="width:100%;" onclick="confirmLatenessAndClockIn()">Confirm & Clock In</button>
     </div>
 </div>
+
+<div class="modal-overlay" id="early-clockout-overlay">
+    <div class="modal-box">
+        <h2 style="color:var(--amber);margin-top:0;">⚠️ Early Clock-Out</h2>
+        <p style="font-size:0.95rem;">You are clocking out before your scheduled departure time (<span id="scheduled-out-target">17:00</span>). Are you sure you want to clock out now?</p>
+        <div class="modal-actions" style="margin-top:15px;">
+            <button class="btn-primary" style="background:var(--amber);" onclick="proceedEarlyClockOut()">Proceed</button>
+            <button class="btn-secondary" onclick="cancelEarlyClockOut()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="daily-wrapup-overlay">
+    <div class="modal-box" style="max-width: 500px;">
+        <h2 style="color:var(--cherry-red);margin-top:0;">📝 Daily Wrap-Up</h2>
+        <p style="font-size:0.9rem;">Generate a professional daily check-out brief based on today's logged accomplishments, or finalize your shift directly.</p>
+        <textarea id="wrapup-content" class="task-notes-textarea" rows="6" placeholder="AI Wrap-Up Brief will appear here..." style="width:100%;margin-bottom:15px;"></textarea>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="generateWrapUpBrief()">✨ Generate Brief (AI)</button>
+            <button class="btn-primary" onclick="finalizeClockOut()">End Shift & Save</button>
+        </div>
+        <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="closeDailyWrapUp()">Cancel (Keep working)</button>
+    </div>
+</div>
+
 <div class="modal-overlay" id="break-overlay">
     <div class="modal-box">
         <h2 style="color:var(--cherry-red);margin-top:0;">☕ Break Time</h2>
@@ -331,7 +356,7 @@
     </div>
 </div>
 
-<script src="app.js?v=20250909"></script>
+<script src="app.js?v=20250910"></script>
 <script>
     window.importAllDataJSON = importAllDataJSON;
     window.exportAllDataJSON = exportAllDataJSON;
@@ -339,6 +364,12 @@
     window.toggleDarkMode = toggleDarkMode;
     window.toggleBreak = toggleBreak;
     window.toggleClock = toggleClock;
+    window.proceedEarlyClockOut = proceedEarlyClockOut;
+    window.cancelEarlyClockOut = cancelEarlyClockOut;
+    window.openDailyWrapUp = openDailyWrapUp;
+    window.closeDailyWrapUp = closeDailyWrapUp;
+    window.generateWrapUpBrief = generateWrapUpBrief;
+    window.finalizeClockOut = finalizeClockOut;
     window.toggleTimer = toggleTimer;
     window.resetTimer = resetTimer;
     window.openEndSessionModal = openEndSessionModal;

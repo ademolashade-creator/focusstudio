@@ -436,7 +436,7 @@ button:active { transform: scale(0.96); }
     max-height: 400px;
 }
 
-/* Task cards former layout with font size reduced by 1 point (~0.8rem) */
+/* Task cards layout */
 .task-item {
     background-color: var(--input-bg);
     border: 1px solid var(--border-color);
@@ -888,4 +888,37 @@ button:active { transform: scale(0.96); }
     0% { opacity: 0.8; }
     50% { opacity: 1; text-shadow: 0 0 8px rgba(40,167,69,0.4); }
     100% { opacity: 0.8; }
+}
+
+/* Activity Timeline CSS */
+.activity-timeline {
+    list-style: none;
+    padding: 0 0 0 14px;
+    margin: 10px 0 0 0;
+    border-left: 2px solid var(--border-color);
+    max-height: 250px;
+    overflow-y: auto;
+}
+.timeline-item {
+    position: relative;
+    margin-bottom: 8px;
+    font-size: 0.75rem;
+    color: var(--text-color);
+}
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -19px;
+    top: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cherry-red);
+}
+.timeline-item.in-out::before { background: var(--green); }
+.timeline-item.break::before { background: var(--amber); }
+.timeline-time {
+    font-weight: 600;
+    color: #888;
+    margin-right: 4px;
 }
