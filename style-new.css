@@ -340,7 +340,6 @@ button:active { transform: scale(0.96); }
 .ai-batch-actions { display: flex; gap: 4px; margin-bottom: 0.5rem; flex-wrap: wrap; }
 .ai-batch-actions button { font-size: 0.6rem; padding: 0.2rem 0.4rem; flex: 1; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--cherry-red); border-radius: 8px; }
 
-/* The horizontal fix for the task entry */
 .task-input-group {
     display: flex;
     flex-direction: row; 
@@ -434,9 +433,10 @@ button:active { transform: scale(0.96); }
     margin: 0;
     flex: 1;
     overflow-y: auto;
-    max-height: 400px; /* Greatly expanded */
+    max-height: 400px;
 }
 
+/* Task cards former layout with font size reduced by 1 point (~0.8rem) */
 .task-item {
     background-color: var(--input-bg);
     border: 1px solid var(--border-color);
@@ -444,7 +444,7 @@ button:active { transform: scale(0.96); }
     border-radius: 12px;
     margin-bottom: 0.4rem;
     padding: 0.6rem 0.8rem;
-    font-size: 0.8rem;
+    font-size: 0.8rem !important;
     transition: border-color 0.2s ease;
     width: 100%;
     box-sizing: border-box;
@@ -473,7 +473,6 @@ button:active { transform: scale(0.96); }
 .task-item.completed .task-name-input { text-decoration: line-through; color: #aaa; }
 .task-item input[type="checkbox"] { accent-color: var(--cherry-red); cursor: pointer; flex-shrink: 0; margin-top: 5px; }
 
-/* The auto-expanding Textarea */
 .task-name-input {
     flex: 1;
     background: transparent;
@@ -481,14 +480,14 @@ button:active { transform: scale(0.96); }
     font-family: var(--font-family);
     font-weight: 500;
     color: var(--text-color);
-    font-size: 0.85rem;
+    font-size: 0.8rem !important;
     outline: none;
     min-width: 0;
     width: 100%;
     padding: 2px 0;
     resize: none;
     overflow: hidden;
-    min-height: 1.5rem;
+    min-height: 1.4rem;
     line-height: 1.4;
 }
 
@@ -822,7 +821,6 @@ button:active { transform: scale(0.96); }
     .header-top { gap: 0.5rem; }
 }
 
-/* --- Space Optimization & Input Area Overrides --- */
 .task-column { padding: 1rem 1rem 0.5rem 1rem; }
 .task-controls-row { gap: 2px 6px; margin-top: 4px; padding-top: 4px; }
 .task-estimate-input { width: 34px; padding: 1px 2px; font-size: 0.7rem; height: 1.3rem; }
@@ -831,28 +829,21 @@ button:active { transform: scale(0.96); }
 .recurrence-select { padding: 0px 2px; font-size: 0.6rem; height: 1.3rem; }
 .time-wrapper { display: flex; align-items: center; gap: 2px; font-size: 0.7rem; color: #888; font-weight: 600; margin-right: 4px; }
 
-/* Re-styled Add Task Input Area (Two Rows) */
-.task-input-group { 
-    flex-direction: column !important; 
-    align-items: stretch !important; 
+.task-input-group { 
+    flex-direction: column !important; 
+    align-items: stretch !important; 
 }
-.task-estimate-new { 
-    width: 45px !important; 
-    padding: 2px !important; 
-    height: 1.9rem !important; 
-    font-size: 0.8rem; 
+.task-estimate-new { 
+    width: 45px !important; 
+    padding: 2px !important; 
+    height: 1.9rem !important; 
+    font-size: 0.8rem; 
 }
-.task-input-group .add-task-btn, 
-.task-input-group .btn-secondary { 
-    height: 1.9rem !important; 
+.task-input-group .add-task-btn, 
+.task-input-group .btn-secondary { 
+    height: 1.9rem !important; 
 }
-/* Reduce task font size by 1 point and align actions */
-.task-item {
-    font-size: 0.85rem !important;
-}
-.task-name-input {
-    font-size: 0.85rem !important;
-}
+
 .task-main-row {
     display: flex;
     align-items: center;
@@ -874,7 +865,6 @@ button:active { transform: scale(0.96); }
     font-size: 0.75rem;
 }
 
-/* Prevent layout jumping on subtasks/details toggle */
 .task-item details, .task-item .details-trigger-btn {
     transition: none !important;
 }
@@ -882,7 +872,6 @@ button:active { transform: scale(0.96); }
     min-height: 120px;
 }
 
-/* Wider, shorter bottom cards */
 .wide-card {
     min-height: auto;
     border-radius: 10px;
@@ -890,7 +879,6 @@ button:active { transform: scale(0.96); }
     border: 1px solid var(--border-color);
 }
 
-/* Exciting countdown styling */
 .clockout-countdown {
     font-weight: 700;
     color: var(--green);
