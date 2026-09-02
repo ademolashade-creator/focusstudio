@@ -356,7 +356,7 @@ button:active { transform: scale(0.96); }
 
 .task-input {
     flex: 1;
-    padding: 0.5rem 0.6rem;
+    padding: 0.4rem 0.6rem; /* reduced from 0.5rem */
     font-family: var(--font-family);
     font-size: 0.85rem;
     border: 1px solid var(--border-color);
@@ -365,7 +365,7 @@ button:active { transform: scale(0.96); }
     background-color: var(--input-bg);
     color: var(--text-color);
     min-width: 80px;
-    height: 2.8rem; /* taller for better text entry */
+    height: 2.2rem; /* changed from 2.8rem */
 }
 
 /* The row with estimate, mic, add button */
@@ -436,13 +436,13 @@ button:active { transform: scale(0.96); }
     resize: vertical;
     box-sizing: border-box;
     font-size: 0.75rem;
-    padding: 0.4rem 0.6rem;
+    padding: 0.3rem 0.5rem; /* reduced padding */
     border-radius: 8px;
     border: 1px solid var(--border-color);
     background: var(--input-bg);
     color: var(--text-color);
     font-family: var(--font-family);
-    min-height: 2.5rem;
+    min-height: 1.8rem; /* changed from 2.5rem – much shorter */
 }
 
 .paste-area-actions {
@@ -472,7 +472,7 @@ button:active { transform: scale(0.96); }
     margin: 0;
     flex: 1;
     overflow-y: auto;
-    max-height: 350px; /* increase if needed */
+    max-height: 220px; /* changed from 350px */
 }
 .task-item {
     background-color: var(--input-bg);
@@ -501,11 +501,10 @@ button:active { transform: scale(0.96); }
 }
 .task-checkbox-name {
     display: flex;
-    align-items: center;
+    align-items: flex-start; /* align to top so text wraps properly */
     gap: 6px;
     flex: 1;
     min-width: 0;
-    overflow: hidden;
 }
 .task-item.completed .task-name-input { text-decoration: line-through; color: #aaa; }
 .task-item input[type="checkbox"] { accent-color: var(--cherry-red); cursor: pointer; }
@@ -517,7 +516,7 @@ button:active { transform: scale(0.96); }
     font-family: var(--font-family);
     font-weight: 500;
     color: var(--text-color);
-    font-size: 0.9rem;
+    font-size: 0.85rem; /* changed from 0.9rem – one point smaller */
     outline: none;
     min-width: 0;
     word-wrap: break-word;
@@ -525,6 +524,7 @@ button:active { transform: scale(0.96); }
     line-height: 1.4;
     max-width: 100%;
     overflow-wrap: break-word;
+    word-break: break-word; /* added for better wrapping */
     width: 100%;
     padding: 2px 0;
 }
