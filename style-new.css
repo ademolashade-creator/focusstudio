@@ -286,6 +286,11 @@ button:active { transform: scale(0.96); }
     }
 }
 
+.task-column, .task-input-group, .paste-textarea, .ai-batch-actions {
+    width: 100%;
+    box-sizing: border-box;
+}
+
 .task-column {
     background-color: var(--card-bg);
     padding: 1.5rem; 
@@ -460,6 +465,7 @@ button:active { transform: scale(0.96); }
     align-items: center;
     gap: 8px;
     width: 100%;
+    box-sizing: border-box;
 }
 .task-checkbox-name {
     display: flex;
@@ -484,6 +490,8 @@ button:active { transform: scale(0.96); }
     outline: none;
     min-width: 0;
     width: 100%;
+    word-wrap: break-word;
+    white-space: pre-wrap;
     padding: 2px 0;
     resize: none;
     overflow: hidden;
@@ -896,8 +904,6 @@ button:active { transform: scale(0.96); }
     padding: 0 0 0 14px;
     margin: 10px 0 0 0;
     border-left: 2px solid var(--border-color);
-    max-height: 250px;
-    overflow-y: auto;
 }
 .timeline-item {
     position: relative;

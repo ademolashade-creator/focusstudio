@@ -27,11 +27,13 @@ function saveScrollPositions() {
     });
 }
 function restoreScrollPositions() {
-    document.querySelectorAll('.task-list').forEach(function(list, idx) {
-        var key = 'list-' + idx;
-        if (scrollPositions[key] !== undefined) {
-            list.scrollTop = scrollPositions[key];
-        }
+    requestAnimationFrame(function() {
+        document.querySelectorAll('.task-list').forEach(function(list, idx) {
+            var key = 'list-' + idx;
+            if (scrollPositions[key] !== undefined) {
+                list.scrollTop = scrollPositions[key];
+            }
+        });
     });
 }
 
@@ -429,7 +431,8 @@ function getPrioritizedOpenTasks() {
     let openEntries = [];
     boardData.forEach(function(col, ci) {
         col.tasks.forEach(function(task, ti) {
-            if (!task.completed) {
+            // Parent tasks with subtasks act as containers, do not flow directly on them.
+            if (!task.completed && !task.hasSubtasks) {
                 openEntries.push({ col: col, task: task, ci: ci, ti: ti, actualSecondsSoFar: task.trackedSeconds || 0 });
             }
         });
@@ -513,6 +516,7 @@ function renderInternalQueue() {
         return;
     }
     q.innerHTML = tasks.map(function(entry, idx) {
+        var subtaskIcon = entry.task.isSubtask ? '<span style="color:var(--amber);margin-right:4px;">↳</span>' : '';
         return '<li draggable="true" ' +
             'ondragstart="queueDragStart(event, \'' + entry.task.id + '\')" ' +
             'ondragover="queueDragOver(event)" ' +
@@ -521,7 +525,7 @@ function renderInternalQueue() {
             '<div style="display:flex;align-items:center;gap:6px;">' +
             '<span style="color:var(--cherry-red);font-size:1.1rem;cursor:grab;padding-right:4px;" title="Drag to reorder sequence">≡</span>' +
             '<span style="color:#888;font-size:0.7rem;">' + (idx+1) + '.</span> ' +
-            escapeHTML(entry.task.text) +
+            subtaskIcon + escapeHTML(entry.task.text) +
             '</div>' +
             getDeadlineBadge(entry.task) +
             '</li>';
@@ -533,17 +537,26 @@ function buildFlowSegments() {
     var openEntries = getPrioritizedOpenTasks();
     var standardBreak = parseInt(breakInput.value) || 5;
 
+    var cumulativeWork = 0;
+
     openEntries.forEach(function(entry, entryIdx) {
         var chunkData = buildChunks(Math.max(1, entry.task.estimateMinutes || 15));
         var chunks = chunkData.chunks;
         var bonusBreakMinutes = chunkData.bonusBreakMinutes;
+        
         chunks.forEach(function(chunkMin, i) {
             var isLastChunk = (i === chunks.length - 1);
             segments.push({ type: 'work', entry: entry, minutes: chunkMin, isLastChunk: isLastChunk });
+            cumulativeWork += chunkMin;
+            
             var isVeryLastSegment = (entryIdx === openEntries.length - 1) && isLastChunk;
+            
             if (!isVeryLastSegment) {
-                var breakMin = isLastChunk ? standardBreak + bonusBreakMinutes : standardBreak;
-                segments.push({ type: 'break', minutes: breakMin });
+                if (cumulativeWork >= 25 || chunkMin >= 25) {
+                    var breakMin = isLastChunk ? standardBreak + bonusBreakMinutes : standardBreak;
+                    segments.push({ type: 'break', minutes: breakMin });
+                    cumulativeWork = 0; 
+                }
             }
         });
     });
@@ -636,6 +649,44 @@ function completeFlowTask(entry, actualSeconds) {
         completedAt: task.completedAtIso
     });
     if (historyData.length > 500) historyData.pop();
+    
+    // Parent Task Cascade check 
+    if (task.parentId) {
+        // If this was a subtask, let's optionally check if all subtasks are done
+        var allSubtasksDone = entry.col.tasks.filter(t => t.parentId === task.parentId).every(t => t.completed);
+        if (allSubtasksDone) {
+            var parentTask = entry.col.tasks.find(t => t.id === task.parentId);
+            if (parentTask && !parentTask.completed) {
+                parentTask.completed = true;
+                parentTask.completedAt = task.completedAt;
+                parentTask.completedAtIso = task.completedAtIso;
+            }
+        }
+    } else if (task.hasSubtasks) {
+        // Cascade completion to all subtasks if completing a parent
+        entry.col.tasks.forEach(function(t) {
+            if (t.parentId === task.id && !t.completed) {
+                t.completed = true;
+                t.isTracking = false;
+                t.trackedSeconds = t.estimateMinutes * 60; 
+                t.completedAt = task.completedAt;
+                t.completedAtIso = task.completedAtIso;
+                var sHistoryId = 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                t._historyId = sHistoryId;
+                historyData.unshift({
+                    _id: sHistoryId,
+                    client: entry.col.title,
+                    task: t.text,
+                    estimateMinutes: t.estimateMinutes,
+                    actualMinutes: t.estimateMinutes,
+                    breakMinutes: 0,
+                    notes: 'Cascaded completion from parent flow',
+                    completedAt: t.completedAtIso
+                });
+            }
+        });
+    }
+
     rememberTaskTime(task.text, Math.round(actualSeconds / 60));
     saveBoardData();
     renderBoard();
@@ -979,9 +1030,7 @@ function adjustTasksForMidnight() {
     });
     if (changed) {
         saveBoardData();
-        saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
     }
 }
 
@@ -1083,7 +1132,6 @@ function toggleDateGroup(colIndex, key) {
     if (_toggledDateGroups[groupKey] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[groupKey];
     _toggledDateGroups[groupKey] = !isCurrentlyCollapsed;
     renderBoard();
-    restoreScrollPositions();
 }
 
 function setupAutosuggest(inputElement) {
@@ -1165,12 +1213,11 @@ async function naturalLanguageAddTask(ci) {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
         if (newTask.estimateMinutes <= 15) {
             estimateTask(newTask);
         }
     } catch(e) {
-        alert('Could not parse natural language. Please try again.');
+        alert('Could not parse natural language: ' + e.message);
         console.error(e);
     }
 }
@@ -1205,7 +1252,6 @@ function setupRecurringTasks() {
     saveBoardData();
     saveScrollPositions();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function shouldRecurToday(task) {
@@ -1420,7 +1466,7 @@ function renderBoard() {
                         <div class="task-top-row">
                             <div class="task-checkbox-name">
                                 <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
-                                <textarea class="task-name-input" rows="1" oninput="this.style.height='';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.text)}</textarea>
+                                <textarea class="task-name-input" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.text)}</textarea>
                                 ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">📋</span>` : ''}
                                 ${task.recurrence ? `<span class="recurrence-badge">🔄 ${task.recurrence}</span>` : ''}
                                 ${carriedOverBadge}
@@ -1479,7 +1525,7 @@ function renderBoard() {
                                                 <div class="task-checkbox-name">
                                                     <input type="checkbox" ${subtask.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${subIdx})">
                                                     <span class="subtask-indent">↳</span>
-                                                    <textarea class="task-name-input subtask-name" rows="1" oninput="this.style.height='';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">${escapeHTML(subtask.text)}</textarea>
+                                                    <textarea class="task-name-input subtask-name" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">${escapeHTML(subtask.text)}</textarea>
                                                 </div>
                                                 <div class="task-top-actions">
                                                     <button class="collapse-toggle-btn" style="background:none;border:none;cursor:pointer;color:#888;font-size:0.6rem;" onclick="toggleTaskCollapse(${colIndex}, ${subIdx})" title="${isSubtaskCollapsed2 ? 'Expand' : 'Collapse'} controls">
@@ -1559,10 +1605,12 @@ function renderBoard() {
 
     setTimeout(function() {
         document.querySelectorAll('.task-name-input').forEach(function(el) {
-            el.style.height = '';
+            el.style.height = 'auto';
             el.style.height = el.scrollHeight + 'px';
         });
     }, 0);
+    
+    restoreScrollPositions();
 }
 
 function toggleTaskCollapse(ci, ti) {
@@ -1571,7 +1619,6 @@ function toggleTaskCollapse(ci, ti) {
     task.collapsedControls = !task.collapsedControls;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function moveColumn(ci, dir) {
@@ -1583,7 +1630,6 @@ function moveColumn(ci, dir) {
     boardData[target] = temp;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
@@ -1593,7 +1639,6 @@ function toggleColumnCollapse(ci) {
     boardData[ci].collapsed = !boardData[ci].collapsed;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function toggleSubtasksCollapse(ci, ti) {
@@ -1602,7 +1647,6 @@ function toggleSubtasksCollapse(ci, ti) {
     task.collapsed = !task.collapsed;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function addColumn() {
@@ -1611,7 +1655,6 @@ function addColumn() {
     boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function deleteColumn(ci) {
@@ -1621,7 +1664,6 @@ function deleteColumn(ci) {
     boardData.splice(ci, 1);
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function toggleNotesRequired(colIndex, checked) {
@@ -1629,7 +1671,6 @@ function toggleNotesRequired(colIndex, checked) {
     boardData[colIndex].notesRequired = checked;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 var dragContext = null;
@@ -1669,7 +1710,6 @@ function dropTask(e, targetColIndex) {
     dragContext = null;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function promptDeadline(ci, ti) {
@@ -1685,7 +1725,6 @@ function promptDeadline(ci, ti) {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
     });
     var btn = document.querySelector('[onclick="promptDeadline(' + ci + ', ' + ti + ')"]');
     if (btn) btn.replaceWith(input);
@@ -1702,7 +1741,6 @@ function removeAllSubtasks(ci, ti) {
     task.collapsed = false;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function setRecurrence(ci, ti, value) {
@@ -1712,7 +1750,6 @@ function setRecurrence(ci, ti, value) {
     task.lastRecurrenceDate = value ? getTodayKey() : null;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function removeRecurrence(ci, ti) {
@@ -1722,7 +1759,6 @@ function removeRecurrence(ci, ti) {
     task.lastRecurrenceDate = null;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 function updateDailyProgress() {
@@ -1841,9 +1877,12 @@ async function getTaskEstimateFromAI(taskText, notes) {
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+        if (res.status === 429) throw new Error('AI rate limit reached (HTTP 429). Please wait a moment before trying again.');
         if (!res.ok) return null;
         var data = await res.json();
-        var raw = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '';
+        var candidate = data.candidates && data.candidates[0];
+        var part = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0];
+        var raw = part ? part.text : '';
         var num = parseInt(raw.match(/\d+/));
         return num ? Math.max(1, num) : null;
     } catch(e) { return null; }
@@ -1855,7 +1894,6 @@ async function estimateTask(task) {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
         return;
     }
     est = await getTaskEstimateFromAI(task.text, task.notes);
@@ -1864,7 +1902,6 @@ async function estimateTask(task) {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
     }
 }
 
@@ -1912,7 +1949,6 @@ function addTask(ci) {
     saveBoardData();
     saveScrollPositions();
     renderBoard();
-    restoreScrollPositions();
 
     if (estimate <= 15) {
         estimateTask(task);
@@ -1983,7 +2019,6 @@ function addPastedTasks(ci) {
     saveBoardData();
     saveScrollPositions();
     renderBoard();
-    restoreScrollPositions();
 
     newTasks.forEach(function(task) {
         if (task.estimateMinutes <= 15) {
@@ -1999,7 +2034,6 @@ function updateTaskEstimate(ci, ti, v) {
     saveBoardData();
     saveScrollPositions();
     renderBoard();
-    restoreScrollPositions();
 }
 function moveTask(ci, ti, dir) {
     saveScrollPositions();
@@ -2015,7 +2049,6 @@ function moveTask(ci, ti, dir) {
             tasks[target] = temp;
             saveBoardData();
             renderBoard();
-            restoreScrollPositions();
             return;
         }
         target += dir;
@@ -2033,9 +2066,12 @@ async function callGemini(promptText) {
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
     });
+    if (res.status === 429) throw new Error('AI rate limit reached (HTTP 429). Please wait a moment before trying again.');
     if (!res.ok) throw new Error('API error ' + res.status);
     var data = await res.json();
-    var text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] ? data.candidates[0].content.parts[0].text : '';
+    var candidate = data.candidates && data.candidates[0];
+    var part = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0];
+    var text = part ? part.text : '';
     return cleanEmDashes(text);
 }
 
@@ -2055,8 +2091,11 @@ async function suggestColumnTimesAI(ci) {
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+        if (res.status === 429) throw new Error('AI rate limit reached (HTTP 429). Please wait a moment before trying again.');
         var data = await res.json();
-        var raw = data.candidates[0].content.parts[0].text;
+        var candidate = data.candidates && data.candidates[0];
+        var part = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0];
+        var raw = part ? part.text : '';
         var cleaned = raw.replace(/```json|```/g, '').trim();
         var estimates = JSON.parse(cleaned);
         estimates.forEach(function(e) {
@@ -2066,7 +2105,6 @@ async function suggestColumnTimesAI(ci) {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
     } catch(e) { alert('AI error: ' + e.message); }
 }
 
@@ -2076,28 +2114,24 @@ function applyTaskEstimate(ci, ti) {
     if (task.stagedEstimate) { task.estimateMinutes = task.stagedEstimate; task.stagedEstimate = null; }
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 function dismissTaskEstimate(ci, ti) { 
     saveScrollPositions(); 
     boardData[ci].tasks[ti].stagedEstimate = null; 
     saveBoardData(); 
     renderBoard(); 
-    restoreScrollPositions(); 
 }
 function applyAllEstimates(ci) {
     saveScrollPositions();
     boardData[ci].tasks.forEach(function(t) { if (t.stagedEstimate) { t.estimateMinutes = t.stagedEstimate; t.stagedEstimate = null; } });
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 function dismissAllEstimates(ci) {
     saveScrollPositions();
     boardData[ci].tasks.forEach(function(t) { t.stagedEstimate = null; });
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 async function optimizeColumnFlowAI(ci) {
@@ -2115,8 +2149,12 @@ async function optimizeColumnFlowAI(ci) {
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+        if (res.status === 429) throw new Error('AI rate limit reached (HTTP 429). Please wait a moment before trying again.');
         var data = await res.json();
-        var cleaned = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+        var candidate = data.candidates && data.candidates[0];
+        var part = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0];
+        var raw = part ? part.text : '';
+        var cleaned = raw.replace(/```json|```/g, '').trim();
         var result = JSON.parse(cleaned);
 
         if (result.orderedIds && result.orderedIds.length === openTasks.length) {
@@ -2136,7 +2174,6 @@ async function optimizeColumnFlowAI(ci) {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
     } catch(e) { alert('AI optimization error: ' + e.message); }
 }
 
@@ -2172,7 +2209,6 @@ function acceptAISuggestion(ci, sIdx) {
     if (boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 function dismissAISuggestion(ci, sIdx) {
     saveScrollPositions();
@@ -2180,7 +2216,6 @@ function dismissAISuggestion(ci, sIdx) {
     if (boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
 }
 
 async function generateColumnCheckIn(ci) {
@@ -2242,7 +2277,6 @@ function closeDetailsModal() {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
     }
     openDetailsRef = null;
     document.getElementById('details-overlay').style.display = 'none';
@@ -2261,18 +2295,21 @@ async function suggestTimeFromDetails() {
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+        if (res.status === 429) throw new Error('AI rate limit reached (HTTP 429). Please wait a moment before trying again.');
         var data = await res.json();
-        var raw = data.candidates[0].content.parts[0].text;
-        var num = parseInt(raw.match(/\d+/)[0]);
-        if (num) { 
+        var candidate = data.candidates && data.candidates[0];
+        var part = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0];
+        var raw = part ? part.text : '';
+        var match = raw.match(/\d+/);
+        if (match) { 
+            var num = parseInt(match[0]);
             task.estimateMinutes = Math.max(1, num); 
             saveBoardData(); 
             saveScrollPositions();
             renderBoard(); 
-            restoreScrollPositions();
             document.getElementById('details-estimate-label').textContent = 'Est: ' + task.estimateMinutes + ' min'; 
         }
-    } catch(e) { alert('AI error'); }
+    } catch(e) { alert('AI error: ' + e.message); }
 }
 
 async function breakdownTask() {
@@ -2296,7 +2333,6 @@ async function breakdownTask() {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
     }
 
     var apiKey = storageGet('gemini_api_key', null);
@@ -2388,7 +2424,6 @@ async function breakdownTask() {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
         renderInternalQueue();
         closeDetailsModal();
 
@@ -2632,9 +2667,13 @@ async function reEstimateAllTasks() {
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+        if (res.status === 429) throw new Error('AI rate limit reached (HTTP 429). Please wait a moment before trying again.');
         var data = await res.json();
-        var raw = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
-        var estimates = JSON.parse(raw);
+        var candidate = data.candidates && data.candidates[0];
+        var part = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0];
+        var raw = part ? part.text : '';
+        var cleaned = raw.replace(/```json|```/g, '').trim();
+        var estimates = JSON.parse(cleaned);
         estimates.forEach(function(e) {
             var task = allOpenTasks.find(function(t) { return t.text === e.task; });
             if (task) task.estimateMinutes = Math.max(1, e.minutes);
@@ -2642,8 +2681,7 @@ async function reEstimateAllTasks() {
         saveBoardData();
         saveScrollPositions();
         renderBoard();
-        restoreScrollPositions();
-    } catch(e) { alert('AI error'); }
+    } catch(e) { alert('AI error: ' + e.message); }
 }
 
 function renderEstimateLog() {
@@ -2654,8 +2692,14 @@ function renderEstimateLog() {
     var groups = {};
     recent.forEach(function(h) { var key = dateKeyFromISO(h.completedAt); if (!groups[key]) groups[key] = []; groups[key].push(h); });
     var orderedKeys = Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); });
-    logBox.innerHTML = '<ul class="log-list">' + orderedKeys.map(function(key) {
-        return '<li class="date-group-header">' + formatDateKey(key) + '</li>' +
+    
+    var todayKey = getTodayKey();
+
+    logBox.innerHTML = orderedKeys.map(function(key) {
+        var isOpen = (key === todayKey) ? 'open' : '';
+        return '<details ' + isOpen + ' style="margin-bottom:8px; border:1px solid var(--border-color); border-radius:8px; padding:6px; background:var(--card-bg);">' +
+            '<summary style="font-size:0.75rem; font-weight:600; color:var(--cherry-red); cursor:pointer; outline:none; user-select:none;">' + formatDateKey(key) + '</summary>' +
+            '<ul class="log-list" style="margin-top:4px;">' +
             groups[key].map(function(h) {
                 var diff = (h.actualMinutes || 0) - (h.estimateMinutes || 0);
                 var cls = 'under';
@@ -2663,8 +2707,9 @@ function renderEstimateLog() {
                 if (diff > (h.estimateMinutes * 0.2)) cls = 'over';
                 else if (diff > 0) cls = 'near';
                 return '<li class="log-item"><span>' + escapeHTML(h.task) + '</span><span class="log-variance ' + cls + '">Est ' + h.estimateMinutes + 'm / Act ' + h.actualMinutes + 'm (' + label + ')</span></li>';
-            }).join('');
-    }).join('') + '</ul>';
+            }).join('') +
+            '</ul></details>';
+    }).join('');
 }
 
 function renderDailyRecap() {
@@ -2685,7 +2730,6 @@ function renderDailyRecap() {
 
     // Build Chronological Timeline
     var events = [];
-    
     var todayLogs = clockLog.filter(c => c.date === todayDateStr);
     todayLogs.forEach(log => {
         events.push({ timeStr: log.clockIn, timeVal: parseTimeToMinutes(log.clockIn), text: 'Clocked In (' + log.latenessReason + ')', type: 'in' });
@@ -2712,7 +2756,6 @@ function renderDailyRecap() {
     });
 
     events.sort((a,b) => a.timeVal - b.timeVal);
-
     var uniqueEvents = [];
     events.forEach(e => {
         if (!uniqueEvents.some(u => u.timeVal === e.timeVal && u.text === e.text)) {
@@ -2720,7 +2763,8 @@ function renderDailyRecap() {
         }
     });
 
-    var timelineHtml = '<ul class="activity-timeline">';
+    // Populate timeline to the newly dedicated box
+    var timelineHtml = '';
     if (uniqueEvents.length === 0) {
         timelineHtml += '<li style="color:#888;font-size:0.75rem;">No activity logged yet today.</li>';
     } else {
@@ -2729,8 +2773,13 @@ function renderDailyRecap() {
             timelineHtml += `<li class="timeline-item ${iconClass}"><span class="timeline-time">${e.timeStr}</span> ${escapeHTML(e.text)}</li>`;
         });
     }
-    timelineHtml += '</ul>';
+    
+    var timelineBox = $('activity-timeline-content');
+    if (timelineBox) {
+        timelineBox.innerHTML = timelineHtml;
+    }
 
+    // Populate the original recap box without the timeline part
     contentBox.innerHTML = `
         <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
             <li><strong>${todaysHistory.length}</strong> task(s) finished</li>
@@ -2739,10 +2788,6 @@ function renderDailyRecap() {
             <li><strong>${formatHoursMinutes(breakMinutesToday)}</strong> breaks/away</li>
             <li><strong>${formatHoursMinutes(clockedMinutesToday)}</strong> clocked in</li>
         </ul>
-        <div style="margin-top:12px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
-            <strong style="font-size:0.7rem;color:var(--cherry-red);text-transform:uppercase;">Activity Timeline</strong>
-            ${timelineHtml}
-        </div>
     `;
     updateDailyProgress();
     updateFocusScore();
@@ -2874,10 +2919,9 @@ function importAllDataJSON(event) {
             
             saveScrollPositions();
             renderBoard();
-            restoreScrollPositions();
             renderDailyRecap();
             renderEstimateLog();
-            renderClockCard();
+            renderAttendanceCard();
             alert('Import successful!');
         } catch(err) {
             alert('Invalid JSON: ' + err.message);
@@ -3010,7 +3054,6 @@ function initApp() {
     
     saveScrollPositions();
     renderBoard();
-    restoreScrollPositions();
     
     renderEstimateLog();
     updateDisplay();
@@ -3032,6 +3075,7 @@ var pendingCompletion = null;
 function toggleTask(ci, ti) {
     saveScrollPositions();
     var task = boardData[ci].tasks[ti];
+    
     if (task.completed) {
         task.completed = false;
         task.completedAt = null;
@@ -3041,16 +3085,32 @@ function toggleTask(ci, ti) {
             if (idx !== -1) historyData.splice(idx, 1);
             task._historyId = null;
         }
+        
+        // Cascade uncheck to all subtasks if parent is toggled off
+        if (!task.parentId && task.hasSubtasks) {
+            boardData[ci].tasks.forEach(function(t) {
+                if (t.parentId === task.id && t.completed) {
+                    t.completed = false;
+                    t.completedAt = null;
+                    t.completedAtIso = null;
+                    if (t._historyId) {
+                        var sIdx = historyData.findIndex(function(h) { return h._id === t._historyId; });
+                        if (sIdx !== -1) historyData.splice(sIdx, 1);
+                        t._historyId = null;
+                    }
+                }
+            });
+        }
+        
         saveBoardData();
         renderBoard();
-        restoreScrollPositions();
         renderEstimateLog();
         return;
     }
+    
     if (boardData[ci].notesRequired && (!task.notes || task.notes.trim() === '')) {
         alert("This column requires notes! Please add notes via Details before completing.");
         renderBoard();
-        restoreScrollPositions();
         return;
     }
     if (task.trackedSeconds === 0) {
@@ -3078,8 +3138,8 @@ function cancelCompletion() {
     document.getElementById('completion-overlay').style.display = 'none';
     saveScrollPositions();
     renderBoard();
-    restoreScrollPositions();
 }
+
 function finalizeTaskCompletion(ci, ti, actualSeconds) {
     var task = boardData[ci].tasks[ti];
     task.completed = true;
@@ -3104,10 +3164,46 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
         completedAt: task.completedAtIso
     });
     if (historyData.length > 500) historyData.pop();
+    
+    // Parent Task Cascade Complete - complete all subtasks
+    if (!task.parentId && task.hasSubtasks) {
+        boardData[ci].tasks.forEach(function(t) {
+            if (t.parentId === task.id && !t.completed) {
+                t.completed = true;
+                t.isTracking = false;
+                t.trackedSeconds = t.estimateMinutes * 60; 
+                t.completedAt = task.completedAt;
+                t.completedAtIso = task.completedAtIso;
+                var sHistoryId = 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                t._historyId = sHistoryId;
+                historyData.unshift({
+                    _id: sHistoryId,
+                    client: boardData[ci].title,
+                    task: t.text,
+                    estimateMinutes: t.estimateMinutes,
+                    actualMinutes: t.estimateMinutes,
+                    breakMinutes: 0,
+                    notes: 'Cascaded completion from parent',
+                    completedAt: t.completedAtIso
+                });
+            }
+        });
+    } else if (task.parentId) {
+        // Optional: auto-complete parent if all subtasks are finished
+        var allSubtasksDone = boardData[ci].tasks.filter(t => t.parentId === task.parentId).every(t => t.completed);
+        if (allSubtasksDone) {
+            var parentTask = boardData[ci].tasks.find(t => t.id === task.parentId);
+            if (parentTask && !parentTask.completed) {
+                parentTask.completed = true;
+                parentTask.completedAt = task.completedAt;
+                parentTask.completedAtIso = task.completedAtIso;
+            }
+        }
+    }
+
     rememberTaskTime(task.text, Math.round(actualSeconds / 60));
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
     renderEstimateLog();
     renderDailyRecap();
     renderInternalQueue();
@@ -3119,7 +3215,6 @@ function deleteTask(ci, ti) {
     boardData[ci].tasks.splice(ti, 1);
     saveBoardData();
     renderBoard();
-    restoreScrollPositions();
     renderInternalQueue();
 }
 

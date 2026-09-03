@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="style-new.css?v=4">
+    <link rel="stylesheet" href="style-new.css?v=5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <script>
@@ -84,7 +84,7 @@
         </div>
     </div>
 
-   <!-- Clocks (dropdowns) -->
+   <!-- Clocks -->
    <div class="clocks-bar">
        <div class="clock-item">
            <div class="clock-label">Date</div>
@@ -169,6 +169,7 @@
 </div>
 
 <div class="top-section">
+    <!-- Card 1: Adaptive Brain Engine -->
     <div class="hacks-card" style="flex:1 1 220px;">
         <details open>
             <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Adaptive Brain Engine & Streaks</summary>
@@ -183,6 +184,7 @@
         </details>
     </div>
 
+    <!-- Card 2: Daily Recap & Focus Score -->
     <div class="hacks-card" style="flex:1 1 220px;">
         <details open>
             <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Daily Recap & Focus Score</summary>
@@ -191,6 +193,18 @@
                 <div id="daily-progress" style="margin-bottom:8px;"></div>
                 <div id="focus-score" style="margin-bottom:8px;"></div>
                 <div id="daily-recap-content">Complete a task or clock in to see today's recap.</div>
+            </div>
+        </details>
+    </div>
+
+    <!-- Card 3: Dedicated Activity Timeline -->
+    <div class="hacks-card" style="flex:1 1 220px;">
+        <details open>
+            <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Activity Timeline</summary>
+            <div style="margin-top:8px; max-height:220px; overflow-y:auto; padding-right:4px;" id="activity-timeline-box">
+                <ul class="activity-timeline" id="activity-timeline-content">
+                    <li style="color:#888;font-size:0.75rem;">No activity logged yet today.</li>
+                </ul>
             </div>
         </details>
     </div>
@@ -204,7 +218,7 @@
 </div>
 
 <div class="summary-container">
-    <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate (or already ran automatically if your API key is saved).</div>
+    <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate.</div>
     <details open>
         <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">AI Reports & Briefs</summary>
         <div class="summary-header" style="margin-top:8px;">
