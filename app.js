@@ -2792,7 +2792,7 @@ function renderDailyRecap() {
     var todayBreaks = breakLog.filter(function(b) { return new Date(b.date).toLocaleDateString() === todayDateStr; });
     breakMinutesToday += todayBreaks.reduce(function(a, b) { return a + b.durationMinutes; }, 0);
 
-    renderActivityTimeline(); // Call global timeline renderer
+    renderActivityTimeline(); 
 
     contentBox.innerHTML = `
         <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">

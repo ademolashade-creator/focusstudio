@@ -45,7 +45,7 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* KILL NUMBER SCROLL ARROWS */
+/* KILLS DEFAULT SCROLL ARROWS IN NUMBER INPUTS */
 input[type=number]::-webkit-inner-spin-button, 
 input[type=number]::-webkit-outer-spin-button { 
     -webkit-appearance: none; 
@@ -927,7 +927,7 @@ button:active { transform: scale(0.96); }
     font-size: 0.7rem;
     font-weight: 700;
     color: var(--cherry-red);
-    margin: 12px 0 6px -14px; /* Breaks out of the left border safely */
+    margin: 12px 0 6px -14px; 
     text-transform: uppercase;
     position: relative;
     background: var(--card-bg);
