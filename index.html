@@ -132,6 +132,12 @@
                 <ul class="internal-queue" id="internal-flow-queue"></ul>
             </div>
 
+            <!-- Restored: Projected Completion inside Timer Card -->
+            <div style="margin-top:12px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed var(--border-color); font-size:0.8rem; text-align:left;">
+                <div style="font-weight:700;margin-bottom:6px;color:var(--text-color);">⏱ Projected Completion</div>
+                <div id="time-counter-box">Add tasks to see your projected completion times.</div>
+            </div>
+
             <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
             <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
 
@@ -205,20 +211,13 @@
     </div>
 </div>
 
-<!-- Side-by-Side Bottom Section (2 Cards) -->
+<!-- Side-by-Side Bottom Section (Strictly 2 Cards) -->
 <div class="bottom-split">
-    <!-- Card 1: Log & Estimates Card (Restored) -->
+    <!-- Card 1: Estimate vs Actual Log -->
     <div class="log-card">
         <details open>
-            <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Time Estimates & Rolling Log</summary>
-            
-            <div style="margin-top:12px; margin-bottom:15px; padding-bottom:15px; border-bottom:1px dashed var(--border-color); font-size:0.8rem;">
-                <div style="font-weight:700;margin-bottom:8px;color:var(--text-color);">⏱ Projected Completion</div>
-                <div id="time-counter-box">Add tasks to see your projected completion times.</div>
-            </div>
-
-            <div style="font-weight:700;margin-bottom:8px;color:var(--text-color);font-size:0.8rem;">📜 Rolling Log (Est vs Actual)</div>
-            <div style="max-height:280px; overflow-y:auto; padding-right:4px;" id="estimate-log-box">
+            <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Estimate vs Actual (Rolling Log)</summary>
+            <div style="max-height:280px; overflow-y:auto; padding-right:4px; margin-top:12px;" id="estimate-log-box">
                 <ul class="activity-timeline" id="estimate-log">
                     <li style="color:#888;font-size:0.75rem;">Complete a tracked task to start your log.</li>
                 </ul>
@@ -381,7 +380,7 @@
     </div>
 </div>
 
-<script src="app.js?v=20260904"></script>
+<script src="app.js?v=20260905"></script>
 <script>
     window.importAllDataJSON = importAllDataJSON;
     window.exportAllDataJSON = exportAllDataJSON;
