@@ -2686,28 +2686,49 @@ function renderEstimateLog() {
     var logBox = $('estimate-log');
     if (!logBox) return;
     var recent = historyData.slice(0, 40);
-    if (recent.length === 0) { logBox.innerHTML = '<p style="font-size:0.85rem;color:#888;">Complete a tracked task to start your log.</p>'; return; }
+    if (recent.length === 0) { 
+        logBox.innerHTML = '<li style="color:#888;font-size:0.75rem;">Complete a tracked task to start your log.</li>'; 
+        return; 
+    }
+    
     var groups = {};
-    recent.forEach(function(h) { var key = dateKeyFromISO(h.completedAt); if (!groups[key]) groups[key] = []; groups[key].push(h); });
+    recent.forEach(function(h) { 
+        var key = dateKeyFromISO(h.completedAt); 
+        if (!groups[key]) groups[key] = []; 
+        groups[key].push(h); 
+    });
+    
     var orderedKeys = Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); });
     
     var todayKey = getTodayKey();
+    var yesterdayKey = getYesterdayKey();
 
-    logBox.innerHTML = orderedKeys.map(function(key) {
-        var isOpen = (key === todayKey) ? 'open' : '';
-        return '<details ' + isOpen + ' style="margin-bottom:8px; border:1px solid var(--border-color); border-radius:8px; padding:6px; background:var(--card-bg);">' +
-            '<summary style="font-size:0.75rem; font-weight:600; color:var(--cherry-red); cursor:pointer; outline:none; user-select:none;">' + formatDateKey(key) + '</summary>' +
-            '<ul class="log-list" style="margin-top:4px;">' +
-            groups[key].map(function(h) {
-                var diff = (h.actualMinutes || 0) - (h.estimateMinutes || 0);
-                var cls = 'under';
-                var label = (diff <= 0 ? diff : '+' + diff) + 'm';
-                if (diff > (h.estimateMinutes * 0.2)) cls = 'over';
-                else if (diff > 0) cls = 'near';
-                return '<li class="log-item"><span>' + escapeHTML(h.task) + '</span><span class="log-variance ' + cls + '">Est ' + h.estimateMinutes + 'm / Act ' + h.actualMinutes + 'm (' + label + ')</span></li>';
-            }).join('') +
-            '</ul></details>';
-    }).join('');
+    var html = '';
+    orderedKeys.forEach(function(key) {
+        var label = key === todayKey ? 'Today' : (key === yesterdayKey ? 'Yesterday' : formatDateKey(key));
+        html += '<li class="timeline-date-header">' + label + '</li>';
+
+        groups[key].forEach(function(h) {
+            var diff = (h.actualMinutes || 0) - (h.estimateMinutes || 0);
+            var cls = 'under';
+            var diffLabel = (diff <= 0 ? diff : '+' + diff) + 'm';
+            if (diff > (h.estimateMinutes * 0.2)) cls = 'over';
+            else if (diff > 0) cls = 'near';
+            
+            var timeStr = new Date(h.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            html += '<li class="timeline-item task" style="display:flex;align-items:flex-start;">' +
+                        '<span class="timeline-time" style="flex-shrink:0;">' + timeStr + '</span>' +
+                        '<div style="flex:1;display:flex;justify-content:space-between;gap:8px;">' +
+                            '<span style="word-break:break-word;">' + escapeHTML(h.task) + '</span>' +
+                            '<span class="log-variance ' + cls + '" style="font-size:0.7rem;white-space:nowrap;flex-shrink:0;">' + 
+                                'Est ' + h.estimateMinutes + 'm / Act ' + h.actualMinutes + 'm (' + diffLabel + ')' +
+                            '</span>' +
+                        '</div>' +
+                    '</li>';
+        });
+    });
+    logBox.innerHTML = html;
 }
 
 // Global Timeline Renderer incorporating all dates

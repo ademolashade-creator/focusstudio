@@ -135,12 +135,6 @@
             <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
             <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
 
-            <!-- Projected Time Counter restored here -->
-            <div class="timer-time-counter-box" style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border-color);font-size:0.8rem;">
-                <div style="font-weight:700;margin-bottom:4px;color:var(--cherry-red);">⏱ Projected Completion</div>
-                <div id="time-counter-box">Add tasks to see your projected completion times.</div>
-            </div>
-
             <div class="settings compact" style="margin-top:12px;">
                 <div class="setting-row">
                     <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
@@ -213,11 +207,22 @@
 
 <!-- Side-by-Side Bottom Section (2 Cards) -->
 <div class="bottom-split">
-    <!-- Card 1: Log & Estimates Card -->
+    <!-- Card 1: Log & Estimates Card (Restored) -->
     <div class="log-card">
         <details open>
             <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Time Estimates & Rolling Log</summary>
-            <div class="log-content" id="estimate-log" style="margin-top:8px;">Complete a tracked task to start your log.</div>
+            
+            <div style="margin-top:12px; margin-bottom:15px; padding-bottom:15px; border-bottom:1px dashed var(--border-color); font-size:0.8rem;">
+                <div style="font-weight:700;margin-bottom:8px;color:var(--text-color);">⏱ Projected Completion</div>
+                <div id="time-counter-box">Add tasks to see your projected completion times.</div>
+            </div>
+
+            <div style="font-weight:700;margin-bottom:8px;color:var(--text-color);font-size:0.8rem;">📜 Rolling Log (Est vs Actual)</div>
+            <div style="max-height:280px; overflow-y:auto; padding-right:4px;" id="estimate-log-box">
+                <ul class="activity-timeline" id="estimate-log">
+                    <li style="color:#888;font-size:0.75rem;">Complete a tracked task to start your log.</li>
+                </ul>
+            </div>
         </details>
     </div>
 
