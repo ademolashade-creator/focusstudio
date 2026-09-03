@@ -411,6 +411,8 @@ let customQueueOrder = storageGet('ff-custom-queue', []);
 function setFlowControlsVisible(active) {
     const startBtn = $('start-flow-btn');
     if (startBtn) startBtn.style.display = active ? 'none' : 'inline-block';
+    const startAiBtn = $('start-ai-flow-btn');
+    if (startAiBtn) startAiBtn.style.display = active ? 'none' : 'inline-block';
 }
 
 function buildChunks(totalMinutes) {
@@ -1488,7 +1490,7 @@ function renderBoard() {
                             ` : ''}
                             <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' •' : ''}</button>
                             ${hasSubtasks ? `
-                                <button class="details-trigger-btn" onclick="toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? '▶ Show' : '▼ Hide'} Subtasks</button>
+                                <button class="details-trigger-btn subtasks-toggle-btn" onclick="toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? '▶ Show Subtasks' : '▼ Hide Subtasks'}</button>
                                 <button class="details-trigger-btn" onclick="removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">🗑️ Remove All</button>
                             ` : ''}
                             ${!task.recurrence ? `
@@ -1509,8 +1511,8 @@ function renderBoard() {
                             <div><button onclick="applyTaskEstimate(${colIndex}, ${taskIndex})">Apply</button> <button onclick="dismissTaskEstimate(${colIndex}, ${taskIndex})">x</button></div>
                         </div>` : ''}
 
-                        ${hasSubtasks && !isParentCollapsed ? `
-                            <ul class="subtask-list" style="list-style:none;padding:0;margin:0;margin-top:4px;border-left:2px solid var(--amber);padding-left:12px;">
+                        ${hasSubtasks ? `
+                            <ul class="subtask-list" style="list-style:none;padding:0;margin:0;margin-top:4px;border-left:2px solid var(--amber);padding-left:12px; ${isParentCollapsed ? 'display:none;' : ''}">
                                 ${col.tasks.filter(t => t.parentId === task.id).map((subtask) => {
                                     const subIdx = col.tasks.indexOf(subtask);
                                     const isSubtaskCollapsed2 = subtask.collapsedControls || false;
@@ -1580,7 +1582,7 @@ function renderBoard() {
         </summary>
         <div style="margin-top:8px;">
             <div class="nl-task-input-group" style="display:flex;gap:6px;margin-bottom:8px;">
-                <input type="text" class="task-input" id="nl-task-input-${colIndex}" placeholder="Natural language (e.g. 'Read 20 mins')..." onkeypress="if(event.key==='Enter') naturalLanguageAddTask(${colIndex})">
+                <input type="text" class="task-input" id="nl-task-input-${colIndex}" placeholder="Natural language (e.g. 'Read 20 mins')...." onkeypress="if(event.key==='Enter') naturalLanguageAddTask(${colIndex})">
                 <button class="btn-secondary" onclick="naturalLanguageAddTask(${colIndex})" style="padding:0; min-width:60px; font-size:0.7rem;">✨ Smart</button>
             </div>
             <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (separated by line)..."></textarea>
@@ -1612,13 +1614,39 @@ function renderBoard() {
     restoreScrollPositions();
 }
 
+// ----- THE FIX FOR THE SCREEN JUMP -----
+// Instead of calling renderBoard(), we target the DOM directly and hide the row. 
 function toggleTaskCollapse(ci, ti) {
-    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.collapsedControls = !task.collapsedControls;
     saveBoardData();
-    renderBoard();
+    
+    var li = document.getElementById('task-' + ci + '-' + ti);
+    if (li) {
+        var controls = li.querySelector('.task-controls-row');
+        var btn = li.querySelector('.collapse-toggle-btn');
+        if (controls) controls.style.display = task.collapsedControls ? 'none' : '';
+        if (btn) {
+            btn.textContent = task.collapsedControls ? '▼' : '▲';
+            btn.title = task.collapsedControls ? 'Expand controls' : 'Collapse controls';
+        }
+    }
 }
+
+function toggleSubtasksCollapse(ci, ti) {
+    var task = boardData[ci].tasks[ti];
+    task.collapsed = !task.collapsed;
+    saveBoardData();
+    
+    var li = document.getElementById('task-' + ci + '-' + ti);
+    if (li) {
+        var sublist = li.querySelector('.subtask-list');
+        var btn = li.querySelector('.subtasks-toggle-btn');
+        if (sublist) sublist.style.display = task.collapsed ? 'none' : '';
+        if (btn) btn.textContent = task.collapsed ? '▶ Show Subtasks' : '▼ Hide Subtasks';
+    }
+}
+// ---------------------------------------
 
 function moveColumn(ci, dir) {
     saveScrollPositions();
@@ -1636,14 +1664,6 @@ function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
 function toggleColumnCollapse(ci) {
     saveScrollPositions();
     boardData[ci].collapsed = !boardData[ci].collapsed;
-    saveBoardData();
-    renderBoard();
-}
-
-function toggleSubtasksCollapse(ci, ti) {
-    saveScrollPositions();
-    var task = boardData[ci].tasks[ti];
-    task.collapsed = !task.collapsed;
     saveBoardData();
     renderBoard();
 }

@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="style-new.css?v=7">
+    <link rel="stylesheet" href="style-new.css?v=8">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <script>
@@ -127,20 +127,23 @@
                 <button class="btn-secondary" onclick="skipCurrentSegment()" title="Skip segment">⏭ Skip</button>
             </div>
 
+            <!-- 1. Internal Sequence -->
             <div class="internal-queue-container">
                 <div class="queue-header">Internal Flow Sequence <span style="font-weight:400;font-size:0.65rem;color:#888;">(drag to reorder)</span></div>
                 <ul class="internal-queue" id="internal-flow-queue"></ul>
             </div>
 
-            <!-- Restored: Projected Completion inside Timer Card -->
+            <!-- 2. Flow Buttons -->
+            <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
+            <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
+
+            <!-- 3. Projected Completion / Time Counter -->
             <div style="margin-top:12px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed var(--border-color); font-size:0.8rem; text-align:left;">
                 <div style="font-weight:700;margin-bottom:6px;color:var(--text-color);">⏱ Projected Completion</div>
                 <div id="time-counter-box">Add tasks to see your projected completion times.</div>
             </div>
 
-            <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
-            <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
-
+            <!-- 4 & 5. Time Options & Keyboard Shortcuts -->
             <div class="settings compact" style="margin-top:12px;">
                 <div class="setting-row">
                     <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
@@ -211,13 +214,14 @@
     </div>
 </div>
 
-<!-- Side-by-Side Bottom Section (Strictly 2 Cards) -->
+<!-- Side-by-Side Bottom Section -->
 <div class="bottom-split">
     <!-- Card 1: Estimate vs Actual Log -->
     <div class="log-card">
         <details open>
             <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Estimate vs Actual (Rolling Log)</summary>
-            <div style="max-height:280px; overflow-y:auto; padding-right:4px; margin-top:12px;" id="estimate-log-box">
+            <!-- Adjusted max-height to 200px to match AI reports -->
+            <div style="max-height:200px; overflow-y:auto; padding-right:4px; margin-top:12px;" id="estimate-log-box">
                 <ul class="activity-timeline" id="estimate-log">
                     <li style="color:#888;font-size:0.75rem;">Complete a tracked task to start your log.</li>
                 </ul>
@@ -380,7 +384,7 @@
     </div>
 </div>
 
-<script src="app.js?v=20260905"></script>
+<script src="app.js?v=20260906"></script>
 <script>
     window.importAllDataJSON = importAllDataJSON;
     window.exportAllDataJSON = exportAllDataJSON;
