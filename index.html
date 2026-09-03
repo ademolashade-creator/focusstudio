@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="style-new.css?v=5">
+    <link rel="stylesheet" href="style-new.css?v=6">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <script>
@@ -113,6 +113,7 @@
 
 <div class="board-area">
     <div class="board-container" id="board-container">
+        <!-- Timer Card -->
         <div class="timer-card">
             <div id="mode-indicator">Work Time</div>
             <div class="timer-display" id="time-display">25:00</div>
@@ -134,13 +135,7 @@
             <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
             <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
 
-            <!-- Time Counter Relocated Here -->
-            <div class="timer-time-counter-box" style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border-color);font-size:0.8rem;">
-                <div style="font-weight:700;margin-bottom:4px;color:var(--cherry-red);">⏱ Projected Completion</div>
-                <div id="time-counter-box">Add tasks to see your projected completion times.</div>
-            </div>
-
-            <div class="settings compact">
+            <div class="settings compact" style="margin-top:12px;">
                 <div class="setting-row">
                     <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
                     <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
@@ -203,38 +198,50 @@
             <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Activity Timeline</summary>
             <div style="margin-top:8px; max-height:220px; overflow-y:auto; padding-right:4px;" id="activity-timeline-box">
                 <ul class="activity-timeline" id="activity-timeline-content">
-                    <li style="color:#888;font-size:0.75rem;">No activity logged yet today.</li>
+                    <li style="color:#888;font-size:0.75rem;">No activity logged yet.</li>
                 </ul>
             </div>
         </details>
     </div>
 </div>
 
-<div class="log-card">
-    <details open>
-        <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Estimate vs Actual — Rolling Log</summary>
-        <div class="log-content" id="estimate-log" style="margin-top:8px;">Complete a tracked task to start your log.</div>
-    </details>
-</div>
-
-<div class="summary-container">
-    <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate.</div>
-    <details open>
-        <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">AI Reports & Briefs</summary>
-        <div class="summary-header" style="margin-top:8px;">
-            <h2 style="margin:0;">Monthly Summary & Client Report</h2>
-            <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
-            <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">📅 Download .ics</button>
-            <button class="ai-btn" onclick="generatePDFReport()" style="background:var(--amber);">📄 PDF Report</button>
-        </div>
-        <details style="margin-bottom:1rem;">
-            <summary style="font-size:0.75rem;color:#888;cursor:pointer;">AI settings (Gemini API key)</summary>
-            <div class="api-key-box" style="margin-top:6px;">
-                <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+<!-- Side-by-Side Bottom Section -->
+<div class="bottom-split">
+    <!-- Log & Estimates Card -->
+    <div class="log-card">
+        <details open>
+            <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Time Estimates & Rolling Log</summary>
+            
+            <div class="timer-time-counter-box" style="margin-top:12px;padding-bottom:12px;border-bottom:1px dashed var(--border-color);font-size:0.8rem;">
+                <div style="font-weight:700;margin-bottom:6px;color:var(--cherry-red);">⏱ Projected Completion</div>
+                <div id="time-counter-box">Add tasks to see your projected completion times.</div>
             </div>
+
+            <div style="font-size:0.75rem; font-weight:700; margin-top:12px; margin-bottom:8px; color:var(--text-color);">Estimate vs Actual Log</div>
+            <div class="log-content" id="estimate-log">Complete a tracked task to start your log.</div>
         </details>
-        <div class="summary-content" id="summary-content">Click "Generate AI Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
-    </details>
+    </div>
+
+    <!-- AI Reports Card -->
+    <div class="summary-container">
+        <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate.</div>
+        <details open>
+            <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">AI Reports & Briefs</summary>
+            <div class="summary-header" style="margin-top:8px;">
+                <h2 style="margin:0;">Monthly Summary & Client Report</h2>
+                <button class="ai-btn" onclick="generateAISummary(false)">Generate AI Client Report</button>
+                <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">📅 Download .ics</button>
+                <button class="ai-btn" onclick="generatePDFReport()" style="background:var(--amber);">📄 PDF Report</button>
+            </div>
+            <details style="margin-bottom:1rem;">
+                <summary style="font-size:0.75rem;color:#888;cursor:pointer;">AI settings (Gemini API key)</summary>
+                <div class="api-key-box" style="margin-top:6px;">
+                    <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+                </div>
+            </details>
+            <div class="summary-content" id="summary-content">Click "Generate AI Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
+        </details>
+    </div>
 </div>
 
 <div class="discreet-card">
@@ -370,7 +377,7 @@
     </div>
 </div>
 
-<script src="app.js?v=20250910"></script>
+<script src="app.js?v=20260903"></script>
 <script>
     window.importAllDataJSON = importAllDataJSON;
     window.exportAllDataJSON = exportAllDataJSON;

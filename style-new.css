@@ -45,6 +45,16 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* KILL NUMBER SCROLL ARROWS */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+input[type=number] {
+    -moz-appearance: textfield;
+}
+
 header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px; }
 
 .header-top {
@@ -191,8 +201,6 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
     border-radius: 6px;
 }
 
-.top-controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
-
 .clocks-bar {
     display: flex;
     justify-content: center;
@@ -228,7 +236,7 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
 .top-section { display: flex; flex-wrap: wrap; gap: 1rem; width: 100%; max-width: 1100px; margin-bottom: 1.5rem; }
 .board-area { width: 100%; max-width: 1100px; }
 
-.timer-card, .stats-card, .hacks-card, .log-card {
+.timer-card, .stats-card, .hacks-card, .log-card, .summary-container {
     background-color: var(--card-bg);
     padding: 1rem 1.5rem;
     border-radius: 20px;
@@ -579,16 +587,21 @@ button:active { transform: scale(0.96); }
     flex-shrink: 0;
 }
 
-.summary-container, .log-card {
+/* Side-by-Side Flex Layout Container */
+.bottom-split {
+    display: flex;
+    gap: 1.5rem;
     width: 100%;
     max-width: 1100px;
-    background: var(--card-bg);
-    padding: 1rem 1.5rem;
-    border-radius: 20px;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-color);
     margin-top: 1.5rem;
-    box-sizing: border-box;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+.bottom-split > .summary-container, 
+.bottom-split > .log-card {
+    flex: 1;
+    min-width: 300px;
+    margin-top: 0; /* Resetting margin inside the flex box */
 }
 
 .discreet-card {
@@ -817,6 +830,11 @@ button:active { transform: scale(0.96); }
 .modal-actions { display: flex; gap: 10px; }
 .modal-actions button { flex: 1; }
 
+@media (max-width: 768px) {
+    .bottom-split { flex-direction: column; }
+    .bottom-split > .summary-container, 
+    .bottom-split > .log-card { width: 100%; }
+}
 @media (max-width: 600px) {
     .attendance-row { gap: 0.6rem; }
     .attendance-field { min-width: 50px; }
@@ -898,13 +916,24 @@ button:active { transform: scale(0.96); }
     100% { opacity: 0.8; }
 }
 
-/* Activity Timeline CSS */
+/* Activity Timeline Multi-Day CSS */
 .activity-timeline {
     list-style: none;
     padding: 0 0 0 14px;
     margin: 10px 0 0 0;
     border-left: 2px solid var(--border-color);
 }
+.timeline-date-header {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--cherry-red);
+    margin: 12px 0 6px -14px; /* Breaks out of the left border safely */
+    text-transform: uppercase;
+    position: relative;
+    background: var(--card-bg);
+    padding: 2px 0;
+}
+.timeline-date-header:first-child { margin-top: 0; }
 .timeline-item {
     position: relative;
     margin-bottom: 8px;

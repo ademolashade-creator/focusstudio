@@ -19,6 +19,13 @@ function storageSet(key, value) {
 }
 const $ = (id) => document.getElementById(id);
 
+// ---------- Prevent Number Input Scroll Jumping Globally ----------
+document.addEventListener('wheel', function(e) {
+    if (document.activeElement && document.activeElement.type === 'number') {
+        document.activeElement.blur();
+    }
+}, { passive: true });
+
 // ---------- Scroll Position Helper ----------
 var scrollPositions = {};
 function saveScrollPositions() {
@@ -431,7 +438,6 @@ function getPrioritizedOpenTasks() {
     let openEntries = [];
     boardData.forEach(function(col, ci) {
         col.tasks.forEach(function(task, ti) {
-            // Parent tasks with subtasks act as containers, do not flow directly on them.
             if (!task.completed && !task.hasSubtasks) {
                 openEntries.push({ col: col, task: task, ci: ci, ti: ti, actualSecondsSoFar: task.trackedSeconds || 0 });
             }
@@ -443,7 +449,6 @@ function getPrioritizedOpenTasks() {
         var aDeadMs = a.task.deadlineTime ? new Date(a.task.deadlineTime).getTime() : Infinity;
         var bDeadMs = b.task.deadlineTime ? new Date(b.task.deadlineTime).getTime() : Infinity;
 
-        // Due within 1 hour or overdue ALWAYS jump to top
         var aUrgent = aDeadMs < nowMs + 3600000; 
         var bUrgent = bDeadMs < nowMs + 3600000;
 
@@ -451,19 +456,16 @@ function getPrioritizedOpenTasks() {
         if (!aUrgent && bUrgent) return 1;
         if (aUrgent && bUrgent) return aDeadMs - bDeadMs;
 
-        // Fallback to manual queue arrangement
         var idxA = customQueueOrder.indexOf(a.task.id);
         var idxB = customQueueOrder.indexOf(b.task.id);
         if (idxA !== -1 && idxB !== -1) return idxA - idxB;
         if (idxA !== -1) return -1;
         if (idxB !== -1) return 1;
 
-        // General deadlines further out
         if (aDeadMs !== Infinity && bDeadMs === Infinity) return -1;
         if (aDeadMs === Infinity && bDeadMs !== Infinity) return 1;
         if (aDeadMs !== Infinity && bDeadMs !== Infinity) return aDeadMs - bDeadMs;
 
-        // Default order
         if (a.ci !== b.ci) return a.ci - b.ci;
         return a.ti - b.ti;
     });
@@ -650,9 +652,7 @@ function completeFlowTask(entry, actualSeconds) {
     });
     if (historyData.length > 500) historyData.pop();
     
-    // Parent Task Cascade check 
     if (task.parentId) {
-        // If this was a subtask, let's optionally check if all subtasks are done
         var allSubtasksDone = entry.col.tasks.filter(t => t.parentId === task.parentId).every(t => t.completed);
         if (allSubtasksDone) {
             var parentTask = entry.col.tasks.find(t => t.id === task.parentId);
@@ -663,7 +663,6 @@ function completeFlowTask(entry, actualSeconds) {
             }
         }
     } else if (task.hasSubtasks) {
-        // Cascade completion to all subtasks if completing a parent
         entry.col.tasks.forEach(function(t) {
             if (t.parentId === task.id && !t.completed) {
                 t.completed = true;
@@ -2461,7 +2460,6 @@ function updateStreaksAndBadges() {
         var key = year + '-' + month + '-' + day;
         var dow = checkDate.getDay();
         
-        // Skip Weekends logic
         if (dow === 0 || dow === 6) {
             checkDate.setDate(checkDate.getDate() - 1);
             continue;
@@ -2712,74 +2710,90 @@ function renderEstimateLog() {
     }).join('');
 }
 
+// Global Timeline Renderer incorporating all dates
+function renderActivityTimeline() {
+    var timelineBox = $('activity-timeline-content');
+    if (!timelineBox) return;
+
+    var eventsByDate = {};
+    function addEvent(d, text, type, explicitTimeStr) {
+        if (isNaN(d.getTime())) return;
+        var dateKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        if (!eventsByDate[dateKey]) eventsByDate[dateKey] = [];
+        var timeStr = explicitTimeStr || d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        eventsByDate[dateKey].push({ timeVal: d.getTime(), timeStr: timeStr, text: text, type: type });
+    }
+
+    historyData.forEach(h => addEvent(new Date(h.completedAt), 'Completed: ' + h.task, 'task'));
+    
+    var breakLog = storageGet('ff-break-log', []);
+    breakLog.forEach(b => addEvent(new Date(b.date), 'Break: ' + b.reason + ' (' + b.durationMinutes + 'm)', 'break'));
+    
+    clockLog.forEach(log => {
+        var dIn = new Date(log.date + ' ' + log.clockIn);
+        if (!isNaN(dIn)) addEvent(dIn, 'Clocked In (' + log.latenessReason + ')', 'in', log.clockIn);
+        if (log.clockOut && log.clockOut !== '--:--') {
+            var dOut = new Date(log.date + ' ' + log.clockOut);
+            if (!isNaN(dOut)) addEvent(dOut, 'Clocked Out (' + log.durationMinutes + 'm total)', 'out', log.clockOut);
+        }
+    });
+    
+    if (clockState.clockedIn && clockState.startedAt) {
+        addEvent(new Date(clockState.startedAt), 'Clocked In (' + clockState.latenessReason + ')', 'in');
+    }
+
+    var keys = Object.keys(eventsByDate).sort((a,b) => b.localeCompare(a));
+    var html = '';
+    var todayKey = getTodayKey();
+    var yesterdayKey = getYesterdayKey();
+
+    if (keys.length === 0) {
+        html = '<li style="color:#888;font-size:0.75rem;">No activity logged yet.</li>';
+    } else {
+        keys.forEach(key => {
+            var label = key === todayKey ? 'Today' : (key === yesterdayKey ? 'Yesterday' : formatDateKey(key));
+            html += '<li class="timeline-date-header">' + label + '</li>';
+            
+            var uniqueEvents = [];
+            var sorted = eventsByDate[key].sort((a,b) => a.timeVal - b.timeVal);
+            sorted.forEach(e => {
+                if (!uniqueEvents.some(u => u.timeVal === e.timeVal && u.text === e.text)) {
+                    uniqueEvents.push(e);
+                }
+            });
+            
+            uniqueEvents.forEach(e => {
+                var iconClass = e.type === 'in' || e.type === 'out' ? 'in-out' : e.type === 'break' ? 'break' : 'task';
+                html += '<li class="timeline-item ' + iconClass + '"><span class="timeline-time">' + e.timeStr + '</span> ' + escapeHTML(e.text) + '</li>';
+            });
+        });
+    }
+    timelineBox.innerHTML = html;
+}
+
 function renderDailyRecap() {
     var contentBox = $('daily-recap-content');
     if (!contentBox) return;
+    
     var todayKey = getTodayKey();
     var todayDateStr = new Date().toLocaleDateString();
+    
     var todaysHistory = historyData.filter(function(h) { return dateKeyFromISO(h.completedAt) === todayKey; });
     var totalActual = todaysHistory.reduce(function(a, h) { return a + (h.actualMinutes || 0); }, 0);
+    
     var openFromToday = 0;
     boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (t.dateAdded === todayKey && !t.completed) openFromToday++; }); });
+    
     var clockedMinutesToday = clockLog.filter(function(c) { return c.date === todayDateStr; }).reduce(function(a, c) { return a + c.durationMinutes; }, 0);
     if (clockState.clockedIn) clockedMinutesToday += Math.max(0, Math.round((Date.now() - clockState.startedAt) / 60000));
+    
     var breakMinutesToday = todaysHistory.reduce(function(a, h) { return a + (h.breakMinutes || 0); }, 0);
     var breakLog = storageGet('ff-break-log', []);
     var todayBreaks = breakLog.filter(function(b) { return new Date(b.date).toLocaleDateString() === todayDateStr; });
     breakMinutesToday += todayBreaks.reduce(function(a, b) { return a + b.durationMinutes; }, 0);
 
-    // Build Chronological Timeline
-    var events = [];
-    var todayLogs = clockLog.filter(c => c.date === todayDateStr);
-    todayLogs.forEach(log => {
-        events.push({ timeStr: log.clockIn, timeVal: parseTimeToMinutes(log.clockIn), text: 'Clocked In (' + log.latenessReason + ')', type: 'in' });
-        if (log.clockOut && log.clockOut !== '--:--') {
-            events.push({ timeStr: log.clockOut, timeVal: parseTimeToMinutes(log.clockOut), text: 'Clocked Out (' + log.durationMinutes + 'm total)', type: 'out' });
-        }
-    });
-    
-    if (clockState.clockedIn) {
-        var inTime = new Date(clockState.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        events.push({ timeStr: inTime, timeVal: parseTimeToMinutes(inTime), text: 'Clocked In (' + clockState.latenessReason + ')', type: 'in' });
-    }
+    renderActivityTimeline(); // Call global timeline renderer
 
-    todaysHistory.forEach(h => {
-        var d = new Date(h.completedAt);
-        var timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        events.push({ timeStr: timeStr, timeVal: d.getHours()*60 + d.getMinutes(), text: 'Completed: ' + h.task, type: 'task' });
-    });
-
-    todayBreaks.forEach(b => {
-        var d = new Date(b.date);
-        var timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        events.push({ timeStr: timeStr, timeVal: d.getHours()*60 + d.getMinutes(), text: 'Break: ' + b.reason + ' (' + b.durationMinutes + 'm)', type: 'break' });
-    });
-
-    events.sort((a,b) => a.timeVal - b.timeVal);
-    var uniqueEvents = [];
-    events.forEach(e => {
-        if (!uniqueEvents.some(u => u.timeVal === e.timeVal && u.text === e.text)) {
-            uniqueEvents.push(e);
-        }
-    });
-
-    // Populate timeline to the newly dedicated box
-    var timelineHtml = '';
-    if (uniqueEvents.length === 0) {
-        timelineHtml += '<li style="color:#888;font-size:0.75rem;">No activity logged yet today.</li>';
-    } else {
-        uniqueEvents.forEach(e => {
-            var iconClass = e.type === 'in' || e.type === 'out' ? 'in-out' : e.type === 'break' ? 'break' : 'task';
-            timelineHtml += `<li class="timeline-item ${iconClass}"><span class="timeline-time">${e.timeStr}</span> ${escapeHTML(e.text)}</li>`;
-        });
-    }
-    
-    var timelineBox = $('activity-timeline-content');
-    if (timelineBox) {
-        timelineBox.innerHTML = timelineHtml;
-    }
-
-    // Populate the original recap box without the timeline part
     contentBox.innerHTML = `
         <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem;line-height:1.7;">
             <li><strong>${todaysHistory.length}</strong> task(s) finished</li>
@@ -3165,7 +3179,7 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
     });
     if (historyData.length > 500) historyData.pop();
     
-    // Parent Task Cascade Complete - complete all subtasks
+    // Parent Task Cascade Complete
     if (!task.parentId && task.hasSubtasks) {
         boardData[ci].tasks.forEach(function(t) {
             if (t.parentId === task.id && !t.completed) {
@@ -3189,7 +3203,6 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
             }
         });
     } else if (task.parentId) {
-        // Optional: auto-complete parent if all subtasks are finished
         var allSubtasksDone = boardData[ci].tasks.filter(t => t.parentId === task.parentId).every(t => t.completed);
         if (allSubtasksDone) {
             var parentTask = boardData[ci].tasks.find(t => t.id === task.parentId);
