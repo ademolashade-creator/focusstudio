@@ -208,12 +208,13 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
 
 .attendance-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     margin-bottom: 0.4rem;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
 }
+.attendance-header > span:last-child { margin-left: auto; }
 .attendance-title {
     font-weight: 600;
     color: var(--cherry-red);
@@ -342,6 +343,7 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
 .controls button { flex: 1 1 0; min-height: 42px; padding: 0.4rem 0.3rem; }
 
 button { padding: 0.35rem 0.7rem; font-family: var(--font-family); font-size: 0.8rem; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; }
+button:hover { box-shadow: 0 0 0 2px var(--cherry-red); }
 button:active { transform: scale(0.96); }
 
 .btn-primary, #start-pause-btn { background-color: var(--cherry-red); color: white; flex: 1; }
@@ -378,7 +380,7 @@ button:active { transform: scale(0.96); }
 }
 @media (min-width: 900px) {
     .board-container {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
@@ -839,6 +841,13 @@ button:active { transform: scale(0.96); }
     transition: all 0.15s ease;
 }
 .badge-pill svg { width: 14px; height: 14px; color: var(--cherry-red); }
+
+.badge-progress { width: 100%; margin-top: 4px; }
+.badge-progress > div:last-child { display: flex; align-items: center; gap: 8px; }
+.badge-progress progress { flex: 1; height: 6px; border-radius: 3px; border: none; overflow: hidden; }
+.badge-progress progress::-webkit-progress-bar { background: var(--border-color); border-radius: 3px; }
+.badge-progress progress::-webkit-progress-value { background: var(--cherry-red); border-radius: 3px; transition: width 0.3s ease; }
+.badge-progress progress::-moz-progress-bar { background: var(--cherry-red); border-radius: 3px; }
 
 .recurrence-badge {
     font-size: 0.55rem;

@@ -167,7 +167,7 @@
     </header>
 
     <!-- Timer Card & Internal Queue -->
-    <div class="timer-card-wrapper" style="max-width:560px;margin:0 auto;">
+    <div class="timer-card-wrapper" style="max-width:600px;margin:0 auto;">
         <div class="timer-card">
             <div id="mode-indicator">Work Time</div>
             <div class="timer-display" id="time-display">25:00</div>
@@ -240,7 +240,7 @@
     <div class="board-area">
         <div class="board-container" id="board-container"></div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem; max-width:1100px; margin-left:auto; margin-right:auto;">
-            <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/9 columns</span>
+            <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/8 columns</span>
             <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
         </div>
     </div>
@@ -314,12 +314,14 @@
 
         <!-- AI Adaptive Brain Engine Report Card -->
         <div class="summary-container" style="width:100%;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
                 <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
                 <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
             </div>
+            <p style="font-size:0.72rem;color:#888;margin:0 0 0.6rem;">A written AI summary of your current workload and pace, how much is on your plate right now and whether you're on track, not a task-by-task list.</p>
             <div class="hacks-content" id="adaptive-hacks" style="margin-bottom:0.8rem;">Analyzing your current task load...</div>
             <div class="summary-content" id="brain-engine-report-content" style="min-height:100px;margin-bottom:0.8rem;">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
+            <p style="font-size:0.72rem;color:#888;margin:0 0 4px;">Re-runs AI time estimates for every open task at once, using this same task-time memory, useful after a big batch add.</p>
             <button class="btn-secondary reestimate-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
         </div>
 
@@ -596,6 +598,7 @@
     window.switchView = switchView;
     window.updateCognitiveState = updateCognitiveState;
     window.promptQueueNumber = promptQueueNumber;
+    window.nudgeQueueEntry = nudgeQueueEntry;
     window.generateBrainEngineReport = generateBrainEngineReport;
     window.openPdfExportOverlay = openPdfExportOverlay;
     window.closePdfExportOverlay = closePdfExportOverlay;

@@ -489,23 +489,21 @@ function buildChunks(totalMinutes) {
 }
 
 function getPrioritizedOpenTasks() {
-    let openEntries = [];
+    var topLevel = [];
     boardData.forEach(function(col, ci) {
         col.tasks.forEach(function(task, ti) {
-            if (!task.completed && !task.hasSubtasks) {
-                openEntries.push({ col: col, task: task, ci: ci, ti: ti, actualSecondsSoFar: task.trackedSeconds || 0 });
+            if (!task.completed && !task.parentId) {
+                topLevel.push({ col: col, task: task, ci: ci, ti: ti });
             }
         });
     });
 
-    openEntries.sort(function(a, b) {
+    topLevel.sort(function(a, b) {
         var nowMs = Date.now();
         var aDeadMs = a.task.deadlineTime ? new Date(a.task.deadlineTime).getTime() : Infinity;
         var bDeadMs = b.task.deadlineTime ? new Date(b.task.deadlineTime).getTime() : Infinity;
-
-        var aUrgent = aDeadMs < nowMs + 3600000; 
-        var bUrgent = bDeadMs < nowMs + 3600000;
-
+        var aUrgent = aDeadMs < nowMs + 10800000; // within 3 hours or overdue
+        var bUrgent = bDeadMs < nowMs + 10800000;
         if (aUrgent && !bUrgent) return -1;
         if (!aUrgent && bUrgent) return 1;
         if (aUrgent && bUrgent) return aDeadMs - bDeadMs;
@@ -523,7 +521,21 @@ function getPrioritizedOpenTasks() {
         if (a.ci !== b.ci) return a.ci - b.ci;
         return a.ti - b.ti;
     });
-    return openEntries;
+
+    var flat = [];
+    topLevel.forEach(function(entry) {
+        var subtasks = entry.col.tasks.filter(function(t) { return t.parentId === entry.task.id && !t.completed; });
+        if (subtasks.length > 0) {
+            flat.push({ col: entry.col, task: entry.task, ci: entry.ci, ti: entry.ti, isGroupParent: true, actualSecondsSoFar: 0 });
+            subtasks.forEach(function(st) {
+                var sti = entry.col.tasks.indexOf(st);
+                flat.push({ col: entry.col, task: st, ci: entry.ci, ti: sti, isSubtaskEntry: true, parentTaskId: entry.task.id, actualSecondsSoFar: st.trackedSeconds || 0 });
+            });
+        } else {
+            flat.push({ col: entry.col, task: entry.task, ci: entry.ci, ti: entry.ti, actualSecondsSoFar: entry.task.trackedSeconds || 0 });
+        }
+    });
+    return flat;
 }
 
 var queueDragTaskId = null;
@@ -547,11 +559,30 @@ function queueDrop(e, targetTaskId) {
     if (!queueDragTaskId || queueDragTaskId === targetTaskId) return;
 
     var tasks = getPrioritizedOpenTasks();
-    var currentOrder = tasks.map(function(t) { return t.task.id; });
+    var draggedEntry = tasks.find(function(t) { return t.task.id === queueDragTaskId; });
+    var targetEntry = tasks.find(function(t) { return t.task.id === targetTaskId; });
+    if (!draggedEntry || !targetEntry) return;
 
+    if (draggedEntry.isSubtaskEntry) {
+        // Subtasks can only reorder among their own siblings, never separate from their parent.
+        if (!targetEntry.isSubtaskEntry || targetEntry.parentTaskId !== draggedEntry.parentTaskId) return;
+        var col = draggedEntry.col;
+        var fromIdx = col.tasks.indexOf(draggedEntry.task);
+        var toIdx = col.tasks.indexOf(targetEntry.task);
+        if (fromIdx === -1 || toIdx === -1) return;
+        col.tasks.splice(fromIdx, 1);
+        col.tasks.splice(toIdx, 0, draggedEntry.task);
+        saveBoardData();
+        renderInternalQueue();
+        return;
+    }
+
+    // Dragging a parent/leaf-level task: never allow dropping it onto a subtask slot.
+    if (targetEntry.isSubtaskEntry) return;
+
+    var currentOrder = tasks.filter(function(t) { return !t.isSubtaskEntry; }).map(function(t) { return t.task.id; });
     var fromIdx = currentOrder.indexOf(queueDragTaskId);
     var toIdx = currentOrder.indexOf(targetTaskId);
-
     if (fromIdx === -1 || toIdx === -1) return;
 
     currentOrder.splice(fromIdx, 1);
@@ -565,7 +596,10 @@ function queueDrop(e, targetTaskId) {
 
 function promptQueueNumber(taskId) {
     var tasks = getPrioritizedOpenTasks();
-    var currentOrder = tasks.map(function(t) { return t.task.id; });
+    var entry = tasks.find(function(t) { return t.task.id === taskId; });
+    if (entry && entry.isSubtaskEntry) return; // subtasks aren't individually numbered
+
+    var currentOrder = tasks.filter(function(t) { return !t.isSubtaskEntry; }).map(function(t) { return t.task.id; });
     var currentIdx = currentOrder.indexOf(taskId);
     if (currentIdx === -1) return;
 
@@ -593,31 +627,67 @@ function renderInternalQueue() {
         q.innerHTML = '<li style="color:#888;">No open tasks. Add some below.</li>';
         return;
     }
-    q.innerHTML = tasks.map(function(entry, idx) {
-        var subtaskIcon = entry.task.isSubtask ? '<span style="color:var(--amber);margin-right:4px;">↳</span>' : '';
-        return '<li draggable="true" ' +
+    var seq = 0;
+    q.innerHTML = tasks.map(function(entry) {
+        var isSub = !!entry.isSubtaskEntry;
+        var numberHtml = '';
+        if (!isSub) {
+            seq++;
+            numberHtml = '<span onclick="promptQueueNumber(\'' + entry.task.id + '\')" style="color:var(--cherry-red);font-size:0.75rem;font-weight:700;cursor:pointer;text-decoration:underline;" title="Click to assign index number">' + seq + '.</span> ';
+        }
+        var indentStyle = isSub ? 'margin-left:22px;' : '';
+        var subtaskIcon = isSub ? '<span style="color:var(--amber);margin-right:4px;">\u21B3</span>' : '';
+        var groupBadge = entry.isGroupParent ? '<span style="font-size:0.65rem;color:#888;margin-left:4px;">(parent)</span>' : '';
+        var upDownHtml = !isSub ? (
+            '<span style="display:flex;flex-direction:column;line-height:0.6;">' +
+            '<button class="icon-btn" style="font-size:0.55rem;padding:0;" onclick="event.stopPropagation();nudgeQueueEntry(\'' + entry.task.id + '\', -1)" title="Move up">\u25B2</button>' +
+            '<button class="icon-btn" style="font-size:0.55rem;padding:0;" onclick="event.stopPropagation();nudgeQueueEntry(\'' + entry.task.id + '\', 1)" title="Move down">\u25BC</button>' +
+            '</span>'
+        ) : '';
+        return '<li draggable="true" style="' + indentStyle + '" data-parent-id="' + (entry.parentTaskId || '') + '" data-is-sub="' + isSub + '" ' +
             'ondragstart="queueDragStart(event, \'' + entry.task.id + '\')" ' +
             'ondragover="queueDragOver(event)" ' +
             'ondragleave="queueDragLeave(event)" ' +
             'ondrop="queueDrop(event, \'' + entry.task.id + '\')">' +
             '<div style="display:flex;align-items:center;gap:6px;">' +
-            '<span style="color:var(--cherry-red);font-size:1.1rem;cursor:grab;padding-right:4px;" title="Drag to reorder sequence">≡</span>' +
-            '<span onclick="promptQueueNumber(\'' + entry.task.id + '\')" style="color:var(--cherry-red);font-size:0.75rem;font-weight:700;cursor:pointer;text-decoration:underline;" title="Click to assign index number">' + (idx+1) + '.</span> ' +
-            subtaskIcon + escapeHTML(entry.task.text) +
+            '<span style="color:var(--cherry-red);font-size:1.1rem;cursor:grab;padding-right:4px;" title="Drag to reorder">\u2261</span>' +
+            upDownHtml +
+            numberHtml +
+            subtaskIcon + escapeHTML(entry.task.text) + groupBadge +
             '</div>' +
             getDeadlineBadge(entry.task) +
             '</li>';
     }).join('');
 }
 
-function buildFlowSegments() {
+function nudgeQueueEntry(taskId, direction) {
+    var tasks = getPrioritizedOpenTasks();
+    var parentLevelIds = tasks.filter(function(t) { return !t.isSubtaskEntry; }).map(function(t) { return t.task.id; });
+    var idx = parentLevelIds.indexOf(taskId);
+    if (idx === -1) return;
+    var targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= parentLevelIds.length) return;
+
+    parentLevelIds.splice(idx, 1);
+    parentLevelIds.splice(targetIdx, 0, taskId);
+
+    customQueueOrder = parentLevelIds;
+    storageSet('ff-custom-queue', customQueueOrder);
+    renderInternalQueue();
+}
+
+function buildFlowSegments(columnIndex) {
     var segments = [];
     var openEntries = getPrioritizedOpenTasks();
+    if (columnIndex !== undefined && columnIndex !== null) {
+        openEntries = openEntries.filter(function(e) { return e.ci === columnIndex; });
+    }
     var standardBreak = parseInt(breakInput.value) || 5;
 
     var cumulativeWork = 0;
 
     openEntries.forEach(function(entry, entryIdx) {
+        if (entry.isGroupParent) return; // placeholder only; its own subtasks carry the actual work
         var chunkData = buildChunks(Math.max(1, entry.task.estimateMinutes || 15));
         var chunks = chunkData.chunks;
         var bonusBreakMinutes = chunkData.bonusBreakMinutes;
@@ -641,10 +711,10 @@ function buildFlowSegments() {
     return segments;
 }
 
-function startFlow() {
-    flowSegments = buildFlowSegments();
+function startFlow(columnIndex) {
+    flowSegments = buildFlowSegments(columnIndex);
     if (flowSegments.length === 0) {
-        alert("No open tasks to flow through — add a task with a time estimate first.");
+        alert(columnIndex !== undefined ? "No open tasks in this column to flow through." : "No open tasks to flow through — add a task with a time estimate first.");
         return;
     }
 
@@ -1567,7 +1637,7 @@ function renderBoard() {
     container.querySelectorAll('.task-column').forEach(function(el) { el.remove(); });
 
     var colCountLabel = $('column-count-label');
-    if (colCountLabel) colCountLabel.textContent = boardData.length + '/9 columns';
+    if (colCountLabel) colCountLabel.textContent = boardData.length + '/8 columns';
 
     boardData.forEach(function(col, colIndex) {
         var columnEl = document.createElement('div');
@@ -1712,6 +1782,7 @@ function renderBoard() {
     </ul>
 
     <div class="ai-batch-actions">
+        <button onclick="startFlow(${colIndex})" title="Run Auto Flow using only this column's tasks">Start Flow (this column)</button>
         <button onclick="suggestColumnTimesAI(${colIndex})" title="Suggest Times via AI">Suggest Time</button>
         <button onclick="optimizeColumnFlowAI(${colIndex})" title="Optimize Flow via AI">Optimize</button>
         <button onclick="generateColumnCheckIn(${colIndex})" title="Daily Check-In via AI">Check-In</button>
@@ -1803,7 +1874,7 @@ function toggleColumnCollapse(ci) {
 }
 
 function addColumn() {
-    if (boardData.length >= 9) { alert('Maximum of 9 columns.'); return; }
+    if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
     saveScrollPositions();
     boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
     saveBoardData();
@@ -1876,8 +1947,28 @@ function promptDeadline(ci, ti) {
     input.addEventListener('change', function() {
         task.deadlineTime = this.value || null;
         saveBoardData();
-        saveScrollPositions();
-        renderBoard();
+
+        var replacement;
+        if (task.deadlineTime) {
+            replacement = document.createElement('span');
+            replacement.className = 'deadline-label';
+            replacement.textContent = 'Deadline: ' + new Date(task.deadlineTime).toLocaleString();
+        } else {
+            replacement = document.createElement('button');
+            replacement.className = 'deadline-trigger-btn';
+            replacement.textContent = '+ Deadline';
+        }
+        replacement.setAttribute('onclick', 'promptDeadline(' + ci + ', ' + ti + ')');
+        input.replaceWith(replacement);
+
+        var li = document.getElementById('task-' + ci + '-' + ti);
+        if (li) {
+            var oldBadge = li.querySelector('.deadline-badge');
+            if (oldBadge) oldBadge.remove();
+            var newBadgeHtml = getDeadlineBadge(task);
+            if (newBadgeHtml) replacement.insertAdjacentHTML('afterend', newBadgeHtml);
+        }
+        renderInternalQueue();
     });
     var btn = document.querySelector('[onclick="promptDeadline(' + ci + ', ' + ti + ')"]');
     if (btn) btn.replaceWith(input);
@@ -2189,10 +2280,18 @@ function addPastedTasks(ci) {
 function updateTaskText(ci, ti, v) { boardData[ci].tasks[ti].text = v.trim() || 'Untitled task'; saveBoardData(); }
 function updateTaskEstimate(ci, ti, v) {
     if (isNaN(v) || v < 1) v = 1;
-    boardData[ci].tasks[ti].estimateMinutes = v;
+    var task = boardData[ci].tasks[ti];
+    task.estimateMinutes = v;
     saveBoardData();
-    saveScrollPositions();
-    renderBoard();
+
+    var li = document.getElementById('task-' + ci + '-' + ti);
+    if (li) {
+        li.classList.remove('time-ok', 'time-warn', 'time-over');
+        var cls = urgencyClassFor(task);
+        if (cls) li.classList.add(cls);
+    }
+    renderInternalQueue();
+    if (typeof renderTimeCounter === 'function') renderTimeCounter();
 }
 function moveTask(ci, ti, dir) {
     saveScrollPositions();
@@ -2620,34 +2719,48 @@ function updateStreaksAndBadges() {
 
     var totalCompleted = historyData.length;
     var badgeDefinitions = [
-        { id: 'first', label: 'First Task', condition: totalCompleted >= 1, desc: 'Completed your first task.' },
-        { id: 'ten', label: '10 Tasks', condition: totalCompleted >= 10, desc: 'Finished 10 tasks total.' },
-        { id: 'fifty', label: '50 Tasks', condition: totalCompleted >= 50, desc: 'Reached 50 completed tasks.' },
-        { id: 'hundred', label: '100 Tasks', condition: totalCompleted >= 100, desc: 'A century of tasks.' },
+        { id: 'first', label: 'First Task', condition: totalCompleted >= 1, progress: totalCompleted, target: 1, desc: 'Completed your first task.' },
+        { id: 'ten', label: '10 Tasks', condition: totalCompleted >= 10, progress: totalCompleted, target: 10, desc: 'Finished 10 tasks total.' },
+        { id: 'fifty', label: '50 Tasks', condition: totalCompleted >= 50, progress: totalCompleted, target: 50, desc: 'Reached 50 completed tasks.' },
+        { id: 'hundred', label: '100 Tasks', condition: totalCompleted >= 100, progress: totalCompleted, target: 100, desc: 'A century of tasks.' },
         { id: 'accuracy', label: 'Accuracy Pro', condition: (function() {
             var withBoth = historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; });
             if (withBoth.length < 10) return false;
             var totalDiff = withBoth.reduce(function(a, h) { return a + Math.abs(h.actualMinutes - h.estimateMinutes); }, 0);
             return (totalDiff / withBoth.length) < 3;
-        })(), desc: 'Precise estimations.' },
-        { id: 'flowmaster', label: 'Flow Master', condition: flowBlocksCompleted >= 5, desc: 'Completed 5 flow sessions.' },
-        { id: 'streak7', label: '7-Day Streak', condition: streak >= 7, desc: 'Worked 7 days in a row.' }
+        })(), progress: historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; }).length, target: 10, desc: 'Precise estimations.' },
+        { id: 'flowmaster', label: 'Flow Master', condition: flowBlocksCompleted >= 5, progress: flowBlocksCompleted, target: 5, desc: 'Completed 5 flow sessions.' },
+        { id: 'streak7', label: '7-Day Streak', condition: streak >= 7, progress: streak, target: 7, desc: 'Worked 7 days in a row.' }
     ];
 
     var earned = badgeDefinitions.filter(function(b) { return b.condition; });
+    var nextUp = badgeDefinitions.filter(function(b) { return !b.condition; })
+        .sort(function(a, b) { return (b.progress / b.target) - (a.progress / a.target); })[0];
 
-    streakEl.textContent = 'Streak: ' + streak + ' day' + (streak !== 1 ? 's' : '');
+    var streakColor = streak >= 7 ? '#ff3366' : (streak >= 3 ? '#e08a00' : (streak >= 1 ? '#c9a227' : '#aaa'));
+    var streakGlow = streak >= 7 ? 'filter: drop-shadow(0 0 4px rgba(255,51,102,0.5));' : '';
+    streakEl.innerHTML = '<svg viewBox="0 0 24 24" fill="' + streakColor + '" style="width:16px;height:16px;vertical-align:-3px;' + streakGlow + '"><path d="M12 2c-2 4-2 6 0 8 2-1 2-3 1-4 2 1 3 3 3 5a4 4 0 0 1-8 0c0-3 2-5 4-9z"/></svg> ' +
+        'Streak: <strong style="color:' + streakColor + ';">' + streak + '</strong> day' + (streak !== 1 ? 's' : '');
 
+    var html = '';
     if (earned.length === 0) {
-        badgesEl.innerHTML = '<span style="color:#888;font-size:0.75rem;">No badges yet. Complete tasks to earn milestones.</span>';
+        html += '<span style="color:#888;font-size:0.75rem;">No badges yet, complete tasks to earn milestones.</span>';
     } else {
-        badgesEl.innerHTML = earned.map(function(b) {
-            return `<span class="badge-pill" title="${b.desc}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                ${b.label}
-            </span>`;
+        html += earned.map(function(b) {
+            return '<span class="badge-pill" title="' + b.desc + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ' +
+                b.label +
+                '</span>';
         }).join(' ');
     }
+    if (nextUp) {
+        var pct = Math.min(100, Math.round((nextUp.progress / nextUp.target) * 100));
+        html += '<div class="badge-progress" title="' + nextUp.desc + '">' +
+            '<div style="font-size:0.65rem;color:#888;margin-top:6px;">Next: ' + nextUp.label + ' (' + nextUp.progress + '/' + nextUp.target + ')</div>' +
+            '<div><progress value="' + pct + '" max="100"></progress></div>' +
+            '</div>';
+    }
+    badgesEl.innerHTML = html;
 }
 
 document.addEventListener('keydown', function(e) {
