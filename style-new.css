@@ -45,6 +45,48 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Cherry Blossom Margins Animation */
+.cherry-margin-container {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: calc((100vw - 1100px) / 2);
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+}
+.cherry-margin-container.left { left: 0; }
+.cherry-margin-container.right { right: 0; }
+
+@media (max-width: 1150px) {
+    .cherry-margin-container { display: none; }
+}
+
+.petal {
+    position: absolute;
+    background: var(--border-color-pink);
+    border-radius: 120% 0 120% 0;
+    pointer-events: none;
+    animation: petal-drift linear infinite;
+}
+
+@keyframes petal-drift {
+    0% {
+        transform: translateY(-20px) rotate(0deg) scale(0.8);
+        opacity: 0;
+    }
+    15% {
+        opacity: 0.65;
+    }
+    85% {
+        opacity: 0.65;
+    }
+    100% {
+        transform: translateY(105vh) rotate(360deg) scale(1);
+        opacity: 0;
+    }
+}
+
 /* SPA Views */
 .app-view { display: none; width: 100%; max-width: 1100px; }
 .app-view.active { display: block; }
@@ -290,6 +332,8 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
 .progress-bar { height: 100%; width: 100%; background-color: var(--cherry-red); transition: width 1s linear, background-color 0.4s ease; }
 .progress-bar.urgent { animation: pulse 1s infinite; }
 
+.controls-start-row { display: flex; justify-content: center; margin-bottom: 8px; }
+.controls-start-row #start-pause-btn { flex: none; width: 70%; min-height: 52px; font-size: 1.05rem; }
 .controls { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.8rem; flex-wrap: wrap; }
 
 button { padding: 0.35rem 0.7rem; font-family: var(--font-family); font-size: 0.8rem; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; }

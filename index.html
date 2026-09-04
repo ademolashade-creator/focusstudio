@@ -30,6 +30,20 @@
 </head>
 <body>
 
+    <!-- Cherry Blossom Margins -->
+    <div class="cherry-margin-container left">
+        <div class="petal" style="left: 20%; width: 10px; height: 14px; animation-duration: 9s; animation-delay: 0s;"></div>
+        <div class="petal" style="left: 60%; width: 8px; height: 11px; animation-duration: 12s; animation-delay: 3s;"></div>
+        <div class="petal" style="left: 40%; width: 12px; height: 16px; animation-duration: 7s; animation-delay: 5s;"></div>
+        <div class="petal" style="left: 80%; width: 9px; height: 13px; animation-duration: 10s; animation-delay: 1.5s;"></div>
+    </div>
+    <div class="cherry-margin-container right">
+        <div class="petal" style="left: 30%; width: 11px; height: 15px; animation-duration: 8s; animation-delay: 2s;"></div>
+        <div class="petal" style="left: 70%; width: 8px; height: 11px; animation-duration: 11s; animation-delay: 4s;"></div>
+        <div class="petal" style="left: 50%; width: 10px; height: 14px; animation-duration: 9.5s; animation-delay: 0.5s;"></div>
+        <div class="petal" style="left: 15%; width: 9px; height: 12px; animation-duration: 13s; animation-delay: 6s;"></div>
+    </div>
+
 <!-- Navigation Dock -->
 <nav class="nav-dock">
     <button class="nav-btn active" data-view="timer" onclick="switchView('timer')" title="Timer & Home">
@@ -146,8 +160,10 @@
             <div class="timer-display" id="time-display">25:00</div>
             <div class="progress-bar-container"><div class="progress-bar" id="progress-bar"></div></div>
 
-            <div class="controls">
+            <div class="controls-start-row">
                 <button id="start-pause-btn" onclick="toggleTimer()">Start</button>
+            </div>
+            <div class="controls">
                 <button id="reset-btn" onclick="resetTimer()">Restart</button>
                 <button class="btn-secondary" onclick="openEndSessionModal()">Stop</button>
                 <button class="btn-secondary" onclick="addFiveMinutes()" title="Add 5 minutes">+5 min</button>
@@ -159,7 +175,7 @@
                 <div class="queue-header">Internal Flow Sequence <span style="font-weight:400;font-size:0.65rem;color:#888;">(drag or click number to reorder)</span></div>
                 <ul class="internal-queue" id="internal-flow-queue"></ul>
             </div>
-
+            
             <!-- Flow Buttons -->
             <button class="lock-btn" id="start-flow-btn" onclick="startFlow()">Start My Flow</button>
             <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
