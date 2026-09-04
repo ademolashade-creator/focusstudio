@@ -153,10 +153,12 @@ const quotes = [
 ];
 let quoteInterval = null;
 function rotateQuote() {
-    const banner = document.getElementById('quote-banner');
-    if (!banner) return;
     const randomIndex = Math.floor(Math.random() * quotes.length);
-    banner.textContent = '“' + quotes[randomIndex] + '”';
+    const text = '“' + quotes[randomIndex] + '”';
+    const timerBanner = document.getElementById('quote-banner');
+    const tasksBanner = document.getElementById('quote-banner-tasks');
+    if (timerBanner) timerBanner.textContent = text;
+    if (tasksBanner) tasksBanner.textContent = text;
 }
 function startQuoteRotation() {
     rotateQuote();
@@ -165,27 +167,32 @@ function startQuoteRotation() {
 }
 
 async function generateTaskAwareClockInQuote() {
-    const banner = document.getElementById('quote-banner');
-    if (!banner) return;
+    const tipEl = document.getElementById('daily-kickoff-tip');
+    if (!tipEl) return;
+    function fallback() {
+        var q = quotes[Math.floor(Math.random() * quotes.length)];
+        tipEl.textContent = '“' + q + '”';
+    }
     let openTasks = [];
     boardData.forEach(col => {
         col.tasks.forEach(t => { if (!t.completed) openTasks.push(t.text); });
     });
     if (openTasks.length === 0) {
-        rotateQuote();
+        fallback();
         return;
     }
     const apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) {
-        rotateQuote();
+        fallback();
         return;
     }
     try {
         const prompt = 'Give a short, powerful, encouraging operational tip or productivity strategy for starting work today given these open tasks: ' + JSON.stringify(openTasks.slice(0, 5)) + '. Keep it under 20 words. No em-dashes.';
         const res = await callGemini(prompt);
-        if (res) banner.textContent = '“' + res.trim() + '”';
+        if (res) tipEl.textContent = '“' + res.trim() + '”';
+        else fallback();
     } catch(e) {
-        rotateQuote();
+        fallback();
     }
 }
 
@@ -938,7 +945,22 @@ function executeClockIn(latenessReason) {
     clockState = { clockedIn: true, startedAt: Date.now(), latenessReason: latenessReason || 'On Time' };
     storageSet('ff-clock-state', clockState);
     renderAttendanceCard();
+    openDailyKickoff();
+}
+
+function openDailyKickoff() {
+    var overlay = $('daily-kickoff-overlay');
+    var tipEl = $('daily-kickoff-tip');
+    var stateSelect = $('cognitive-state-select');
+    if (stateSelect) stateSelect.value = (typeof cognitiveState !== 'undefined' && cognitiveState) ? cognitiveState : 'steady';
+    if (tipEl) tipEl.textContent = 'Thinking of a tip for today...';
+    if (overlay) overlay.style.display = 'flex';
     generateTaskAwareClockInQuote();
+}
+
+function closeDailyKickoff() {
+    var overlay = $('daily-kickoff-overlay');
+    if (overlay) overlay.style.display = 'none';
 }
 
 function calculateTodayCompletionRatio() {
@@ -984,10 +1006,12 @@ function finalizeClockOut() {
     const todayStr = new Date().toLocaleDateString();
 
     const ratio = calculateTodayCompletionRatio();
-    if (ratio > 0.6) {
+    if (ratio >= 0.6) {
         showConfettiCelebration();
-    } else if (ratio === 0.5) {
-        alert('Motivational Checkpoint: You have achieved 50% completion today. Steady progress wins the marathon.');
+    } else if (ratio >= 0.4) {
+        alert('Steady Checkpoint: solid progress today. Consistency beats intensity.');
+    } else {
+        alert('Every day does not need to be your best day. What matters is that you showed up. Tomorrow is another chance.');
     }
 
     clockLog.unshift({
@@ -1419,10 +1443,29 @@ function startVoiceInput(ci) {
     recognition.start();
 }
 
-function promptPDFExport() {
-    var choice = prompt("Type 'all' to export all project cards, or enter the exact title of a single project card to export:", "all");
-    if (choice === null) return;
-    generatePDFReport(choice.trim().toLowerCase() === 'all' ? null : choice.trim());
+function openPdfExportOverlay() {
+    var sel = $('pdf-export-column-select');
+    if (sel) {
+        var options = '<option value="__all__">All columns</option>';
+        boardData.forEach(function(col) {
+            options += '<option value="' + escapeHTML(col.title) + '">' + escapeHTML(col.title) + '</option>';
+        });
+        sel.innerHTML = options;
+    }
+    var overlay = $('pdf-export-overlay');
+    if (overlay) overlay.style.display = 'flex';
+}
+
+function closePdfExportOverlay() {
+    var overlay = $('pdf-export-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function confirmPdfExport() {
+    var sel = $('pdf-export-column-select');
+    var value = sel ? sel.value : '__all__';
+    closePdfExportOverlay();
+    generatePDFReport(value === '__all__' ? null : value);
 }
 
 function generatePDFReport(singleCardTitle) {
@@ -1509,7 +1552,7 @@ function renderBoard() {
     container.querySelectorAll('.task-column').forEach(function(el) { el.remove(); });
 
     var colCountLabel = $('column-count-label');
-    if (colCountLabel) colCountLabel.textContent = boardData.length + '/8 columns';
+    if (colCountLabel) colCountLabel.textContent = boardData.length + '/9 columns';
 
     boardData.forEach(function(col, colIndex) {
         var columnEl = document.createElement('div');
@@ -1657,7 +1700,7 @@ function renderBoard() {
         <button onclick="suggestColumnTimesAI(${colIndex})" title="Suggest Times via AI">Suggest Time</button>
         <button onclick="optimizeColumnFlowAI(${colIndex})" title="Optimize Flow via AI">Optimize</button>
         <button onclick="generateColumnCheckIn(${colIndex})" title="Daily Check-In via AI">Check-In</button>
-        <button onclick="promptPDFExport()" title="PDF Report">PDF Export</button>
+        <button onclick="generatePDFReport(boardData[${colIndex}].title)" title="Export this column to PDF">PDF Export</button>
     </div>
 
     ${suggestionsHtml}
@@ -1737,7 +1780,7 @@ function toggleColumnCollapse(ci) {
 }
 
 function addColumn() {
-    if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
+    if (boardData.length >= 9) { alert('Maximum of 9 columns.'); return; }
     saveScrollPositions();
     boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
     saveBoardData();
@@ -2031,6 +2074,8 @@ function addTask(ci) {
         originalDate: null
     };
     col.tasks.push(task);
+    customQueueOrder.unshift(task.id);
+    storageSet('ff-custom-queue', customQueueOrder);
     input.value = '';
     saveBoardData();
     saveScrollPositions();
@@ -2459,10 +2504,6 @@ async function breakdownTask() {
             alert('This task is simple enough as a single unit.');
             closeDetailsModal();
             return;
-        }
-
-        if (subtasks.length > 8) {
-            subtasks = subtasks.slice(0, 8);
         }
 
         subtasks = subtasks.filter(function(st) { return st.text && st.text.trim().length > 0; });

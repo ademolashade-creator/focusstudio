@@ -60,7 +60,7 @@
             </button>
         </div>
         <p class="tagline">Curate your day, honor your energy, and master your workflow.</p>
-        <div id="quote-banner" class="quote-banner">✨ “Focus is the art of knowing what to ignore.” — James Clear</div>
+        <div id="quote-banner" class="quote-banner">“Focus is the art of knowing what to ignore.” — James Clear</div>
 
         <!-- Attendance + buttons -->
         <div class="attendance-container">
@@ -139,29 +139,6 @@
        </div>
     </header>
 
-    <div class="top-section">
-        <!-- Adaptive Brain Engine & Pacing -->
-        <div class="hacks-card" style="width:100%;">
-            <details open>
-                <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">Adaptive Brain Engine & Flow Pacing</summary>
-                <div style="margin-top:8px;">
-                    <div class="setting-group" style="margin-bottom:8px;">
-                        <label for="cognitive-state-select">Cognitive State Selector</label>
-                        <select id="cognitive-state-select" class="attendance-time-input" onchange="updateCognitiveState(this.value)">
-                            <option value="steady">Steady &amp; Focused (25m)</option>
-                            <option value="peak">Peak Cognitive Flow (45m)</option>
-                            <option value="recovery">Low Energy / Recovery (15m)</option>
-                        </select>
-                    </div>
-                    <div class="hacks-content" id="adaptive-hacks">Analyzing your current task load...</div>
-                    <div style="display:flex;gap:8px;margin-top:8px;">
-                        <button class="btn-secondary" style="flex:1;" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
-                    </div>
-                </div>
-            </details>
-        </div>
-    </div>
-
     <!-- Timer Card & Internal Queue -->
     <div class="timer-card-wrapper" style="max-width:1100px;margin:0 auto;">
         <div class="timer-card">
@@ -209,11 +186,12 @@
     <header>
         <h2 style="color:var(--cherry-red);margin-bottom:0.2rem;">Tasks Kanban Board</h2>
         <p class="tagline">Manage projects, subtasks, deadlines, and AI workflow optimization.</p>
+        <div id="quote-banner-tasks" class="quote-banner">“Focus is the art of knowing what to ignore.” — James Clear</div>
     </header>
     <div class="board-area">
         <div class="board-container" id="board-container"></div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.8rem; max-width:1100px; margin-left:auto; margin-right:auto;">
-            <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/8 columns</span>
+            <span id="column-count-label" style="font-size:0.85rem;color:#888;">3/9 columns</span>
             <button class="add-task-btn" onclick="addColumn()">+ Add Column</button>
         </div>
     </div>
@@ -277,7 +255,9 @@
                 <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
                 <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
             </div>
-            <div class="summary-content" id="brain-engine-report-content" style="min-height:100px;">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
+            <div class="hacks-content" id="adaptive-hacks" style="margin-bottom:0.8rem;">Analyzing your current task load...</div>
+            <div class="summary-content" id="brain-engine-report-content" style="min-height:100px;margin-bottom:0.8rem;">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
+            <button class="btn-secondary" style="width:100%;" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
         </div>
 
         <!-- AI Reports & Briefs Card -->
@@ -288,7 +268,7 @@
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                     <button class="ai-btn" onclick="generateAISummary(false)">Generate Client Report</button>
                     <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">Download .ics</button>
-                    <button class="ai-btn" onclick="promptPDFExport()" style="background:var(--amber);">PDF Report</button>
+                    <button class="ai-btn" onclick="openPdfExportOverlay()" style="background:var(--amber);">PDF Report</button>
                 </div>
             </div>
             <div class="summary-content" id="summary-content" style="margin-top:10px;">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
@@ -356,6 +336,36 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="daily-kickoff-overlay">
+    <div class="modal-box">
+        <h2 style="color:var(--cherry-red);margin-top:0;">Today's Focus</h2>
+        <p id="daily-kickoff-tip" style="font-style:italic;font-size:0.95rem;min-height:2.4em;">Thinking of a tip for today...</p>
+        <div class="setting-group" style="margin:14px 0;text-align:left;">
+            <label for="cognitive-state-select">How are you feeling today?</label>
+            <select id="cognitive-state-select" class="attendance-time-input" onchange="updateCognitiveState(this.value)">
+                <option value="steady">Steady &amp; Focused (25m)</option>
+                <option value="peak">Peak Cognitive Flow (45m)</option>
+                <option value="recovery">Low Energy / Recovery (15m)</option>
+            </select>
+        </div>
+        <button class="btn-primary" style="width:100%;" onclick="closeDailyKickoff()">Let's go</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="pdf-export-overlay">
+    <div class="modal-box">
+        <h2 style="color:var(--cherry-red);margin-top:0;">Export to PDF</h2>
+        <p style="font-size:0.9rem;">Choose what to include:</p>
+        <select id="pdf-export-column-select" style="width:100%;padding:8px;margin-bottom:15px;border-radius:6px;">
+            <option value="__all__">All columns</option>
+        </select>
+        <div class="modal-actions">
+            <button class="btn-primary" onclick="confirmPdfExport()">Generate PDF</button>
+            <button class="btn-secondary" onclick="closePdfExportOverlay()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="early-clockout-overlay">
     <div class="modal-box">
         <h2 style="color:var(--amber);margin-top:0;">Early Clock-Out</h2>
@@ -386,10 +396,10 @@
         <p style="font-size:1.2rem;font-weight:700;">You have been away for: <br><span id="break-away-time" style="font-size:2rem;color:var(--text-color);">00:00</span></p>
         <label style="font-size:0.8rem;font-weight:700;display:block;text-align:left;margin-bottom:4px;">Tag this break:</label>
         <select id="break-reason-select" style="width:100%;padding:8px;margin-bottom:15px;border-radius:6px;">
-            <option value="Lunch">Lunch</option>
-            <option value="Meeting">Meeting</option>
-            <option value="Errand">Errand</option>
             <option value="Rest">Rest</option>
+            <option value="Stretch">Stretch</option>
+            <option value="Meal">Meal</option>
+            <option value="Reflection">Reflection</option>
             <option value="Other">Other</option>
         </select>
         <button class="btn-primary" style="width:100%;" onclick="resumeFromBreak()">Resume Work</button>
@@ -403,9 +413,9 @@
         <label style="font-size:0.8rem;font-weight:700;display:block;text-align:left;margin-bottom:4px;">Tag this break:</label>
         <select id="flow-break-reason-select" style="width:100%;padding:8px;margin-bottom:15px;border-radius:6px;">
             <option value="Interruption">Interruption</option>
-            <option value="Lunch">Lunch</option>
-            <option value="Client Call">Client Call</option>
-            <option value="Rest">Rest / Break</option>
+            <option value="Bathroom">Bathroom</option>
+            <option value="Phone Call">Phone Call</option>
+            <option value="Other">Other</option>
         </select>
         <button class="btn-primary" style="width:100%;" onclick="resumeFromFlowBreak()">Resume Work</button>
     </div>
@@ -534,7 +544,9 @@
     window.updateCognitiveState = updateCognitiveState;
     window.promptQueueNumber = promptQueueNumber;
     window.generateBrainEngineReport = generateBrainEngineReport;
-    window.promptPDFExport = promptPDFExport;
+    window.openPdfExportOverlay = openPdfExportOverlay;
+    window.closePdfExportOverlay = closePdfExportOverlay;
+    window.confirmPdfExport = confirmPdfExport;
 </script>
 </body>
 </html>
