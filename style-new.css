@@ -349,6 +349,12 @@ button:active { transform: scale(0.96); }
 .btn-secondary, #reset-btn { background-color: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); }
 .lock-btn { background-color: var(--input-bg); color: var(--cherry-red); border: 1px solid var(--cherry-red); width: 100%; margin-top: 5px; padding: 0.4rem 0.6rem; }
 .lock-btn.active { background-color: var(--cherry-red); color: white; }
+
+.now-playing-bar { border-top: 1px dashed var(--border-color); margin-top: 12px; padding-top: 10px; text-align: left; }
+.now-playing-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; font-size: 0.8rem; color: var(--cherry-red); }
+.now-playing-body { margin-top: 8px; }
+.now-playing-controls { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+.now-playing-controls button { flex: 1; }
 .reestimate-btn { width: 100%; padding: 0.35rem 0.6rem; min-height: 34px; font-size: 0.78rem; }
 
 .settings { border-top: 1px dashed var(--border-color); padding-top: 0.8rem; display: flex; flex-direction: column; gap: 6px; }

@@ -1764,10 +1764,18 @@ function renderBoard() {
     }, 0);
     
     restoreScrollPositions();
-    requestAnimationFrame(function() { window.scrollTo(0, __pageScrollY); });
+    (function pinScroll(targetY, durationMs) {
+        var start = performance.now();
+        function step() {
+            window.scrollTo(0, targetY);
+            if (performance.now() - start < durationMs) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    })(__pageScrollY, 280);
 }
 
 function toggleSubtasksCollapse(ci, ti) {
+    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.collapsed = !task.collapsed;
     saveBoardData();
@@ -3047,9 +3055,94 @@ function generateICS() {
     URL.revokeObjectURL(a.href);
 }
 
+// ---------- Now Playing: YouTube link player ----------
+var ytPlayer = null;
+var ytApiReady = false;
+var ytPendingVideoId = null;
+
+window.onYouTubeIframeAPIReady = function() {
+    ytApiReady = true;
+    if (ytPendingVideoId) {
+        createOrLoadYtPlayer(ytPendingVideoId);
+        ytPendingVideoId = null;
+    }
+};
+
+function loadYoutubeIframeApiScript() {
+    if (document.getElementById('youtube-iframe-api-script')) return;
+    var tag = document.createElement('script');
+    tag.id = 'youtube-iframe-api-script';
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.body.appendChild(tag);
+}
+
+function extractYoutubeId(url) {
+    var m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : null;
+}
+
+function createOrLoadYtPlayer(videoId) {
+    if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
+        ytPlayer.loadVideoById(videoId);
+        return;
+    }
+    ytPlayer = new YT.Player('yt-player-mount', {
+        height: '146',
+        width: '260',
+        videoId: videoId,
+        playerVars: { rel: 0 }
+    });
+}
+
+function loadYoutubeTrack() {
+    var input = $('yt-link-input');
+    if (!input) return;
+    var videoId = extractYoutubeId(input.value.trim());
+    if (!videoId) { alert('Please paste a valid YouTube link.'); return; }
+    storageSet('ff-now-playing-id', videoId);
+    if (ytApiReady) {
+        createOrLoadYtPlayer(videoId);
+    } else {
+        ytPendingVideoId = videoId;
+        loadYoutubeIframeApiScript();
+    }
+}
+
+function ytPlay() { if (ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo(); }
+function ytPause() { if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo(); }
+function ytRestart() {
+    if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+        ytPlayer.seekTo(0);
+        ytPlayer.playVideo();
+    }
+}
+
+function toggleNowPlaying() {
+    var body = $('now-playing-body');
+    var icon = $('now-playing-toggle-icon');
+    if (!body) return;
+    var isCollapsed = body.style.display === 'none';
+    body.style.display = isCollapsed ? 'block' : 'none';
+    if (icon) icon.innerHTML = isCollapsed ? '&#9662;' : '&#9656;';
+    storageSet('ff-now-playing-collapsed', !isCollapsed);
+    if (isCollapsed) {
+        var savedId = storageGet('ff-now-playing-id', null);
+        var input = $('yt-link-input');
+        if (savedId && input && !input.value) {
+            input.value = 'https://youtu.be/' + savedId;
+        }
+    }
+}
+
 function initApp() {
     applySettings();
     applyAttendanceCollapseState();
+    if (!storageGet('ff-now-playing-collapsed', true)) {
+        var npBody = $('now-playing-body');
+        var npIcon = $('now-playing-toggle-icon');
+        if (npBody) npBody.style.display = 'block';
+        if (npIcon) npIcon.innerHTML = '&#9662;';
+    }
     updateClocks();
     setInterval(updateClocks, 1000);
     if (typeof adjustTasksForMidnight === 'function') adjustTasksForMidnight();

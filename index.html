@@ -167,7 +167,7 @@
     </header>
 
     <!-- Timer Card & Internal Queue -->
-    <div class="timer-card-wrapper" style="max-width:480px;margin:0 auto;">
+    <div class="timer-card-wrapper" style="max-width:560px;margin:0 auto;">
         <div class="timer-card">
             <div id="mode-indicator">Work Time</div>
             <div class="timer-display" id="time-display">25:00</div>
@@ -204,6 +204,26 @@
                 <div class="setting-row">
                     <div class="setting-group"><label for="work-input">Work (min)</label><input type="number" id="work-input" value="25" min="1" max="120" onchange="updateSettings()"></div>
                     <div class="setting-group"><label for="break-input">Break (min)</label><input type="number" id="break-input" value="5" min="1" max="60" onchange="updateSettings()"></div>
+                </div>
+            </div>
+
+            <!-- Now Playing -->
+            <div class="now-playing-bar">
+                <div class="now-playing-header" onclick="toggleNowPlaying()">
+                    <span>Now Playing</span>
+                    <span id="now-playing-toggle-icon">&#9656;</span>
+                </div>
+                <div class="now-playing-body" id="now-playing-body" style="display:none;">
+                    <div style="display:flex;gap:6px;">
+                        <input type="text" id="yt-link-input" class="attendance-time-input" style="flex:1;" placeholder="Paste a YouTube link...">
+                        <button class="btn-secondary btn-small" onclick="loadYoutubeTrack()">Load</button>
+                    </div>
+                    <div id="yt-player-mount" style="margin:10px auto 0;max-width:260px;"></div>
+                    <div class="now-playing-controls">
+                        <button class="btn-secondary btn-small" onclick="ytPlay()">Play</button>
+                        <button class="btn-secondary btn-small" onclick="ytPause()">Pause</button>
+                        <button class="btn-secondary btn-small" onclick="ytRestart()">Restart</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -502,6 +522,11 @@
     window.toggleBreak = toggleBreak;
     window.toggleClock = toggleClock;
     window.toggleAttendanceCollapse = toggleAttendanceCollapse;
+    window.loadYoutubeTrack = loadYoutubeTrack;
+    window.ytPlay = ytPlay;
+    window.ytPause = ytPause;
+    window.ytRestart = ytRestart;
+    window.toggleNowPlaying = toggleNowPlaying;
     window.proceedEarlyClockOut = proceedEarlyClockOut;
     window.cancelEarlyClockOut = cancelEarlyClockOut;
     window.openDailyWrapUp = openDailyWrapUp;
