@@ -32,16 +32,28 @@
 
     <!-- Cherry Blossom Margins -->
     <div class="cherry-margin-container left">
-        <div class="petal" style="left: 20%; width: 10px; height: 14px; animation-duration: 9s; animation-delay: 0s;"></div>
-        <div class="petal" style="left: 60%; width: 8px; height: 11px; animation-duration: 12s; animation-delay: 3s;"></div>
-        <div class="petal" style="left: 40%; width: 12px; height: 16px; animation-duration: 7s; animation-delay: 5s;"></div>
-        <div class="petal" style="left: 80%; width: 9px; height: 13px; animation-duration: 10s; animation-delay: 1.5s;"></div>
+        <div class="petal" style="left: 86%; width: 7px; height: 9px; animation-duration: 9.2s; animation-delay: 2.0s;"></div>
+        <div class="petal" style="left: 18%; width: 12px; height: 17px; animation-duration: 11.4s; animation-delay: 5.3s;"></div>
+        <div class="petal" style="left: 9%; width: 7px; height: 9px; animation-duration: 8.9s; animation-delay: 5.4s;"></div>
+        <div class="petal" style="left: 76%; width: 8px; height: 12px; animation-duration: 12.6s; animation-delay: 3.8s;"></div>
+        <div class="petal" style="left: 62%; width: 11px; height: 15px; animation-duration: 14.0s; animation-delay: 6.8s;"></div>
+        <div class="petal" style="left: 25%; width: 12px; height: 17px; animation-duration: 9.2s; animation-delay: 1.9s;"></div>
+        <div class="petal" style="left: 48%; width: 7px; height: 9px; animation-duration: 7.8s; animation-delay: 7.6s;"></div>
+        <div class="petal" style="left: 82%; width: 9px; height: 13px; animation-duration: 12.8s; animation-delay: 4.8s;"></div>
+        <div class="petal" style="left: 53%; width: 7px; height: 10px; animation-duration: 13.6s; animation-delay: 5.6s;"></div>
+        <div class="petal" style="left: 51%; width: 11px; height: 15px; animation-duration: 7.6s; animation-delay: 6.0s;"></div>
     </div>
     <div class="cherry-margin-container right">
-        <div class="petal" style="left: 30%; width: 11px; height: 15px; animation-duration: 8s; animation-delay: 2s;"></div>
-        <div class="petal" style="left: 70%; width: 8px; height: 11px; animation-duration: 11s; animation-delay: 4s;"></div>
-        <div class="petal" style="left: 50%; width: 10px; height: 14px; animation-duration: 9.5s; animation-delay: 0.5s;"></div>
-        <div class="petal" style="left: 15%; width: 9px; height: 12px; animation-duration: 13s; animation-delay: 6s;"></div>
+        <div class="petal" style="left: 42%; width: 7px; height: 10px; animation-duration: 13.9s; animation-delay: 3.4s;"></div>
+        <div class="petal" style="left: 63%; width: 12px; height: 18px; animation-duration: 8.3s; animation-delay: 3.2s;"></div>
+        <div class="petal" style="left: 90%; width: 9px; height: 13px; animation-duration: 12.5s; animation-delay: 0.6s;"></div>
+        <div class="petal" style="left: 86%; width: 8px; height: 11px; animation-duration: 9.0s; animation-delay: 4.2s;"></div>
+        <div class="petal" style="left: 39%; width: 12px; height: 17px; animation-duration: 8.8s; animation-delay: 2.9s;"></div>
+        <div class="petal" style="left: 12%; width: 8px; height: 12px; animation-duration: 13.4s; animation-delay: 3.6s;"></div>
+        <div class="petal" style="left: 13%; width: 8px; height: 12px; animation-duration: 11.5s; animation-delay: 6.5s;"></div>
+        <div class="petal" style="left: 32%; width: 12px; height: 17px; animation-duration: 14.1s; animation-delay: 5.8s;"></div>
+        <div class="petal" style="left: 23%; width: 9px; height: 12px; animation-duration: 13.0s; animation-delay: 4.9s;"></div>
+        <div class="petal" style="left: 79%; width: 10px; height: 15px; animation-duration: 10.2s; animation-delay: 2.0s;"></div>
     </div>
 
 <!-- Navigation Dock -->
@@ -80,6 +92,7 @@
         <div class="attendance-container">
             <div class="attendance-card">
                 <div class="attendance-header">
+                    <button class="icon-btn" id="attendance-collapse-btn" onclick="toggleAttendanceCollapse()" title="Collapse" style="padding:2px 6px;">&#9662;</button>
                     <span class="attendance-title">
                         <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Attendance
                     </span>
@@ -91,7 +104,7 @@
                         <button class="btn-secondary btn-small" id="clock-btn" onclick="toggleClock()">Clock In</button>
                     </span>
                 </div>
-                <div class="attendance-body">
+                <div class="attendance-body" id="attendance-body">
                     <div class="attendance-row">
                         <div class="attendance-field">
                             <label>Scheduled In</label>
@@ -154,7 +167,7 @@
     </header>
 
     <!-- Timer Card & Internal Queue -->
-    <div class="timer-card-wrapper" style="max-width:1100px;margin:0 auto;">
+    <div class="timer-card-wrapper" style="max-width:480px;margin:0 auto;">
         <div class="timer-card">
             <div id="mode-indicator">Work Time</div>
             <div class="timer-display" id="time-display">25:00</div>
@@ -200,7 +213,7 @@
 <!-- VIEW 2: TASKS BOARD (#tasks) -->
 <div id="view-tasks" class="app-view" style="display:none;">
     <header>
-        <h2 style="color:var(--cherry-red);margin-bottom:0.2rem;">Tasks Kanban Board</h2>
+        <h2 style="color:var(--cherry-red);margin-bottom:0.2rem;">Tasks Board</h2>
         <p class="tagline">Manage projects, subtasks, deadlines, and AI workflow optimization.</p>
         <div id="quote-banner-tasks" class="quote-banner">“Focus is the art of knowing what to ignore.” — James Clear</div>
     </header>
@@ -265,17 +278,6 @@
     </header>
     <div class="top-section" style="max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:1.5rem;">
         
-        <!-- AI Adaptive Brain Engine Report Card -->
-        <div class="summary-container" style="width:100%;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
-                <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
-                <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
-            </div>
-            <div class="hacks-content" id="adaptive-hacks" style="margin-bottom:0.8rem;">Analyzing your current task load...</div>
-            <div class="summary-content" id="brain-engine-report-content" style="min-height:100px;margin-bottom:0.8rem;">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
-            <button class="btn-secondary" style="width:100%;" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
-        </div>
-
         <!-- AI Reports & Briefs Card -->
         <div class="summary-container" style="width:100%;">
             <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate.</div>
@@ -288,6 +290,17 @@
                 </div>
             </div>
             <div class="summary-content" id="summary-content" style="margin-top:10px;">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
+        </div>
+
+        <!-- AI Adaptive Brain Engine Report Card -->
+        <div class="summary-container" style="width:100%;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+                <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
+                <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
+            </div>
+            <div class="hacks-content" id="adaptive-hacks" style="margin-bottom:0.8rem;">Analyzing your current task load...</div>
+            <div class="summary-content" id="brain-engine-report-content" style="min-height:100px;margin-bottom:0.8rem;">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
+            <button class="btn-secondary reestimate-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
         </div>
 
         <!-- System Configuration (Collapsible) -->
@@ -488,6 +501,7 @@
     window.toggleDarkMode = toggleDarkMode;
     window.toggleBreak = toggleBreak;
     window.toggleClock = toggleClock;
+    window.toggleAttendanceCollapse = toggleAttendanceCollapse;
     window.proceedEarlyClockOut = proceedEarlyClockOut;
     window.cancelEarlyClockOut = cancelEarlyClockOut;
     window.openDailyWrapUp = openDailyWrapUp;
@@ -533,8 +547,6 @@
     window.optimizeColumnFlowAI = optimizeColumnFlowAI;
     window.applyTaskEstimate = applyTaskEstimate;
     window.dismissTaskEstimate = dismissTaskEstimate;
-    window.applyAllEstimates = applyAllEstimates;
-    window.dismissAllEstimates = dismissAllEstimates;
     window.generateColumnCheckIn = generateColumnCheckIn;
     window.startVoiceInput = startVoiceInput;
     window.naturalLanguageAddTask = naturalLanguageAddTask;

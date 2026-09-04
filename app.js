@@ -868,6 +868,20 @@ function saveAttendanceSettings() {
     renderAttendanceCard();
 }
 
+function toggleAttendanceCollapse() {
+    var collapsed = !storageGet('ff-attendance-collapsed', false);
+    storageSet('ff-attendance-collapsed', collapsed);
+    applyAttendanceCollapseState();
+}
+
+function applyAttendanceCollapseState() {
+    var collapsed = storageGet('ff-attendance-collapsed', false);
+    var body = $('attendance-body');
+    var icon = $('attendance-collapse-btn');
+    if (body) body.style.display = collapsed ? 'none' : 'flex';
+    if (icon) icon.innerHTML = collapsed ? '&#9656;' : '&#9662;';
+}
+
 function toggleClock() {
     if (clockState.clockedIn) {
         const now = new Date();
@@ -1354,7 +1368,7 @@ function setupRecurringTasks() {
     var today = getTodayKey();
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
-            if (!task.recurrence || task.completed) return;
+            if (!task.recurrence) return;
 
             var shouldCreateNew = shouldRecurToday(task);
             if (shouldCreateNew) {
@@ -1547,6 +1561,7 @@ function getTodayCompleted() {
 }
 
 function renderBoard() {
+    var __pageScrollY = window.scrollY || document.documentElement.scrollTop || 0;
     var container = $('board-container');
     if (!container) return;
     container.querySelectorAll('.task-column').forEach(function(el) { el.remove(); });
@@ -1700,7 +1715,6 @@ function renderBoard() {
         <button onclick="suggestColumnTimesAI(${colIndex})" title="Suggest Times via AI">Suggest Time</button>
         <button onclick="optimizeColumnFlowAI(${colIndex})" title="Optimize Flow via AI">Optimize</button>
         <button onclick="generateColumnCheckIn(${colIndex})" title="Daily Check-In via AI">Check-In</button>
-        <button onclick="generatePDFReport(boardData[${colIndex}].title)" title="Export this column to PDF">PDF Export</button>
     </div>
 
     ${suggestionsHtml}
@@ -1750,6 +1764,7 @@ function renderBoard() {
     }, 0);
     
     restoreScrollPositions();
+    requestAnimationFrame(function() { window.scrollTo(0, __pageScrollY); });
 }
 
 function toggleSubtasksCollapse(ci, ti) {
@@ -1967,7 +1982,12 @@ function updateFocusScore() {
     var todayBreaks = breakLog.filter(function(b) { return new Date(b.date).toLocaleDateString() === new Date().toLocaleDateString(); });
     var breakScore = todayBreaks.length > 0 ? Math.min(100, Math.round(100 / (todayBreaks.length))) : 100;
 
-    var overall = Math.round((flowScore * 0.5) + (completionScore * 0.3) + (breakScore * 0.2));
+    var overall;
+    if (totalToday === 0 && completedToday === 0 && totalTracked === 0) {
+        overall = 0;
+    } else {
+        overall = Math.round((flowScore * 0.5) + (completionScore * 0.3) + (breakScore * 0.2));
+    }
 
     var grade = 'Excellent';
     var color = 'var(--green)';
@@ -3029,6 +3049,7 @@ function generateICS() {
 
 function initApp() {
     applySettings();
+    applyAttendanceCollapseState();
     updateClocks();
     setInterval(updateClocks, 1000);
     if (typeof adjustTasksForMidnight === 'function') adjustTasksForMidnight();
