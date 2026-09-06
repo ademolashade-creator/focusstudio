@@ -62,6 +62,22 @@ body {
     .cherry-margin-container { display: none; }
 }
 
+.cherry-fullscreen-container {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+.timer-blossom { animation-name: petal-drift-faint !important; }
+@keyframes petal-drift-faint {
+    0% { transform: translateY(-20px) rotate(0deg) scale(0.8); opacity: 0; }
+    15% { opacity: 0.35; }
+    85% { opacity: 0.35; }
+    100% { transform: translateY(105vh) rotate(360deg) scale(1); opacity: 0; }
+}
+
 .petal {
     position: absolute;
     background: var(--border-color-pink);
@@ -94,7 +110,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .petal, .blossom-flower { animation: none; opacity: 0; }
+    .petal, .blossom-flower, .timer-blossom { animation: none !important; opacity: 0; }
 }
 
 /* SPA Views */
@@ -365,7 +381,11 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
 .quick-add-status { font-size: 0.72rem; color: var(--cherry-red); margin-top: 4px; padding-left: 4px; min-height: 1em; }
 @media (max-width: 700px) {
     .quick-add-row { flex-wrap: wrap; }
-    .quick-add-row select { max-width: none; flex: 1; }
+    .quick-add-row input[type="text"] { flex: 1 1 100%; order: 1; }
+    #quick-add-mic-btn { order: 2; }
+    .quick-add-row select { order: 3; flex: 1; max-width: none; }
+    .quick-add-row button:not(#quick-add-mic-btn) { order: 4; }
+    #view-tasks h2 button { display: block; margin: 6px 0 0 !important; }
 }
 
 .daily-planning-panel {
