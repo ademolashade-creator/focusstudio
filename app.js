@@ -1032,6 +1032,7 @@ function executeClockIn(latenessReason) {
     storageSet('ff-clock-state', clockState);
     renderAttendanceCard();
     openDailyKickoff();
+    setTimeout(function() { maybeOfferDailyPlanning(); }, 4000);
 }
 
 function openDailyKickoff() {
@@ -1047,7 +1048,6 @@ function openDailyKickoff() {
 function closeDailyKickoff() {
     var overlay = $('daily-kickoff-overlay');
     if (overlay) overlay.style.display = 'none';
-    maybeOfferDailyPlanning();
 }
 
 function maybeOfferDailyPlanning() {
@@ -1930,6 +1930,7 @@ function renderBoard() {
     renderTimeCounter();
     renderInternalQueue();
     updateStreaksAndBadges();
+    renderBlossomTree();
     updateDailyProgress();
     updateFocusScore();
 
@@ -2809,6 +2810,57 @@ async function breakdownTask() {
 
     } catch (e) {
         alert('AI breakdown error: ' + e.message);
+    }
+}
+
+function makeStaticBlossom(x, y, scale) {
+    scale = scale || 1;
+    var petals = [];
+    for (var i = 0; i < 5; i++) {
+        var angle = i * 72;
+        petals.push('<ellipse cx="' + x + '" cy="' + (y - 5 * scale) + '" rx="' + (3.5 * scale) + '" ry="' + (5 * scale) + '" fill="var(--border-color-pink)" transform="rotate(' + angle + ' ' + x + ' ' + y + ')"/>');
+    }
+    return petals.join('') + '<circle cx="' + x + '" cy="' + y + '" r="' + (1.8 * scale) + '" fill="var(--cherry-red)"/>';
+}
+
+function renderBlossomTree() {
+    var container = document.getElementById('blossom-tree-container');
+    var caption = document.getElementById('blossom-tree-caption');
+    if (!container) return;
+
+    var totalCompleted = historyData.length;
+    var stage = totalCompleted >= 100 ? 4 : totalCompleted >= 50 ? 3 : totalCompleted >= 20 ? 2 : totalCompleted >= 5 ? 1 : 0;
+    var stageLabels = ['A sapling, just getting started', 'First branches taking shape', 'Filling out nicely', 'A tree in full stride', 'Full, glorious bloom'];
+    var nextThresholds = [5, 20, 50, 100, null];
+
+    var branchPaths = [
+        '<path d="M100 205 L100 120" stroke="#a3785c" stroke-width="9" fill="none" stroke-linecap="round"/>',
+        '<path d="M100 150 Q70 130 48 98" stroke="#a3785c" stroke-width="5" fill="none" stroke-linecap="round"/>',
+        '<path d="M100 150 Q130 130 152 98" stroke="#a3785c" stroke-width="5" fill="none" stroke-linecap="round"/>',
+        '<path d="M100 128 Q80 108 62 82" stroke="#a3785c" stroke-width="4" fill="none" stroke-linecap="round"/>',
+        '<path d="M100 128 Q120 108 138 82" stroke="#a3785c" stroke-width="4" fill="none" stroke-linecap="round"/>',
+        '<path d="M62 88 Q45 75 33 55" stroke="#a3785c" stroke-width="3" fill="none" stroke-linecap="round"/>',
+        '<path d="M138 88 Q155 75 167 55" stroke="#a3785c" stroke-width="3" fill="none" stroke-linecap="round"/>'
+    ];
+    var branchCountByStage = [1, 3, 5, 7, 7];
+
+    var blossomPositions = [
+        [48, 98, 1], [152, 98, 1],
+        [62, 82, 0.9], [138, 82, 0.9], [100, 118, 0.9],
+        [33, 55, 0.8], [167, 55, 0.8], [78, 90, 0.8], [122, 90, 0.8], [100, 85, 0.8],
+        [42, 62, 0.7], [158, 62, 0.7], [55, 72, 0.7], [145, 72, 0.7], [100, 65, 0.9], [88, 100, 0.7], [112, 100, 0.7]
+    ];
+    var blossomCountByStage = [0, 2, 5, 10, 17];
+
+    var branchesHtml = branchPaths.slice(0, branchCountByStage[stage]).join('');
+    var blossomsHtml = blossomPositions.slice(0, blossomCountByStage[stage])
+        .map(function(p) { return makeStaticBlossom(p[0], p[1], p[2]); }).join('');
+
+    container.innerHTML = '<svg viewBox="0 0 200 220" style="width:100%;max-width:200px;">' + branchesHtml + blossomsHtml + '</svg>';
+
+    if (caption) {
+        var next = nextThresholds[stage];
+        caption.textContent = stageLabels[stage] + (next ? ' — ' + (next - totalCompleted) + ' more completed task' + ((next - totalCompleted) !== 1 ? 's' : '') + ' to bloom further' : ', as full as it gets');
     }
 }
 

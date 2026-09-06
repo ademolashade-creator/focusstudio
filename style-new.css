@@ -62,21 +62,6 @@ body {
     .cherry-margin-container { display: none; }
 }
 
-.cherry-branch-corner {
-    position: fixed;
-    top: 0;
-    width: 140px;
-    height: 140px;
-    opacity: 0.08;
-    pointer-events: none;
-    z-index: 0;
-}
-.cherry-branch-corner.top-left { left: 0; }
-.cherry-branch-corner.top-right { right: 0; }
-@media (max-width: 900px) {
-    .cherry-branch-corner { width: 90px; height: 90px; opacity: 0.06; }
-}
-
 .petal {
     position: absolute;
     background: var(--border-color-pink);
@@ -84,6 +69,12 @@ body {
     pointer-events: none;
     animation: petal-drift linear infinite;
 }
+.blossom-flower {
+    position: absolute;
+    pointer-events: none;
+    animation: petal-drift linear infinite;
+}
+.blossom-flower svg { display: block; width: 100%; height: 100%; }
 
 @keyframes petal-drift {
     0% {
@@ -103,7 +94,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .petal { animation: none; opacity: 0; }
+    .petal, .blossom-flower { animation: none; opacity: 0; }
 }
 
 /* SPA Views */
