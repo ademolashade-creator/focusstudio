@@ -539,6 +539,7 @@ function getPrioritizedOpenTasks() {
 }
 
 var queueDragTaskId = null;
+var columnDragFromIndex = null;
 function queueDragStart(e, taskId) {
     queueDragTaskId = taskId;
     e.dataTransfer.effectAllowed = "move";
@@ -838,6 +839,7 @@ function completeFlowTask(entry, actualSeconds) {
     renderEstimateLog();
     renderDailyRecap();
     renderInternalQueue();
+    requestAnimationFrame(function() { triggerTaskMicroCelebration(entry.ci, entry.ti); });
 }
 
 function finishFlow() {
@@ -1045,6 +1047,86 @@ function openDailyKickoff() {
 function closeDailyKickoff() {
     var overlay = $('daily-kickoff-overlay');
     if (overlay) overlay.style.display = 'none';
+    maybeOfferDailyPlanning();
+}
+
+function maybeOfferDailyPlanning() {
+    var lastPlanned = storageGet('ff-last-planning-date', null);
+    if (lastPlanned === getTodayKey()) return; // already planned today, don't nag
+    showGentleNotice('plan-day-notice', 'Plan your day?', 'Let\'s plan', 'openDailyPlanningFromNotice()');
+}
+
+function openDailyPlanningFromNotice() {
+    var notice = document.getElementById('plan-day-notice');
+    if (notice) notice.remove();
+    switchView('tasks');
+    openDailyPlanningSession();
+}
+
+var planningSessionStart = null;
+var planningSessionInterval = null;
+
+function openDailyPlanningSession() {
+    var panel = document.getElementById('daily-planning-panel');
+    if (!panel) return;
+    panel.style.display = 'block';
+    planningSessionStart = Date.now();
+    var timerEl = document.getElementById('planning-session-timer');
+    clearInterval(planningSessionInterval);
+    planningSessionInterval = setInterval(function() {
+        var elapsed = Math.floor((Date.now() - planningSessionStart) / 1000);
+        var m = Math.floor(elapsed / 60);
+        var s = elapsed % 60;
+        if (timerEl) timerEl.textContent = m + 'm ' + (s < 10 ? '0' : '') + s + 's';
+    }, 1000);
+    var quickInput = document.getElementById('quick-add-input');
+    if (quickInput) quickInput.focus();
+}
+
+function closeDailyPlanningSession() {
+    var panel = document.getElementById('daily-planning-panel');
+    if (panel) panel.style.display = 'none';
+    if (planningSessionStart) {
+        var minutesSpent = Math.max(1, Math.round((Date.now() - planningSessionStart) / 60000));
+        var log = storageGet('ff-planning-log', {});
+        var todayKey = getTodayKey();
+        log[todayKey] = (log[todayKey] || 0) + minutesSpent;
+        storageSet('ff-planning-log', log);
+        storageSet('ff-last-planning-date', todayKey);
+    }
+    clearInterval(planningSessionInterval);
+    planningSessionStart = null;
+    renderDailyRecap();
+}
+
+async function runFullDailyCheckIn() {
+    var resultBox = document.getElementById('planning-checkin-result');
+    if (resultBox) resultBox.textContent = 'Generating your check-in...';
+
+    var apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) {
+        if (resultBox) resultBox.textContent = 'Add your Gemini API key in Reports to generate an AI check-in.';
+        return;
+    }
+
+    var byColumn = {};
+    boardData.forEach(function(col) {
+        var openTasks = col.tasks.filter(function(t) { return !t.completed && !t.parentId; }).map(function(t) { return t.text; });
+        if (openTasks.length > 0) byColumn[col.title] = openTasks;
+    });
+
+    if (Object.keys(byColumn).length === 0) {
+        if (resultBox) resultBox.textContent = 'No open tasks yet, add some above first.';
+        return;
+    }
+
+    var prompt = 'Act as a world-class formal assistant. Write one short, warm, encouraging daily check-in brief covering everything on the agenda today, organized by project/client. Data grouped by project: ' + JSON.stringify(byColumn) + '. Use formal language. Do not use em-dashes.';
+    try {
+        var result = await callGemini(prompt);
+        if (resultBox) resultBox.textContent = result;
+    } catch (e) {
+        if (resultBox) resultBox.textContent = 'Error: ' + e.message;
+    }
 }
 
 function calculateTodayCompletionRatio() {
@@ -1643,6 +1725,29 @@ function renderBoard() {
         var columnEl = document.createElement('div');
         columnEl.className = 'task-column';
         columnEl.dataset.colIndex = colIndex;
+        columnEl.draggable = true;
+        columnEl.addEventListener('dragstart', function(e) {
+            if (e.target !== columnEl) return; // only when dragging the card itself, not a child input/task
+            columnDragFromIndex = colIndex;
+            setTimeout(function() { columnEl.classList.add('column-dragging'); }, 0);
+        });
+        columnEl.addEventListener('dragend', function() {
+            columnEl.classList.remove('column-dragging');
+        });
+        columnEl.addEventListener('dragover', function(e) {
+            if (columnDragFromIndex === null) return;
+            e.preventDefault();
+        });
+        columnEl.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (columnDragFromIndex === null || columnDragFromIndex === colIndex) return;
+            var moved = boardData.splice(columnDragFromIndex, 1)[0];
+            boardData.splice(colIndex, 0, moved);
+            columnDragFromIndex = null;
+            saveBoardData();
+            saveScrollPositions();
+            renderBoard();
+        });
 
         var suggestionsHtml = '';
         if (col.aiSuggestions) {
@@ -1786,6 +1891,7 @@ function renderBoard() {
         <button onclick="suggestColumnTimesAI(${colIndex})" title="Suggest Times via AI">Suggest Time</button>
         <button onclick="optimizeColumnFlowAI(${colIndex})" title="Optimize Flow via AI">Optimize</button>
         <button onclick="generateColumnCheckIn(${colIndex})" title="Daily Check-In via AI">Check-In</button>
+        <button onclick="clearCompletedInColumn(${colIndex})" title="Remove all completed tasks in this column">Clear Done</button>
     </div>
 
     ${suggestionsHtml}
@@ -1843,6 +1949,17 @@ function renderBoard() {
         }
         requestAnimationFrame(step);
     })(__pageScrollY, 280);
+
+    setTimeout(function() {
+        document.querySelectorAll('.task-name-input').forEach(function(el) {
+            if (el.scrollWidth > el.clientWidth + 1) {
+                el.title = el.value || el.textContent;
+            } else {
+                el.removeAttribute('title');
+            }
+        });
+    }, 0);
+    populateQuickAddColumnSelect();
 }
 
 function toggleSubtasksCollapse(ci, ti) {
@@ -1888,6 +2005,18 @@ function deleteColumn(ci) {
     boardData.splice(ci, 1);
     saveBoardData();
     renderBoard();
+}
+
+function clearCompletedInColumn(ci) {
+    var col = boardData[ci];
+    var completedCount = col.tasks.filter(function(t) { return t.completed; }).length;
+    if (completedCount === 0) { alert('No completed tasks to clear in this column.'); return; }
+    if (!confirm('Remove ' + completedCount + ' completed task' + (completedCount !== 1 ? 's' : '') + ' from "' + col.title + '"? This cannot be undone.')) return;
+    saveScrollPositions();
+    col.tasks = col.tasks.filter(function(t) { return !t.completed; });
+    saveBoardData();
+    renderBoard();
+    renderInternalQueue();
 }
 
 function toggleNotesRequired(colIndex, checked) {
@@ -2718,6 +2847,15 @@ function updateStreaksAndBadges() {
     }
 
     var totalCompleted = historyData.length;
+    var icons = {
+        first: '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>',
+        ten: '<path d="M4 19h16M4 15h16M4 11h16M4 7h16"/>',
+        fifty: '<path d="M12 2v20M4 7l8-5 8 5M4 17l8 5 8-5"/>',
+        hundred: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>',
+        accuracy: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
+        flowmaster: '<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" stroke="none"/>',
+        streak7: '<path d="M12 2c-2 4-2 6 0 8 2-1 2-3 1-4 2 1 3 3 3 5a4 4 0 0 1-8 0c0-3 2-5 4-9z" fill="currentColor" stroke="none"/>'
+    };
     var badgeDefinitions = [
         { id: 'first', label: 'First Task', condition: totalCompleted >= 1, progress: totalCompleted, target: 1, desc: 'Completed your first task.' },
         { id: 'ten', label: '10 Tasks', condition: totalCompleted >= 10, progress: totalCompleted, target: 10, desc: 'Finished 10 tasks total.' },
@@ -2742,21 +2880,22 @@ function updateStreaksAndBadges() {
     streakEl.innerHTML = '<svg viewBox="0 0 24 24" fill="' + streakColor + '" style="width:16px;height:16px;vertical-align:-3px;' + streakGlow + '"><path d="M12 2c-2 4-2 6 0 8 2-1 2-3 1-4 2 1 3 3 3 5a4 4 0 0 1-8 0c0-3 2-5 4-9z"/></svg> ' +
         'Streak: <strong style="color:' + streakColor + ';">' + streak + '</strong> day' + (streak !== 1 ? 's' : '');
 
-    var html = '';
+    var html = '<div class="badge-grid">';
     if (earned.length === 0) {
         html += '<span style="color:#888;font-size:0.75rem;">No badges yet, complete tasks to earn milestones.</span>';
     } else {
         html += earned.map(function(b) {
-            return '<span class="badge-pill" title="' + b.desc + '">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ' +
-                b.label +
-                '</span>';
-        }).join(' ');
+            return '<div class="badge-card" title="' + b.desc + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + icons[b.id] + '</svg>' +
+                '<span>' + b.label + '</span>' +
+                '</div>';
+        }).join('');
     }
+    html += '</div>';
     if (nextUp) {
         var pct = Math.min(100, Math.round((nextUp.progress / nextUp.target) * 100));
         html += '<div class="badge-progress" title="' + nextUp.desc + '">' +
-            '<div style="font-size:0.65rem;color:#888;margin-top:6px;">Next: ' + nextUp.label + ' (' + nextUp.progress + '/' + nextUp.target + ')</div>' +
+            '<div style="font-size:0.65rem;color:#888;margin-top:8px;">Next: ' + nextUp.label + ' (' + nextUp.progress + '/' + nextUp.target + ')</div>' +
             '<div><progress value="' + pct + '" max="100"></progress></div>' +
             '</div>';
     }
@@ -2997,6 +3136,9 @@ function renderDailyRecap() {
     var todayBreaks = breakLog.filter(function(b) { return new Date(b.date).toLocaleDateString() === todayDateStr; });
     breakMinutesToday += todayBreaks.reduce(function(a, b) { return a + b.durationMinutes; }, 0);
 
+    var planningLog = storageGet('ff-planning-log', {});
+    var planningMinutesToday = planningLog[todayKey] || 0;
+
     renderActivityTimeline(); 
 
     contentBox.innerHTML = `
@@ -3006,6 +3148,7 @@ function renderDailyRecap() {
             <li><strong>${formatHoursMinutes(totalActual)}</strong> logged work</li>
             <li><strong>${formatHoursMinutes(breakMinutesToday)}</strong> breaks/away</li>
             <li><strong>${formatHoursMinutes(clockedMinutesToday)}</strong> clocked in</li>
+            ${planningMinutesToday > 0 ? `<li><strong>${formatHoursMinutes(planningMinutesToday)}</strong> spent planning today</li>` : ''}
         </ul>
     `;
     updateDailyProgress();
@@ -3075,6 +3218,7 @@ function updateAdaptiveHacks() {
 }
 
 function exportAllDataJSON() {
+    storageSet('ff-last-backup-at', Date.now());
     var data = {
         appSettings: appSettings,
         boardData: boardData,
@@ -3247,6 +3391,130 @@ function toggleNowPlaying() {
     }
 }
 
+function startQuickAddVoiceInput() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Voice input is not supported in this browser.');
+        return;
+    }
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    var btn = document.getElementById('quick-add-mic-btn');
+    recognition.onstart = function() { if (btn) btn.classList.add('recording'); };
+    recognition.onend = function() { if (btn) btn.classList.remove('recording'); };
+    recognition.onerror = function(event) {
+        if (btn) btn.classList.remove('recording');
+        alert('Voice input error: ' + event.error);
+    };
+    recognition.onresult = function(event) {
+        var transcript = event.results[0][0].transcript;
+        var input = document.getElementById('quick-add-input');
+        if (input) input.value = transcript;
+    };
+    recognition.start();
+}
+
+function populateQuickAddColumnSelect() {
+    var sel = document.getElementById('quick-add-column-select');
+    if (!sel) return;
+    var currentValue = sel.value;
+    var options = '<option value="__auto__">Auto-detect column</option>';
+    boardData.forEach(function(col, ci) {
+        options += '<option value="' + ci + '">' + escapeHTML(col.title) + '</option>';
+    });
+    sel.innerHTML = options;
+    if ([...sel.options].some(function(o) { return o.value === currentValue; })) {
+        sel.value = currentValue;
+    }
+}
+
+function guessColumnIndexLocally(taskText) {
+    var lowerText = taskText.toLowerCase();
+    var bestIdx = -1;
+    var bestScore = 0;
+    boardData.forEach(function(col, ci) {
+        var words = col.title.toLowerCase().split(/\s+/).filter(function(w) { return w.length > 2; });
+        var score = words.reduce(function(acc, w) { return acc + (lowerText.indexOf(w) !== -1 ? 1 : 0); }, 0);
+        if (score > bestScore) { bestScore = score; bestIdx = ci; }
+    });
+    return bestIdx !== -1 ? bestIdx : 0;
+}
+
+async function submitQuickAdd() {
+    var input = document.getElementById('quick-add-input');
+    var colSelect = document.getElementById('quick-add-column-select');
+    var statusEl = document.getElementById('quick-add-status');
+    if (!input) return;
+    var rawText = input.value.trim();
+    if (!rawText) return;
+
+    if (statusEl) statusEl.textContent = 'Adding...';
+
+    // Step 1: separate time from text using the same local parser used for pasted tasks.
+    var parsed = parseTimeFromLine(rawText);
+    var taskText = parsed.text;
+    var minutes = parsed.minutes;
+
+    // Step 2: figure out which column this belongs to.
+    var ci;
+    if (colSelect && colSelect.value !== '__auto__') {
+        ci = parseInt(colSelect.value);
+    } else {
+        ci = guessColumnIndexLocally(taskText);
+    }
+    if (isNaN(ci) || !boardData[ci]) ci = 0;
+
+    var col = boardData[ci];
+    var newTask = {
+        id: 't_' + Math.random().toString(36).substr(2, 9),
+        text: taskText,
+        estimateMinutes: minutes || 15,
+        trackedSeconds: 0,
+        isTracking: false,
+        notes: '',
+        completed: false,
+        completedAt: null,
+        dateAdded: getTodayKey(),
+        breaks: [],
+        timeSegments: [],
+        deadlineTime: null,
+        googleLink: '',
+        startedAtIso: null,
+        completedAtIso: null,
+        parentId: null,
+        subtasks: [],
+        isSubtask: false,
+        hasSubtasks: false,
+        collapsed: false,
+        collapsedControls: true,
+        recurrence: null,
+        lastRecurrenceDate: null,
+        carriedOver: false,
+        originalDate: null
+    };
+    col.tasks.push(newTask);
+    customQueueOrder.unshift(newTask.id);
+    storageSet('ff-custom-queue', customQueueOrder);
+    saveBoardData();
+    input.value = '';
+    if (colSelect) colSelect.value = '__auto__';
+    saveScrollPositions();
+    renderBoard();
+    renderInternalQueue();
+
+    if (statusEl) statusEl.textContent = 'Added to "' + col.title + '"' + (minutes ? '' : ', estimating time...');
+
+    // Step 3: if no time was stated in the text, fall back to memory, then AI, same as everywhere else in the app.
+    if (!minutes) {
+        await estimateTask(newTask);
+        if (statusEl) statusEl.textContent = 'Added to "' + col.title + '" (' + newTask.estimateMinutes + ' min estimated)';
+    }
+    setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 4000);
+}
+
 function initApp() {
     applySettings();
     applyAttendanceCollapseState();
@@ -3297,6 +3565,51 @@ function initApp() {
     renderDailyRecap();
 
     if (typeof setupRecurringTasks === 'function') setupRecurringTasks();
+
+    checkGentleReengagement();
+    checkBackupReminder();
+}
+
+function showGentleNotice(id, message, actionLabel, actionFn) {
+    if (document.getElementById(id)) return;
+    var container = document.getElementById('gentle-notice-stack');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'gentle-notice-stack';
+        container.className = 'gentle-notice-stack';
+        document.body.appendChild(container);
+    }
+    var notice = document.createElement('div');
+    notice.id = id;
+    notice.className = 'gentle-notice';
+    var actionHtml = actionLabel ? '<button onclick="' + actionFn + '">' + actionLabel + '</button>' : '';
+    notice.innerHTML = '<span>' + message + '</span>' + actionHtml +
+        '<button class="gentle-notice-dismiss" onclick="this.parentElement.remove()">&times;</button>';
+    container.appendChild(notice);
+    requestAnimationFrame(function() { notice.classList.add('show'); });
+}
+
+function checkGentleReengagement() {
+    var lastVisit = storageGet('ff-last-visit-at', null);
+    var now = Date.now();
+    storageSet('ff-last-visit-at', now);
+    if (!lastVisit) return; // first ever visit, nothing to welcome back from
+    var daysAway = Math.floor((now - lastVisit) / 86400000);
+    if (daysAway >= 2) {
+        showGentleNotice('welcome-back-notice', 'Welcome back.', null, null);
+    }
+}
+
+function checkBackupReminder() {
+    var totalTasks = 0;
+    boardData.forEach(function(col) { totalTasks += col.tasks.length; });
+    if (totalTasks < 5 && historyData.length < 5) return; // not enough built up yet to worry about
+
+    var lastBackup = storageGet('ff-last-backup-at', null);
+    var daysSinceBackup = lastBackup ? Math.floor((Date.now() - lastBackup) / 86400000) : Infinity;
+    if (daysSinceBackup >= 30) {
+        showGentleNotice('backup-reminder-notice', "You haven't backed up your data in a while.", 'Export Now', 'switchView(\'reports\');exportAllDataJSON();document.getElementById(\'backup-reminder-notice\').remove();');
+    }
 }
 
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
@@ -3371,6 +3684,16 @@ function cancelCompletion() {
     renderBoard();
 }
 
+function triggerTaskMicroCelebration(ci, ti) {
+    var li = document.getElementById('task-' + ci + '-' + ti);
+    if (!li) return;
+    var petal = document.createElement('span');
+    petal.className = 'micro-petal';
+    li.style.position = li.style.position || 'relative';
+    li.appendChild(petal);
+    setTimeout(function() { petal.remove(); }, 1000);
+}
+
 function finalizeTaskCompletion(ci, ti, actualSeconds) {
     var task = boardData[ci].tasks[ti];
     task.completed = true;
@@ -3436,15 +3759,57 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
     renderEstimateLog();
     renderDailyRecap();
     renderInternalQueue();
+    requestAnimationFrame(function() { triggerTaskMicroCelebration(ci, ti); });
 }
+var pendingDeletionTimeout = null;
+
 function deleteTask(ci, ti) {
     saveScrollPositions();
     var task = boardData[ci].tasks[ti];
+    var subtasks = boardData[ci].tasks.filter(function(t) { return t.parentId === task.id; });
+    var taskIndex = boardData[ci].tasks.indexOf(task);
+
+    pendingDeletion = { ci: ci, task: task, subtasks: subtasks, taskIndex: taskIndex };
+
     boardData[ci].tasks = boardData[ci].tasks.filter(function(t) { return t.parentId !== task.id; });
-    boardData[ci].tasks.splice(ti, 1);
+    boardData[ci].tasks.splice(boardData[ci].tasks.indexOf(task), 1);
     saveBoardData();
     renderBoard();
     renderInternalQueue();
+    showUndoToast('Task deleted');
+}
+
+function undoLastDeletion() {
+    if (!pendingDeletion) return;
+    clearTimeout(pendingDeletionTimeout);
+    var col = boardData[pendingDeletion.ci];
+    var insertAt = Math.min(pendingDeletion.taskIndex, col.tasks.length);
+    col.tasks.splice(insertAt, 0, pendingDeletion.task);
+    pendingDeletion.subtasks.forEach(function(st) { col.tasks.push(st); });
+    pendingDeletion = null;
+    saveBoardData();
+    renderBoard();
+    renderInternalQueue();
+    hideUndoToast();
+}
+
+function showUndoToast(message) {
+    hideUndoToast();
+    var toast = document.createElement('div');
+    toast.id = 'undo-toast';
+    toast.className = 'undo-toast';
+    toast.innerHTML = '<span>' + message + '</span><button onclick="undoLastDeletion()">Undo</button>';
+    document.body.appendChild(toast);
+    requestAnimationFrame(function() { toast.classList.add('show'); });
+    pendingDeletionTimeout = setTimeout(function() {
+        pendingDeletion = null;
+        hideUndoToast();
+    }, 7000);
+}
+
+function hideUndoToast() {
+    var toast = document.getElementById('undo-toast');
+    if (toast) toast.remove();
 }
 
 function rememberTaskTime(text, minutes) {
