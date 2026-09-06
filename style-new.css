@@ -45,23 +45,6 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Cherry Blossom Margins Animation */
-.cherry-margin-container {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    width: max(36px, calc((100vw - 1100px) / 2));
-    pointer-events: none;
-    z-index: 1;
-    overflow: hidden;
-}
-.cherry-margin-container.left { left: 0; }
-.cherry-margin-container.right { right: 0; }
-
-@media (max-width: 700px) {
-    .cherry-margin-container { display: none; }
-}
-
 .cherry-fullscreen-container {
     position: fixed;
     inset: 0;
