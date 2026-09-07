@@ -2020,15 +2020,17 @@ function renderSingleColumn(colIndex) {
     }
     var input = document.getElementById('task-input-' + colIndex);
     if (input) setupAutosuggest(input);
-    columnEl.querySelectorAll('.task-name-input').forEach(function(el) {
-        el.style.height = 'auto';
-        el.style.height = el.scrollHeight + 'px';
-        if (el.scrollWidth > el.clientWidth + 1) {
-            el.title = el.value || el.textContent;
-        } else {
-            el.removeAttribute('title');
-        }
-    });
+    setTimeout(function() {
+        columnEl.querySelectorAll('.task-name-input').forEach(function(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+            if (el.scrollWidth > el.clientWidth + 1) {
+                el.title = el.value || el.textContent;
+            } else {
+                el.removeAttribute('title');
+            }
+        });
+    }, 0);
     restoreScrollPositions();
 }
 
