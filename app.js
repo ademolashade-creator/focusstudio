@@ -1775,13 +1775,6 @@ function renderBoard() {
     updateDailyProgress();
     updateFocusScore();
 
-    setTimeout(function() {
-        document.querySelectorAll('.task-name-input').forEach(function(el) {
-            el.style.height = 'auto';
-            el.style.height = el.scrollHeight + 'px';
-        });
-    }, 0);
-    
     restoreScrollPositions();
     (function pinScroll(targetY, durationMs) {
         var start = performance.now();
@@ -1895,7 +1888,7 @@ function renderSingleColumn(colIndex) {
                             <div class="task-checkbox-name">
                                 <button class="priority-star-btn ${task.isTopPriority ? 'active' : ''}" onclick="toggleTopPriority(${colIndex}, ${taskIndex})" title="${task.isTopPriority ? 'Remove from today top priorities' : 'Mark as a top priority for today'}">&#9733;</button>
                                 <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
-                                <textarea class="task-name-input" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.text)}</textarea>
+                                <div class="grow-wrap" data-replicated-value="${escapeHTML(task.text)}"><textarea class="task-name-input" rows="1" oninput="this.parentNode.dataset.replicatedValue = this.value" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.text)}</textarea></div>
                                 ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">Sub</span>` : ''}
                                 ${task.recurrence ? `<span class="recurrence-badge">Repeat: ${task.recurrence}</span>` : ''}
                                 ${carriedOverBadge}
@@ -1950,7 +1943,7 @@ function renderSingleColumn(colIndex) {
                                                 <div class="task-checkbox-name">
                                                     <input type="checkbox" ${subtask.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${subIdx})">
                                                     <span class="subtask-indent">↳</span>
-                                                    <textarea class="task-name-input subtask-name" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">${escapeHTML(subtask.text)}</textarea>
+                                                    <div class="grow-wrap" data-replicated-value="${escapeHTML(subtask.text)}"><textarea class="task-name-input subtask-name" rows="1" oninput="this.parentNode.dataset.replicatedValue = this.value" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">${escapeHTML(subtask.text)}</textarea></div>
                                                 </div>
                                                 <div class="task-top-actions">
                                                     <button class="delete-btn" onclick="deleteTask(${colIndex}, ${subIdx})">&times;</button>
@@ -2022,8 +2015,6 @@ function renderSingleColumn(colIndex) {
     if (input) setupAutosuggest(input);
     setTimeout(function() {
         columnEl.querySelectorAll('.task-name-input').forEach(function(el) {
-            el.style.height = 'auto';
-            el.style.height = el.scrollHeight + 'px';
             if (el.scrollWidth > el.clientWidth + 1) {
                 el.title = el.value || el.textContent;
             } else {

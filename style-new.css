@@ -714,6 +714,33 @@ button:active { transform: scale(0.96); }
     line-height: 1.4;
 }
 
+/* CSS-only auto-grow: the invisible ::after mirrors the text, and grid makes
+   the textarea match whichever of the two needs more height. No JS timing involved. */
+.grow-wrap {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+}
+.grow-wrap::after {
+    content: attr(data-replicated-value) " ";
+    white-space: pre-wrap;
+    visibility: hidden;
+    word-wrap: break-word;
+    font-family: var(--font-family);
+    font-weight: 500;
+    font-size: 0.8rem !important;
+    padding: 2px 0;
+    line-height: 1.4;
+}
+.grow-wrap > textarea {
+    resize: none;
+    overflow: hidden;
+}
+.grow-wrap > textarea,
+.grow-wrap::after {
+    grid-area: 1 / 1 / 2 / 2;
+}
+
 .task-estimate-input { width: 34px; padding: 1px 2px; font-family: var(--font-family); font-weight: 600; text-align: center; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-color); font-size: 0.7rem; height: 1.3rem; }
 
 .task-top-actions {
