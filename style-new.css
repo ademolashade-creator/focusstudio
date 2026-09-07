@@ -404,6 +404,42 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
 }
 .planning-checkin-result:empty { display: none; padding: 0; }
 
+.priority-star-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 1rem;
+    padding: 2px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.priority-star-btn.active { color: var(--cherry-red); }
+.task-item.top-priority { border-left-color: #e8436e; box-shadow: 0 0 0 1.5px rgba(232,67,110,0.25); }
+
+.priority-picker-section { margin-bottom: 10px; }
+.planning-priority-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 160px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--input-bg);
+}
+.planning-priority-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.planning-priority-list li:last-child { border-bottom: none; }
+.planning-priority-list li.is-priority { background: rgba(232,67,110,0.06); }
+.planning-priority-list li span:first-of-type { flex: 1; }
+.planning-priority-col { font-size: 0.65rem; color: #888; flex-shrink: 0; }
+
 .timer-card, .stats-card, .hacks-card, .log-card, .summary-container {
     background-color: var(--card-bg);
     padding: 1rem 1.5rem;

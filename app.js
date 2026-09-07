@@ -28,6 +28,9 @@ document.addEventListener('wheel', function(e) {
 
 // ---------- SPA View Routing ----------
 function switchView(viewId) {
+    if (viewId !== 'tasks' && typeof planningSessionStart !== 'undefined' && planningSessionStart) {
+        closeDailyPlanningSession();
+    }
     document.querySelectorAll('.app-view').forEach(function(view) {
         view.classList.remove('active');
         view.style.display = 'none';
@@ -972,7 +975,7 @@ function toggleClock() {
         const schedDate = new Date(now);
         schedDate.setHours(schedHour, schedMin, 0, 0);
 
-        if (now > schedDate) {
+        if (now > new Date(schedDate.getTime() + 10 * 60000)) {
             $('scheduled-in-target').textContent = attendanceSettings.scheduledIn;
             $('lateness-overlay').style.display = 'flex';
             return;
@@ -1079,8 +1082,26 @@ function openDailyPlanningSession() {
         var s = elapsed % 60;
         if (timerEl) timerEl.textContent = m + 'm ' + (s < 10 ? '0' : '') + s + 's';
     }, 1000);
+    refreshPlanningPriorityPicker();
     var quickInput = document.getElementById('quick-add-input');
     if (quickInput) quickInput.focus();
+}
+
+function refreshPlanningPriorityPicker() {
+    var list = document.getElementById('planning-priority-list');
+    if (!list) return;
+    var html = '';
+    boardData.forEach(function(col, ci) {
+        col.tasks.forEach(function(task, ti) {
+            if (task.completed || task.parentId) return;
+            html += '<li class="' + (task.isTopPriority ? 'is-priority' : '') + '">' +
+                '<button class="priority-star-btn ' + (task.isTopPriority ? 'active' : '') + '" onclick="toggleTopPriority(' + ci + ', ' + ti + ')">&#9733;</button>' +
+                '<span>' + escapeHTML(task.text) + '</span>' +
+                '<span class="planning-priority-col">' + escapeHTML(col.title) + '</span>' +
+                '</li>';
+        });
+    });
+    list.innerHTML = html || '<li style="color:#888;">No open tasks yet, add some below.</li>';
 }
 
 function closeDailyPlanningSession() {
@@ -1110,17 +1131,24 @@ async function runFullDailyCheckIn() {
     }
 
     var byColumn = {};
+    var priorityFilter = countTopPriorityTasks() > 0;
     boardData.forEach(function(col) {
-        var openTasks = col.tasks.filter(function(t) { return !t.completed && !t.parentId; }).map(function(t) { return t.text; });
+        var openTasks = col.tasks.filter(function(t) {
+            if (t.completed || t.parentId) return false;
+            return priorityFilter ? t.isTopPriority : true;
+        }).map(function(t) { return t.text; });
         if (openTasks.length > 0) byColumn[col.title] = openTasks;
     });
 
     if (Object.keys(byColumn).length === 0) {
-        if (resultBox) resultBox.textContent = 'No open tasks yet, add some above first.';
+        if (resultBox) resultBox.textContent = priorityFilter ? 'No open top-priority tasks found.' : 'No open tasks yet, add some above first.';
         return;
     }
 
-    var prompt = 'Act as a world-class formal assistant. Write one short, warm, encouraging daily check-in brief covering everything on the agenda today, organized by project/client. Data grouped by project: ' + JSON.stringify(byColumn) + '. Use formal language. Do not use em-dashes.';
+    var prompt = (priorityFilter
+        ? 'Act as a world-class formal assistant. Write one short, warm, encouraging daily check-in brief covering only today\'s top priorities, organized by project/client. Data grouped by project: '
+        : 'Act as a world-class formal assistant. Write one short, warm, encouraging daily check-in brief covering everything on the agenda today, organized by project/client. Data grouped by project: '
+    ) + JSON.stringify(byColumn) + '. Use formal language. Do not use em-dashes.';
     try {
         var result = await callGemini(prompt);
         if (resultBox) resultBox.textContent = result;
@@ -1323,6 +1351,17 @@ function adjustTasksForMidnight() {
             }
         });
     });
+
+    var lastPriorityReset = storageGet('ff-priorities-reset-date', null);
+    if (lastPriorityReset !== today) {
+        boardData.forEach(function(col) {
+            col.tasks.forEach(function(task) {
+                if (task.isTopPriority) { task.isTopPriority = false; changed = true; }
+            });
+        });
+        storageSet('ff-priorities-reset-date', today);
+    }
+
     if (changed) {
         saveBoardData();
         renderBoard();
@@ -1354,6 +1393,7 @@ boardData.forEach(function(col) {
         if (t.lastRecurrenceDate === undefined) t.lastRecurrenceDate = null;
         if (t.collapsedControls === undefined) t.collapsedControls = true; 
         if (t.carriedOver === undefined) t.carriedOver = false;
+        if (t.isTopPriority === undefined) t.isTopPriority = false;
         if (t.originalDate === undefined) t.originalDate = null;
     });
 });
@@ -1500,6 +1540,7 @@ async function naturalLanguageAddTask(ci) {
             recurrence: null,
             lastRecurrenceDate: null,
             carriedOver: false,
+            isTopPriority: false,
             originalDate: null
         };
         col.tasks.push(newTask);
@@ -1800,9 +1841,10 @@ function renderBoard() {
                 }
 
                 return `
-                    <li class="task-item ${task.completed ? 'completed' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
+                    <li class="task-item ${task.completed ? 'completed' : ''} ${task.isTopPriority ? 'top-priority' : ''} ${urgencyClassFor(task)}" id="task-${colIndex}-${taskIndex}" draggable="${!task.completed}" ondragstart="dragStart(event, ${colIndex}, ${taskIndex})">
                         <div class="task-top-row">
                             <div class="task-checkbox-name">
+                                <button class="priority-star-btn ${task.isTopPriority ? 'active' : ''}" onclick="toggleTopPriority(${colIndex}, ${taskIndex})" title="${task.isTopPriority ? 'Remove from today top priorities' : 'Mark as a top priority for today'}">&#9733;</button>
                                 <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
                                 <textarea class="task-name-input" rows="1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.text)}</textarea>
                                 ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">Sub</span>` : ''}
@@ -1961,6 +2003,7 @@ function renderBoard() {
         });
     }, 0);
     populateQuickAddColumnSelect();
+    refreshPlanningPriorityPicker();
 }
 
 function toggleSubtasksCollapse(ci, ti) {
@@ -2249,7 +2292,7 @@ function getTaskEstimateFromMemory(taskText) {
 async function getTaskEstimateFromAI(taskText, notes) {
     var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) return null;
-    var prompt = 'Estimate realistic minutes for this task: "' + taskText + '" Notes: "' + (notes || 'none') + '" Respond with ONLY a number.';
+    var prompt = 'Before answering, mentally break this task into its real component steps and estimate realistic minutes for each step, then add them together. Task: "' + taskText + '" Notes: "' + (notes || 'none') + '" Respond with ONLY the final total number of minutes, no breakdown, no explanation, just the number.';
     try {
         var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
             method: 'POST',
@@ -2320,6 +2363,7 @@ function addTask(ci) {
         recurrence: null,
         lastRecurrenceDate: null,
         carriedOver: false,
+        isTopPriority: false,
         originalDate: null
     };
     col.tasks.push(task);
@@ -2390,6 +2434,7 @@ function addPastedTasks(ci) {
             recurrence: null,
             lastRecurrenceDate: null,
             carriedOver: false,
+            isTopPriority: false,
             originalDate: null
         };
     });
@@ -2412,6 +2457,17 @@ function updateTaskEstimate(ci, ti, v) {
     if (isNaN(v) || v < 1) v = 1;
     var task = boardData[ci].tasks[ti];
     task.estimateMinutes = v;
+
+    if (task.parentId) {
+        var parent = boardData[ci].tasks.find(function(t) { return t.id === task.parentId; });
+        if (parent) {
+            var siblingTotal = boardData[ci].tasks
+                .filter(function(t) { return t.parentId === parent.id; })
+                .reduce(function(sum, t) { return sum + (t.estimateMinutes || 0); }, 0);
+            parent.estimateMinutes = Math.max(1, siblingTotal);
+        }
+    }
+
     saveBoardData();
 
     var li = document.getElementById('task-' + ci + '-' + ti);
@@ -2422,6 +2478,7 @@ function updateTaskEstimate(ci, ti, v) {
     }
     renderInternalQueue();
     if (typeof renderTimeCounter === 'function') renderTimeCounter();
+    if (task.parentId) renderBoard(); // parent's own displayed number changed, needs a full refresh
 }
 function moveTask(ci, ti, dir) {
     saveScrollPositions();
@@ -2444,15 +2501,22 @@ function moveTask(ci, ti, dir) {
 }
 
 function cleanEmDashes(text) {
-    return text.replace(/[\u2014\u2013]|--/g, ', ');
+    var cleaned = text.replace(/[\u2014\u2013]|--/g, ', ');
+    // Strip stray markdown that some responses include despite instructions not to.
+    cleaned = cleaned.replace(/^#{1,6}\s+/gm, '');
+    cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, '$1');
+    cleaned = cleaned.replace(/(^|\n)\s*[\*\-]\s+/g, '$1');
+    return cleaned;
 }
+var AI_STYLE_GUIDE = 'Write in plain text only, no markdown, no asterisks, no hashtags, no bullet points, no em dashes. Use active voice and complete sentences. Avoid hedging words like "perhaps" or "it is worth noting".';
 async function callGemini(promptText) {
     var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) throw new Error('API key missing');
+    var fullPrompt = AI_STYLE_GUIDE + '\n\n' + promptText;
     var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+        body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
     });
     if (!res.ok) throw new Error('API error ' + res.status);
     var data = await res.json();
@@ -2469,7 +2533,7 @@ async function suggestColumnTimesAI(ci) {
     var openTasks = boardData[ci].tasks.filter(function(t) { return !t.completed; });
     if (openTasks.length === 0) return;
 
-    var prompt = 'Estimate realistic minutes for these tasks as JSON array: [{"id":"<task.id>","minutes":<num>}]. Tasks: ' +
+    var prompt = 'Before estimating each task, mentally break it into its real component steps and add up realistic minutes for each step. Respond as JSON array: [{"id":"<task.id>","minutes":<num>}]. Return only the final total minutes per task, no breakdown. Tasks: ' +
         openTasks.map(function(t) { return '[id:' + t.id + '] ' + t.text; }).join('; ');
 
     try {
@@ -2595,12 +2659,19 @@ async function generateColumnCheckIn(ci) {
     switchView('reports');
     var summaryBox = $('summary-content');
     summaryBox.textContent = 'Generating daily check-in for ' + boardData[ci].title + '...';
-    var openTasks = boardData[ci].tasks.filter(function(t) { return !t.completed; }).map(function(t) { return t.text; });
+    var priorityFilter = countTopPriorityTasks() > 0;
+    var openTasks = boardData[ci].tasks.filter(function(t) {
+        if (t.completed) return false;
+        return priorityFilter ? t.isTopPriority : true;
+    }).map(function(t) { return t.text; });
     if (openTasks.length === 0) {
-        summaryBox.textContent = 'No open tasks for ' + boardData[ci].title + ' today.';
+        summaryBox.textContent = priorityFilter ? 'No open top-priority tasks in ' + boardData[ci].title + ' today.' : 'No open tasks for ' + boardData[ci].title + ' today.';
         return;
     }
-    var prompt = 'Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today for the project/client "' + boardData[ci].title + '" based on this task list: ' + JSON.stringify(openTasks) + '. Use formal language. Do not use em-dashes.';
+    var prompt = (priorityFilter
+        ? 'Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing today\'s top priorities for the project/client "'
+        : 'Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today for the project/client "'
+    ) + boardData[ci].title + '" based on this task list: ' + JSON.stringify(openTasks) + '. Use formal language. Do not use em-dashes.';
     try {
         var result = await callGemini(prompt);
         summaryBox.textContent = result;
@@ -2691,7 +2762,7 @@ async function suggestTimeFromDetails() {
     var task = boardData[ci].tasks[ti];
     var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key in reports view.'); return; }
-    var prompt = 'Estimate realistic minutes for this task: "' + task.text + '" Notes: "' + (task.notes || 'none') + '" Respond with ONLY a number.';
+    var prompt = 'Before answering, mentally break this task into its real component steps and estimate realistic minutes for each step, then add them together. Task: "' + task.text + '" Notes: "' + (task.notes || 'none') + '" Respond with ONLY the final total number of minutes, no breakdown, no explanation, just the number.';
     try {
         var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
             method: 'POST',
@@ -2743,7 +2814,7 @@ async function breakdownTask() {
         return;
     }
 
-    var prompt = 'You are a project management expert. Analyze this task and break it down into 1-8 actionable subtasks.\n\nTask: "' + task.text + '"\nAdditional notes: "' + (task.notes || 'none') + '"\n\nReturn ONLY JSON with this structure:\n{\n  "subtasks": [\n    {"text": "Subtask description", "minutes": 15, "notes": "optional context"}\n  ]\n}';
+    var prompt = 'You are a project management expert. Analyze this task and break it down into 1-8 actionable subtasks. The subtask minutes must divide up the task\'s total realistic time, adjusting the total upward only if the task genuinely needs more time than currently estimated.\n\nTask: "' + task.text + '"\nCurrent total time estimate: ' + (task.estimateMinutes || 15) + ' minutes\nAdditional notes: "' + (task.notes || 'none') + '"\n\nReturn ONLY JSON with this structure:\n{\n  "subtasks": [\n    {"text": "Subtask description", "minutes": 15, "notes": "optional context"}\n  ]\n}';
 
     try {
         var responseText = await callGemini(prompt);
@@ -2766,12 +2837,14 @@ async function breakdownTask() {
         subtasks = subtasks.filter(function(st) { return st.text && st.text.trim().length > 0; });
 
         var createdCount = 0;
+        var createdSubtaskMinutesTotal = 0;
         subtasks.forEach(function(st) {
             if (st.text && st.text.trim()) {
+                var subtaskMinutes = Math.max(1, st.minutes || 15);
                 boardData[ci].tasks.push({
                     id: 't_' + Math.random().toString(36).substr(2,9),
                     text: st.text.trim(),
-                    estimateMinutes: Math.max(1, st.minutes || 15),
+                    estimateMinutes: subtaskMinutes,
                     trackedSeconds: 0,
                     isTracking: false,
                     notes: st.notes || 'Subtask of "' + task.text + '"',
@@ -2794,9 +2867,12 @@ async function breakdownTask() {
                     lastRecurrenceDate: null
                 });
                 createdCount++;
+                createdSubtaskMinutesTotal += subtaskMinutes;
             }
         });
 
+        // The parent's own time always matches the real sum of its subtasks, never an independent guess.
+        task.estimateMinutes = Math.max(1, createdSubtaskMinutesTotal);
         task.hasSubtasks = true;
         task.collapsed = false;
 
@@ -3036,7 +3112,7 @@ async function reEstimateAllTasks() {
     boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (!t.completed) allOpenTasks.push(t); }); });
     if (allOpenTasks.length === 0) return;
     if (!confirm('Re-estimate ' + allOpenTasks.length + ' task(s)?')) return;
-    var prompt = 'Estimate realistic minutes for these tasks as JSON array: [{"task":"<task text>","minutes":<num>}]. Tasks: ' + allOpenTasks.map(function(t) { return '"' + t.text + '"'; }).join('; ');
+    var prompt = 'Before estimating each task, mentally break it into its real component steps and add up realistic minutes for each step. Respond as JSON array: [{"task":"<task text>","minutes":<num>}]. Return only the final total minutes per task, no breakdown. Tasks: ' + allOpenTasks.map(function(t) { return '"' + t.text + '"'; }).join('; ');
     try {
         var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
             method: 'POST',
@@ -3545,6 +3621,7 @@ async function submitQuickAdd() {
         recurrence: null,
         lastRecurrenceDate: null,
         carriedOver: false,
+        isTopPriority: false,
         originalDate: null
     };
     col.tasks.push(newTask);
@@ -3667,6 +3744,25 @@ function checkBackupReminder() {
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, function(tag) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[tag] || tag; }); }
+
+function countTopPriorityTasks() {
+    var count = 0;
+    boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (t.isTopPriority && !t.completed) count++; }); });
+    return count;
+}
+
+function toggleTopPriority(ci, ti) {
+    var task = boardData[ci].tasks[ti];
+    if (!task.isTopPriority && countTopPriorityTasks() >= 5) {
+        alert('You can mark up to 5 top priorities for today. Unstar one first to add another.');
+        return;
+    }
+    task.isTopPriority = !task.isTopPriority;
+    saveBoardData();
+    saveScrollPositions();
+    renderBoard();
+    refreshPlanningPriorityPicker();
+}
 
 var pendingCompletion = null;
 function toggleTask(ci, ti) {
