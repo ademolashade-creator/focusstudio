@@ -1562,6 +1562,7 @@ function setupRecurringTasks() {
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
             if (!task.recurrence) return;
+            if (!task.completed) return; // still open (carried or otherwise): this IS today's instance already, don't spawn a sibling
 
             var shouldCreateNew = shouldRecurToday(task);
             if (shouldCreateNew) {
@@ -1763,45 +1764,93 @@ function renderBoard() {
     if (colCountLabel) colCountLabel.textContent = boardData.length + '/8 columns';
 
     boardData.forEach(function(col, colIndex) {
-        var columnEl = document.createElement('div');
-        columnEl.className = 'task-column';
-        columnEl.dataset.colIndex = colIndex;
-        columnEl.draggable = true;
-        columnEl.addEventListener('dragstart', function(e) {
-            if (e.target !== columnEl) return; // only when dragging the card itself, not a child input/task
-            columnDragFromIndex = colIndex;
-            setTimeout(function() { columnEl.classList.add('column-dragging'); }, 0);
-        });
-        columnEl.addEventListener('dragend', function() {
-            columnEl.classList.remove('column-dragging');
-        });
-        columnEl.addEventListener('dragover', function(e) {
-            if (columnDragFromIndex === null) return;
-            e.preventDefault();
-        });
-        columnEl.addEventListener('drop', function(e) {
-            e.preventDefault();
-            if (columnDragFromIndex === null || columnDragFromIndex === colIndex) return;
-            var moved = boardData.splice(columnDragFromIndex, 1)[0];
-            boardData.splice(colIndex, 0, moved);
-            columnDragFromIndex = null;
-            saveBoardData();
-            saveScrollPositions();
-            renderBoard();
-        });
+        renderSingleColumn(colIndex);
+    });
 
-        var suggestionsHtml = '';
-        if (col.aiSuggestions) {
-            suggestionsHtml = col.aiSuggestions.map(function(s, idx) {
-                return '<div class="ai-suggestion-banner">' +
-                    '<div><strong>AI Suggests:</strong> ' + escapeHTML(s.task) + ' (' + s.minutes + 'm)</div>' +
-                    '<div><button onclick="acceptAISuggestion(' + colIndex + ', ' + idx + ')">Add</button> ' +
-                    '<button onclick="dismissAISuggestion(' + colIndex + ', ' + idx + ')">Dismiss</button></div>' +
-                    '</div>';
-            }).join('');
+    updateAdaptiveHacks();
+    renderTimeCounter();
+    renderInternalQueue();
+    updateStreaksAndBadges();
+    renderBlossomTree();
+    updateDailyProgress();
+    updateFocusScore();
+
+    setTimeout(function() {
+        document.querySelectorAll('.task-name-input').forEach(function(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        });
+    }, 0);
+    
+    restoreScrollPositions();
+    (function pinScroll(targetY, durationMs) {
+        var start = performance.now();
+        function step() {
+            window.scrollTo(0, targetY);
+            if (performance.now() - start < durationMs) requestAnimationFrame(step);
         }
+        requestAnimationFrame(step);
+    })(__pageScrollY, 280);
 
-        columnEl.innerHTML = `
+    setTimeout(function() {
+        document.querySelectorAll('.task-name-input').forEach(function(el) {
+            if (el.scrollWidth > el.clientWidth + 1) {
+                el.title = el.value || el.textContent;
+            } else {
+                el.removeAttribute('title');
+            }
+        });
+    }, 0);
+    populateQuickAddColumnSelect();
+    refreshPlanningPriorityPicker();
+}
+
+function renderSingleColumn(colIndex) {
+    var container = $('board-container');
+    if (!container) return;
+    var col = boardData[colIndex];
+    if (!col) return;
+    saveScrollPositions();
+
+    var columnEl = document.createElement('div');
+    columnEl.className = 'task-column';
+    columnEl.dataset.colIndex = colIndex;
+    columnEl.draggable = true;
+    columnEl.addEventListener('dragstart', function(e) {
+        if (e.target !== columnEl) return; // only when dragging the card itself, not a child input/task
+        columnDragFromIndex = colIndex;
+        setTimeout(function() { columnEl.classList.add('column-dragging'); }, 0);
+    });
+    columnEl.addEventListener('dragend', function() {
+        columnEl.classList.remove('column-dragging');
+    });
+    columnEl.addEventListener('dragover', function(e) {
+        if (columnDragFromIndex === null) return;
+        e.preventDefault();
+    });
+    columnEl.addEventListener('drop', function(e) {
+        e.preventDefault();
+        if (columnDragFromIndex === null || columnDragFromIndex === colIndex) return;
+        var moved = boardData.splice(columnDragFromIndex, 1)[0];
+        boardData.splice(colIndex, 0, moved);
+        columnDragFromIndex = null;
+        saveBoardData();
+        saveScrollPositions();
+        renderBoard();
+    });
+
+    var suggestionsHtml = '';
+    if (col.aiSuggestions) {
+        suggestionsHtml = col.aiSuggestions.map(function(s, idx) {
+            return '<div class="ai-suggestion-banner">' +
+                '<div><strong>AI Suggests:</strong> ' + escapeHTML(s.task) + ' (' + s.minutes + 'm)</div>' +
+                '<div><button onclick="acceptAISuggestion(' + colIndex + ', ' + idx + ')">Add</button> ' +
+                '<button onclick="dismissAISuggestion(' + colIndex + ', ' + idx + ')">Dismiss</button></div>' +
+                '</div>';
+        }).join('');
+    }
+
+    columnEl.innerHTML = `
     <div class="column-header-row">
         <button class="icon-btn" onclick="toggleColumnCollapse(${colIndex})" title="${col.collapsed ? 'Expand' : 'Collapse'}">${col.collapsed ? '&#9656;' : '&#9662;'}</button>
         <input type="text" class="column-header-input" value="${escapeHTML(col.title)}" oninput="updateColumnTitle(${colIndex}, this.value)" placeholder="Project / Client Name">
@@ -1963,55 +2012,22 @@ function renderBoard() {
 
     </div>
 `;
+    var existing = container.querySelector('.task-column[data-col-index="' + colIndex + '"]');
+    if (existing) {
+        existing.replaceWith(columnEl);
+    } else {
         container.appendChild(columnEl);
-        var input = document.getElementById('task-input-' + colIndex);
-        if (input) setupAutosuggest(input);
-    });
-    
-    updateAdaptiveHacks();
-    renderTimeCounter();
-    renderInternalQueue();
-    updateStreaksAndBadges();
-    renderBlossomTree();
-    updateDailyProgress();
-    updateFocusScore();
-
-    setTimeout(function() {
-        document.querySelectorAll('.task-name-input').forEach(function(el) {
-            el.style.height = 'auto';
-            el.style.height = el.scrollHeight + 'px';
-        });
-    }, 0);
-    
+    }
+    var input = document.getElementById('task-input-' + colIndex);
+    if (input) setupAutosuggest(input);
     restoreScrollPositions();
-    (function pinScroll(targetY, durationMs) {
-        var start = performance.now();
-        function step() {
-            window.scrollTo(0, targetY);
-            if (performance.now() - start < durationMs) requestAnimationFrame(step);
-        }
-        requestAnimationFrame(step);
-    })(__pageScrollY, 280);
-
-    setTimeout(function() {
-        document.querySelectorAll('.task-name-input').forEach(function(el) {
-            if (el.scrollWidth > el.clientWidth + 1) {
-                el.title = el.value || el.textContent;
-            } else {
-                el.removeAttribute('title');
-            }
-        });
-    }, 0);
-    populateQuickAddColumnSelect();
-    refreshPlanningPriorityPicker();
 }
 
 function toggleSubtasksCollapse(ci, ti) {
-    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.collapsed = !task.collapsed;
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
 }
 
 function moveColumn(ci, dir) {
@@ -2028,10 +2044,9 @@ function moveColumn(ci, dir) {
 function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
 
 function toggleColumnCollapse(ci) {
-    saveScrollPositions();
     boardData[ci].collapsed = !boardData[ci].collapsed;
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
 }
 
 function addColumn() {
@@ -2478,7 +2493,7 @@ function updateTaskEstimate(ci, ti, v) {
     }
     renderInternalQueue();
     if (typeof renderTimeCounter === 'function') renderTimeCounter();
-    if (task.parentId) renderBoard(); // parent's own displayed number changed, needs a full refresh
+    if (task.parentId) renderSingleColumn(ci); // parent's own displayed number changed, only this column needs it
 }
 function moveTask(ci, ti, dir) {
     saveScrollPositions();
@@ -3759,8 +3774,7 @@ function toggleTopPriority(ci, ti) {
     }
     task.isTopPriority = !task.isTopPriority;
     saveBoardData();
-    saveScrollPositions();
-    renderBoard();
+    renderSingleColumn(ci);
     refreshPlanningPriorityPicker();
 }
 
