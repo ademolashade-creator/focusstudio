@@ -488,7 +488,7 @@ button:active { transform: scale(0.96); }
 .now-playing-body { margin-top: 8px; }
 .now-playing-controls { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
 .now-playing-controls button { flex: 1; }
-.reestimate-btn { width: 100%; padding: 0.35rem 0.6rem; min-height: 34px; font-size: 0.78rem; }
+.reestimate-btn { width: 100%; padding: 0.2rem 0.5rem; min-height: 26px; font-size: 0.72rem; }
 
 .settings { border-top: 1px dashed var(--border-color); padding-top: 0.8rem; display: flex; flex-direction: column; gap: 6px; }
 .setting-row { display: flex; justify-content: space-between; gap: 10px; }
@@ -1061,7 +1061,7 @@ button:active { transform: scale(0.96); }
 }
 .badge-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
 }
 .badge-card {
@@ -1075,10 +1075,9 @@ button:active { transform: scale(0.96); }
     padding: 12px 8px;
     text-align: center;
     box-shadow: 0 2px 6px rgba(255,51,102,0.08);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: default;
 }
-.badge-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255,51,102,0.18); }
-.badge-card svg { width: 26px; height: 26px; color: var(--cherry-red); }
+.badge-card svg { width: 26px; height: 26px; }
 .badge-card span { font-size: 0.68rem; font-weight: 700; color: var(--text-color); line-height: 1.2; }
 
 .undo-toast {

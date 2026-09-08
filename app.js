@@ -3199,24 +3199,46 @@ function updateStreaksAndBadges() {
         flowmaster: '<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" stroke="none"/>',
         streak7: '<path d="M12 2c-2 4-2 6 0 8 2-1 2-3 1-4 2 1 3 3 3 5a4 4 0 0 1-8 0c0-3 2-5 4-9z" fill="currentColor" stroke="none"/>'
     };
+    var badgeColors = {
+        first: 'var(--green)',
+        ten: '#8b5fbf',
+        fifty: 'var(--amber)',
+        hundred: 'var(--cherry-red)',
+        accuracy: '#2a9d8f',
+        flowmaster: '#d4670e',
+        streak7: '#e0455f'
+    };
+    var accuracyWithBoth = historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; });
+    var accuracyAvgVariance = accuracyWithBoth.length > 0
+        ? accuracyWithBoth.reduce(function(a, h) { return a + Math.abs(h.actualMinutes - h.estimateMinutes); }, 0) / accuracyWithBoth.length
+        : null;
+
     var badgeDefinitions = [
         { id: 'first', label: 'First Task', condition: totalCompleted >= 1, progress: totalCompleted, target: 1, desc: 'Completed your first task.' },
         { id: 'ten', label: '10 Tasks', condition: totalCompleted >= 10, progress: totalCompleted, target: 10, desc: 'Finished 10 tasks total.' },
         { id: 'fifty', label: '50 Tasks', condition: totalCompleted >= 50, progress: totalCompleted, target: 50, desc: 'Reached 50 completed tasks.' },
         { id: 'hundred', label: '100 Tasks', condition: totalCompleted >= 100, progress: totalCompleted, target: 100, desc: 'A century of tasks.' },
-        { id: 'accuracy', label: 'Accuracy Pro', condition: (function() {
-            var withBoth = historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; });
-            if (withBoth.length < 10) return false;
-            var totalDiff = withBoth.reduce(function(a, h) { return a + Math.abs(h.actualMinutes - h.estimateMinutes); }, 0);
-            return (totalDiff / withBoth.length) < 3;
-        })(), progress: historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; }).length, target: 10, desc: 'Precise estimations.' },
+        { id: 'accuracy', label: 'Accuracy Pro', condition: accuracyWithBoth.length >= 10 && accuracyAvgVariance < 3,
+            desc: 'Precise estimations.',
+            isQuality: true,
+            qualityLabel: accuracyWithBoth.length < 10
+                ? (accuracyWithBoth.length + '/10 tracked tasks needed')
+                : ('avg variance ' + accuracyAvgVariance.toFixed(1) + 'm, need under 3m'),
+            qualityPct: accuracyWithBoth.length < 10
+                ? Math.round((accuracyWithBoth.length / 10) * 100)
+                : Math.max(0, Math.min(100, Math.round((3 - accuracyAvgVariance) / 3 * 100 + 100)))
+        },
         { id: 'flowmaster', label: 'Flow Master', condition: flowBlocksCompleted >= 5, progress: flowBlocksCompleted, target: 5, desc: 'Completed 5 flow sessions.' },
         { id: 'streak7', label: '7-Day Streak', condition: streak >= 7, progress: streak, target: 7, desc: 'Worked 7 days in a row.' }
     ];
 
     var earned = badgeDefinitions.filter(function(b) { return b.condition; });
     var nextUp = badgeDefinitions.filter(function(b) { return !b.condition; })
-        .sort(function(a, b) { return (b.progress / b.target) - (a.progress / a.target); })[0];
+        .sort(function(a, b) {
+            var aPct = a.isQuality ? a.qualityPct : (a.progress / a.target) * 100;
+            var bPct = b.isQuality ? b.qualityPct : (b.progress / b.target) * 100;
+            return bPct - aPct;
+        })[0];
 
     var streakColor = streak >= 7 ? '#ff3366' : (streak >= 3 ? '#e08a00' : (streak >= 1 ? '#c9a227' : '#aaa'));
     var streakGlow = streak >= 7 ? 'filter: drop-shadow(0 0 4px rgba(255,51,102,0.5));' : '';
@@ -3228,19 +3250,27 @@ function updateStreaksAndBadges() {
         html += '<span style="color:#888;font-size:0.75rem;">No badges yet, complete tasks to earn milestones.</span>';
     } else {
         html += earned.map(function(b) {
-            return '<div class="badge-card" title="' + b.desc + '">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + icons[b.id] + '</svg>' +
+            var color = badgeColors[b.id] || 'var(--cherry-red)';
+            return '<div class="badge-card" title="' + b.desc + '" style="border-left:3px solid ' + color + ';">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:' + color + ';">' + icons[b.id] + '</svg>' +
                 '<span>' + b.label + '</span>' +
                 '</div>';
         }).join('');
     }
     html += '</div>';
     if (nextUp) {
-        var pct = Math.min(100, Math.round((nextUp.progress / nextUp.target) * 100));
-        html += '<div class="badge-progress" title="' + nextUp.desc + '">' +
-            '<div style="font-size:0.65rem;color:#888;margin-top:8px;">Next: ' + nextUp.label + ' (' + nextUp.progress + '/' + nextUp.target + ')</div>' +
-            '<div><progress value="' + pct + '" max="100"></progress></div>' +
-            '</div>';
+        if (nextUp.isQuality) {
+            html += '<div class="badge-progress" title="' + nextUp.desc + '">' +
+                '<div style="font-size:0.65rem;color:#888;margin-top:8px;">Next: ' + nextUp.label + ' (' + nextUp.qualityLabel + ')</div>' +
+                '<div><progress value="' + nextUp.qualityPct + '" max="100"></progress></div>' +
+                '</div>';
+        } else {
+            var pct = Math.min(100, Math.round((nextUp.progress / nextUp.target) * 100));
+            html += '<div class="badge-progress" title="' + nextUp.desc + '">' +
+                '<div style="font-size:0.65rem;color:#888;margin-top:8px;">Next: ' + nextUp.label + ' (' + nextUp.progress + '/' + nextUp.target + ')</div>' +
+                '<div><progress value="' + pct + '" max="100"></progress></div>' +
+                '</div>';
+        }
     }
     badgesEl.innerHTML = html;
 }
@@ -3547,7 +3577,31 @@ function renderTimeCounter() {
     var grandDone = new Date(now.getTime() + grandTotalMinutes * 60000);
     box.innerHTML = '<ul class="log-list">' + rows + '</ul>' +
         '<p style="margin-top:8px;font-size:0.85rem;"><strong>' + formatHoursMinutes(grandWorkMinutes) + '</strong> total work.</p>' +
-        '<p style="font-weight:700;">All done by ' + formatTimeInZone(grandDone, tz) + ' (' + tz + ')</p>';
+        '<p style="font-weight:700;">All done by ' + formatTimeInZone(grandDone, tz) + ' (' + tz + ')</p>' +
+        renderStarredTimeSummary(breakMin, tz, now);
+}
+
+function renderStarredTimeSummary(breakMin, tz, now) {
+    var starredTasks = [];
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(t) {
+            if (t.isTopPriority && !t.completed && !t.parentId) starredTasks.push(t);
+        });
+    });
+    if (starredTasks.length === 0) return '';
+
+    var starredWork = 0;
+    var starredTotalWithBreaks = 0;
+    starredTasks.forEach(function(task, i) {
+        var chunkData = buildChunks(Math.max(1, task.estimateMinutes || 15));
+        var taskWork = chunkData.chunks.reduce(function(a, b) { return a + b; }, 0);
+        starredWork += taskWork;
+        starredTotalWithBreaks += taskWork + (chunkData.chunks.length - 1) * breakMin + chunkData.bonusBreakMinutes;
+        if (i < starredTasks.length - 1) starredTotalWithBreaks += breakMin;
+    });
+    var starredDone = new Date(now.getTime() + starredTotalWithBreaks * 60000);
+    return '<p style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-color);font-size:0.85rem;">' +
+        '<span style="color:var(--cherry-red);">&#9733;</span> Starred only: <strong>' + formatHoursMinutes(starredWork) + '</strong>, done by ' + formatTimeInZone(starredDone, tz) + '</p>';
 }
 
 function updateAdaptiveHacks() {
@@ -3557,7 +3611,7 @@ function updateAdaptiveHacks() {
     boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (!t.completed && !t.parentId) { totalEstimate += (t.estimateMinutes || 0); openTasks++; } }); });
     var workMin = Math.round((workDuration || 1500) / 60);
     var sessions = openTasks > 0 ? Math.ceil(totalEstimate / workMin) : 0;
-    box.innerHTML = '<ul><li><strong>Active Load:</strong> ' + formatHoursMinutes(totalEstimate) + ' across ' + openTasks + ' task(s)' + (sessions ? ' — roughly ' + sessions + ' focus session(s).' : '.') + '</li><li><strong>Timer Flash:</strong> 3 min left warning.</li></ul>';
+    box.innerHTML = '<ul><li><strong>Active Load:</strong> ' + formatHoursMinutes(totalEstimate) + ' across ' + openTasks + ' task(s)' + (sessions ? ', roughly ' + sessions + ' focus session(s).' : '.') + '</li></ul>';
 }
 
 function exportAllDataJSON() {

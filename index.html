@@ -293,22 +293,26 @@
         </div>
         <!-- Card 3: Dedicated Activity Timeline -->
         <div class="hacks-card" style="flex:1 1 300px;">
-            <div style="font-weight:700;color:var(--cherry-red);margin-bottom:8px;">Activity Timeline</div>
-            <div style="max-height:220px; overflow-y:auto; padding-right:4px;" id="activity-timeline-box">
-                <ul class="activity-timeline" id="activity-timeline-content">
-                    <li style="color:#888;font-size:0.75rem;">No activity logged yet.</li>
-                </ul>
-            </div>
+            <details>
+                <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;outline:none;">Activity Timeline</summary>
+                <div style="max-height:220px; overflow-y:auto; padding-right:4px;margin-top:8px;" id="activity-timeline-box">
+                    <ul class="activity-timeline" id="activity-timeline-content">
+                        <li style="color:#888;font-size:0.75rem;">No activity logged yet.</li>
+                    </ul>
+                </div>
+            </details>
         </div>
     </div>
     <div class="bottom-split" style="max-width:1100px;margin:1.5rem auto 0;">
         <div class="log-card" style="width:100%;">
-            <div style="font-weight:700;color:var(--cherry-red);margin-bottom:8px;">Estimate vs Actual (Rolling Log)</div>
-            <div style="max-height:220px; overflow-y:auto; padding-right:4px;" id="estimate-log-box">
-                <ul class="activity-timeline" id="estimate-log">
-                    <li style="color:#888;font-size:0.75rem;">Complete a tracked task to start your log.</li>
-                </ul>
-            </div>
+            <details>
+                <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;outline:none;">Estimate vs Actual (Rolling Log)</summary>
+                <div style="max-height:220px; overflow-y:auto; padding-right:4px;margin-top:8px;" id="estimate-log-box">
+                    <ul class="activity-timeline" id="estimate-log">
+                        <li style="color:#888;font-size:0.75rem;">Complete a tracked task to start your log.</li>
+                    </ul>
+                </div>
+            </details>
         </div>
     </div>
 </div>
@@ -320,32 +324,36 @@
         <p class="tagline">AI client reporting, Adaptive Brain Engine Reports, PDF exports, and data management.</p>
     </header>
     <div class="top-section" style="max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:1.5rem;">
-        
-        <!-- AI Reports & Briefs Card -->
-        <div class="summary-container" style="width:100%;">
-            <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate.</div>
-            <div class="summary-header">
-                <h3 style="margin:0;color:var(--cherry-red);">Monthly Summary & Client Report</h3>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button class="ai-btn" onclick="generateAISummary(false)">Generate Client Report</button>
-                    <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">Download .ics</button>
-                    <button class="ai-btn" onclick="openPdfExportOverlay()" style="background:var(--amber);">PDF Report</button>
-                </div>
-            </div>
-            <div class="summary-content" id="summary-content" style="margin-top:10px;">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
-        </div>
 
-        <!-- AI Adaptive Brain Engine Report Card -->
-        <div class="summary-container" style="width:100%;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
-                <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
-                <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
+        <!-- AI Reports & Briefs + Adaptive Brain Engine, side by side -->
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+            <!-- AI Reports & Briefs Card -->
+            <div class="summary-container" style="flex:1 1 340px;">
+                <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate.</div>
+                <div class="summary-header">
+                    <h3 style="margin:0;color:var(--cherry-red);">Monthly Summary & Client Report</h3>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button class="ai-btn" onclick="generateAISummary(false)">Generate Client Report</button>
+                        <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">Download .ics</button>
+                        <button class="ai-btn" onclick="openPdfExportOverlay()" style="background:var(--amber);">PDF Report</button>
+                    </div>
+                </div>
+                <p style="font-size:0.72rem;color:#888;margin:0.4rem 0 0.6rem;">A written first-person summary of what you completed this month, grouped by project, ready to send or archive.</p>
+                <div class="summary-content" id="summary-content">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
             </div>
-            <p style="font-size:0.72rem;color:#888;margin:0 0 0.6rem;">A written AI summary of your current workload and pace, how much is on your plate right now and whether you're on track, not a task-by-task list.</p>
-            <div class="hacks-content" id="adaptive-hacks" style="margin-bottom:0.8rem;">Analyzing your current task load...</div>
-            <div class="summary-content" id="brain-engine-report-content" style="min-height:100px;margin-bottom:0.8rem;">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
-            <p style="font-size:0.72rem;color:#888;margin:0 0 4px;">Re-runs AI time estimates for every open task at once, using this same task-time memory, useful after a big batch add.</p>
-            <button class="btn-secondary reestimate-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
+
+            <!-- AI Adaptive Brain Engine Report Card -->
+            <div class="summary-container" style="flex:1 1 340px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                    <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
+                    <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
+                </div>
+                <p style="font-size:0.72rem;color:#888;margin:0.4rem 0 0.6rem;">A written AI summary of your current workload and pace, how much is on your plate right now and whether you're on track, not a task-by-task list.</p>
+                <div class="hacks-content" id="adaptive-hacks" style="margin-bottom:0.6rem;">Analyzing your current task load...</div>
+                <div class="summary-content" id="brain-engine-report-content">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
+                <p style="font-size:0.72rem;color:#888;margin:0.6rem 0 4px;">Re-runs AI time estimates for every open task at once, using this same task-time memory, useful after a big batch add.</p>
+                <button class="btn-secondary reestimate-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
+            </div>
         </div>
 
         <!-- Report History Card -->
