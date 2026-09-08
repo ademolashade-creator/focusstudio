@@ -158,7 +158,10 @@
     </header>
 
     <!-- Timer Card & Internal Queue -->
-    <div class="timer-card-wrapper" style="max-width:600px;margin:0 auto;">
+    <div class="timer-card-wrapper" style="max-width:600px;margin:0 auto;position:relative;">
+        <button class="icon-btn focus-mode-toggle" id="focus-mode-toggle" onclick="toggleFocusMode()" title="Focus mode (full screen)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
         <div class="timer-card">
             <div id="mode-indicator">Work Time</div>
             <div class="timer-display" id="time-display">25:00</div>
@@ -326,40 +329,38 @@
     <div class="top-section" style="max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:1.5rem;">
 
         <!-- AI Reports & Briefs + Adaptive Brain Engine, side by side -->
-        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:stretch;">
             <!-- AI Reports & Briefs Card -->
-            <div class="summary-container" style="flex:1 1 340px;">
+            <div class="summary-container report-card-flex" style="flex:1 1 340px;">
                 <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate.</div>
-                <div class="summary-header">
-                    <h3 style="margin:0;color:var(--cherry-red);">Monthly Summary & Client Report</h3>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <button class="ai-btn" onclick="generateAISummary(false)">Generate Client Report</button>
-                        <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">Download .ics</button>
-                        <button class="ai-btn" onclick="openPdfExportOverlay()" style="background:var(--amber);">PDF Report</button>
-                    </div>
+                <h3 style="margin:0;color:var(--cherry-red);">Monthly Summary & Client Report</h3>
+                <p style="font-size:0.72rem;color:#888;margin:0.4rem 0 0.6rem;">A written first-person summary of what you completed, grouped by project, ready to send or archive. Also used for the per-column daily check-ins on each task card.</p>
+                <div class="summary-content report-card-content" id="summary-content">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
+                <div class="report-card-actions">
+                    <button class="ai-btn" onclick="generateAISummary(false)">Generate Client Report</button>
+                    <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">Download .ics</button>
+                    <button class="ai-btn" onclick="openPdfExportOverlay()" style="background:var(--amber);">PDF Report</button>
                 </div>
-                <p style="font-size:0.72rem;color:#888;margin:0.4rem 0 0.6rem;">A written first-person summary of what you completed this month, grouped by project, ready to send or archive.</p>
-                <div class="summary-content" id="summary-content">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
             </div>
 
             <!-- AI Adaptive Brain Engine Report Card -->
-            <div class="summary-container" style="flex:1 1 340px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
-                    <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
-                    <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
-                </div>
+            <div class="summary-container report-card-flex" style="flex:1 1 340px;">
+                <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
                 <p style="font-size:0.72rem;color:#888;margin:0.4rem 0 0.6rem;">A written AI summary of your current workload and pace, how much is on your plate right now and whether you're on track, not a task-by-task list.</p>
                 <div class="hacks-content" id="adaptive-hacks" style="margin-bottom:0.6rem;">Analyzing your current task load...</div>
-                <div class="summary-content" id="brain-engine-report-content">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
+                <div class="summary-content report-card-content" id="brain-engine-report-content">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
                 <p style="font-size:0.72rem;color:#888;margin:0.6rem 0 4px;">Re-runs AI time estimates for every open task at once, using this same task-time memory, useful after a big batch add.</p>
-                <button class="btn-secondary reestimate-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
+                <div class="report-card-actions">
+                    <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
+                    <button class="btn-secondary reestimate-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
+                </div>
             </div>
         </div>
 
         <!-- Report History Card -->
         <div class="summary-container" style="width:100%;">
             <details>
-                <summary style="font-size:0.95rem;font-weight:600;color:var(--cherry-red);cursor:pointer;outline:none;">Saved Reports</summary>
+                <summary style="font-size:0.95rem;font-weight:700;color:var(--cherry-red);cursor:pointer;outline:none;">Saved Reports</summary>
                 <p style="font-size:0.72rem;color:#888;margin:0.6rem 0;">Every check-in and monthly summary you generate is kept here automatically. Click one to preview, export as PDF, or delete it.</p>
                 <ul id="report-history-list" class="report-history-list"></ul>
             </details>
@@ -369,8 +370,15 @@
         <div class="summary-container" style="width:100%;">
             <details>
                 <summary style="font-weight:700;color:var(--cherry-red);cursor:pointer;">System Configuration (Gemini API Key)</summary>
-                <div class="api-key-box" style="margin-top:10px;">
-                    <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+                <div class="api-key-box" style="margin-top:10px;flex-direction:column;align-items:stretch;gap:8px;">
+                    <div>
+                        <label style="font-size:0.7rem;font-weight:700;color:#888;display:block;margin-bottom:3px;">Your Name</label>
+                        <input type="text" id="user-name-input" class="api-key-input" placeholder="Used to sign AI-generated reports correctly" oninput="saveUserName(this.value)">
+                    </div>
+                    <div>
+                        <label style="font-size:0.7rem;font-weight:700;color:#888;display:block;margin-bottom:3px;">Gemini API Key</label>
+                        <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
+                    </div>
                 </div>
             </details>
         </div>
@@ -616,6 +624,8 @@
     window.toggleTopPriority = toggleTopPriority;
     window.openDailyPlanningFromNotice = openDailyPlanningFromNotice;
     window.saveApiKey = saveApiKey;
+    window.saveUserName = saveUserName;
+    window.toggleFocusMode = toggleFocusMode;
     window.handleKeyPress = handleKeyPress;
     window.breakdownTask = breakdownTask;
     window.suggestTimeFromDetails = suggestTimeFromDetails;

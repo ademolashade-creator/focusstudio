@@ -1154,8 +1154,15 @@ function buildCheckInTaskData(tasksFilter) {
 }
 
 function buildCheckInPrompt(byColumn) {
-    return 'Write this exactly as if I am personally telling my manager my plan for today, in my own first-person voice, the way a real person would type a quick morning message, not a formal report written about me. ' +
-        'Open with "Good morning." and nothing else as a greeting, no pleasantries after it. Lead with the single most important priority or meeting of the day. Then walk through the rest of the day in a sensible, logical order, referencing time naturally ("before that", "after the meeting", "once X is done") rather than listing raw minute counts. If a task includes listed steps, use them to explain what the work actually involves rather than just naming the task. Where a project lists a manager name, you are writing this portion for that manager specifically. Close with one short line offering to help further, such as "Let me know if you need anything else." and a brief sign-off, nothing more. Be specific and concrete throughout, never generic praise or filler. ' +
+    var hour = new Date().getHours();
+    var timeGreeting = hour < 12 ? 'Good morning.' : (hour < 17 ? 'Good afternoon.' : 'Good evening.');
+    var userName = storageGet('ff-user-name', '').trim();
+    var signOffInstruction = userName
+        ? 'Sign off with just "' + userName + '", nothing more elaborate.'
+        : 'Do not invent a name to sign off with. End on the offer-to-help line with no name attached.';
+
+    return 'Write this exactly as if I am personally telling my manager my plan for today, in my own first-person voice, the way a real person would type a quick message, not a formal report written about me. ' +
+        'Open with "' + timeGreeting + '" and nothing else as a greeting, no pleasantries after it. This matches the real current time of day, so use it exactly as given, do not guess a different time of day. Lead with the single most important priority or meeting of the day. Then walk through the rest of the day in a sensible, logical order, referencing time naturally ("before that", "after the meeting", "once X is done") rather than listing raw minute counts. If a task includes listed steps, use them to explain what the work actually involves rather than just naming the task. Where a project lists a manager name, you are writing this portion for that manager specifically. Close with one short line offering to help further, such as "Let me know if you need anything else." ' + signOffInstruction + ' Be specific and concrete throughout, never generic praise or filler. ' +
         'Today\'s tasks grouped by project: ' + JSON.stringify(byColumn);
 }
 
@@ -2868,8 +2875,12 @@ async function generateAISummary(silent) {
 
     var managerByColumn = {};
     boardData.forEach(function(col) { if (col.managerName) managerByColumn[col.title] = col.managerName; });
+    var userName = storageGet('ff-user-name', '').trim();
+    var nameInstruction = userName
+        ? 'My name is ' + userName + '. Sign off with just that name if a sign-off feels natural, nothing more elaborate.'
+        : 'Do not invent a name to sign off with.';
 
-    var prompt = 'Write this exactly as if I am personally summarizing my own completed work this month, in my own first-person voice ("I completed", "I finished"), the way a real person reflects on their month, not a formal document written about someone else in the third person. Group the summary by project. Where a project has a manager name listed, address that part of the summary as if reporting to them specifically. Be specific and concrete about what was actually done, never generic praise or filler phrases. Completed work this month: ' + JSON.stringify(thisMonthData) + '. Project managers: ' + JSON.stringify(managerByColumn);
+    var prompt = 'Write this exactly as if I am personally summarizing my own completed work this month, in my own first-person voice ("I completed", "I finished"), the way a real person reflects on their month, not a formal document written about someone else in the third person. Group the summary by project. Where a project has a manager name listed, address that part of the summary as if reporting to them specifically. ' + nameInstruction + ' Be specific and concrete about what was actually done, never generic praise or filler phrases. Completed work this month: ' + JSON.stringify(thisMonthData) + '. Project managers: ' + JSON.stringify(managerByColumn);
     try {
         var result = await callGemini(prompt);
         if (!silent) summaryBox.textContent = result;
@@ -3200,13 +3211,13 @@ function updateStreaksAndBadges() {
         streak7: '<path d="M12 2c-2 4-2 6 0 8 2-1 2-3 1-4 2 1 3 3 3 5a4 4 0 0 1-8 0c0-3 2-5 4-9z" fill="currentColor" stroke="none"/>'
     };
     var badgeColors = {
-        first: 'var(--green)',
-        ten: '#8b5fbf',
-        fifty: 'var(--amber)',
+        first: '#ffb3c6',
+        ten: '#ff8fab',
+        fifty: '#ff5c8a',
         hundred: 'var(--cherry-red)',
-        accuracy: '#2a9d8f',
-        flowmaster: '#d4670e',
-        streak7: '#e0455f'
+        accuracy: 'var(--amber)',
+        flowmaster: 'var(--green)',
+        streak7: '#ff6b35'
     };
     var accuracyWithBoth = historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; });
     var accuracyAvgVariance = accuracyWithBoth.length > 0
@@ -3275,7 +3286,15 @@ function updateStreaksAndBadges() {
     badgesEl.innerHTML = html;
 }
 
+function toggleFocusMode() {
+    document.body.classList.toggle('focus-mode-active');
+}
+
 document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.body.classList.contains('focus-mode-active')) {
+        document.body.classList.remove('focus-mode-active');
+        return;
+    }
     if (e.altKey && e.shiftKey) {
         switch(e.key.toLowerCase()) {
             case 's': toggleTimer(); e.preventDefault(); break;
@@ -3948,6 +3967,10 @@ function initApp() {
     var keyInput = document.getElementById('gemini-api-key');
     if (keyInput) keyInput.value = key;
 
+    var userNameSaved = storageGet('ff-user-name', '');
+    var userNameInput = document.getElementById('user-name-input');
+    if (userNameInput) userNameInput.value = userNameSaved;
+
     setFlowControlsVisible(false);
 
     renderAttendanceCard();
@@ -4012,6 +4035,7 @@ function checkBackupReminder() {
 }
 
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
+function saveUserName(name) { storageSet('ff-user-name', name); }
 function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, function(tag) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[tag] || tag; }); }
 
