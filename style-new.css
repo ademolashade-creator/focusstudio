@@ -574,9 +574,10 @@ button:active { transform: scale(0.96); }
 .manager-name-input {
     font-family: var(--font-family);
     font-size: 0.72rem;
-    color: #888;
+    font-style: italic;
+    color: #c98a9e;
     border: none;
-    border-bottom: 1px dashed var(--border-color);
+    border-bottom: 1px dashed var(--border-color-pink);
     background: transparent;
     width: 100%;
     padding: 2px 0 6px;
@@ -584,6 +585,7 @@ button:active { transform: scale(0.96); }
     outline: none;
 }
 .manager-name-input:focus { color: var(--text-color); border-bottom-color: var(--cherry-red); }
+.manager-name-input::placeholder { color: #d9b3c2; font-style: italic; }
 
 .ai-batch-actions { display: flex; gap: 4px; margin-bottom: 0.5rem; flex-wrap: wrap; }
 
@@ -1206,6 +1208,32 @@ button:active { transform: scale(0.96); }
 .modal-box select { background-color: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 4px; border-radius: 6px; width: 100%; margin-bottom: 8px; }
 .modal-actions { display: flex; gap: 10px; }
 .modal-actions button { flex: 1; }
+
+.details-modal-box { max-width: 440px; }
+.details-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1.5px dashed var(--border-color-pink);
+}
+.details-modal-header strong { font-size: 1.05rem; color: var(--cherry-red); font-weight: 700; }
+.details-modal-section { margin-bottom: 14px; }
+.details-modal-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--cherry-red);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+}
+.details-modal-label svg { width: 14px; height: 14px; flex-shrink: 0; }
+.details-estimate-label { font-size: 0.78rem; color: #888; margin: 0 0 10px !important; text-align: left; }
+.details-ai-actions { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 6px; border-top: 1px dashed var(--border-color); }
 
 .clockout-countdown {
     font-weight: 700;

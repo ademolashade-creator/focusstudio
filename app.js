@@ -1548,18 +1548,29 @@ function groupTasksByDate(tasks, colIndex) {
 
     var today = getTodayKey();
     var yesterday = getYesterdayKey();
+    var sortedKeys = Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); });
 
-    return Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); }).map(function(key) {
-        var groupKey = colIndex + '-' + key;
-        var isCollapsed = (key !== today && key !== yesterday);
-        if (_toggledDateGroups[groupKey] !== undefined) isCollapsed = _toggledDateGroups[groupKey];
-        return {
-            dateKey: key,
-            dateLabel: formatDateKey(key),
-            isCollapsed: isCollapsed,
-            items: groups[key].incomplete.concat(groups[key].completed)
-        };
+    var result = [];
+    var previousItems = [];
+
+    sortedKeys.forEach(function(key) {
+        var items = groups[key].incomplete.concat(groups[key].completed);
+        if (key === today || key === yesterday) {
+            var groupKey = colIndex + '-' + key;
+            var isCollapsed = _toggledDateGroups[groupKey] !== undefined ? _toggledDateGroups[groupKey] : false;
+            result.push({ dateKey: key, dateLabel: formatDateKey(key), isCollapsed: isCollapsed, items: items });
+        } else {
+            previousItems = previousItems.concat(items);
+        }
     });
+
+    if (previousItems.length > 0) {
+        var prevGroupKey = colIndex + '-previous';
+        var prevCollapsed = _toggledDateGroups[prevGroupKey] !== undefined ? _toggledDateGroups[prevGroupKey] : true;
+        result.push({ dateKey: 'previous', dateLabel: 'Previous Days (' + previousItems.length + ')', isCollapsed: prevCollapsed, items: previousItems });
+    }
+
+    return result;
 }
 
 function toggleDateGroup(colIndex, key) {
@@ -2767,6 +2778,12 @@ async function optimizeColumnFlowAI(ci) {
             });
             var comp = boardData[ci].tasks.filter(function(t) { return t.completed; });
             boardData[ci].tasks = sortedOpen.concat(comp);
+
+            // The visual reorder above only affects display order. Start Flow reads customQueueOrder,
+            // so this column's new sequence needs to actually govern the flow too, not just look right on screen.
+            customQueueOrder = customQueueOrder.filter(function(id) { return !result.orderedIds.includes(id); });
+            customQueueOrder = result.orderedIds.concat(customQueueOrder);
+            storageSet('ff-custom-queue', customQueueOrder);
         }
 
         if (result.missingTasks && result.missingTasks.length > 0) {
@@ -2774,8 +2791,8 @@ async function optimizeColumnFlowAI(ci) {
         }
 
         saveBoardData();
-        saveScrollPositions();
-        renderBoard();
+        renderSingleColumn(ci);
+        renderInternalQueue();
     } catch(e) { alert('AI optimization error: ' + e.message); }
 }
 
@@ -2885,8 +2902,37 @@ async function generateBrainEngineReport() {
     try {
         var res = await callGemini(prompt);
         box.textContent = res;
+        logBrainEngineSnapshot(openTasksCount, totalEst, res);
+        maybeSynthesizeMonthlyLearnings();
     } catch(e) {
         box.textContent = 'Error generating brain engine report: ' + e.message;
+    }
+}
+
+function logBrainEngineSnapshot(openTasksCount, totalEst, reportText) {
+    var log = storageGet('ff-brain-report-log', []);
+    log.push({ date: getTodayKey(), openTasksCount: openTasksCount, totalEst: totalEst, summary: reportText.slice(0, 300) });
+    storageSet('ff-brain-report-log', log);
+}
+
+async function maybeSynthesizeMonthlyLearnings() {
+    var log = storageGet('ff-brain-report-log', []);
+    if (log.length === 0) return;
+    var firstEntryDate = new Date(log[0].date);
+    var daysSinceFirst = Math.floor((Date.now() - firstEntryDate.getTime()) / 86400000);
+    if (daysSinceFirst < 30) return;
+
+    var apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) return;
+
+    var prompt = 'Here is a month of daily workload snapshots for one person, each with the date, number of open tasks, total estimated minutes, and a brief note. Synthesize the genuine patterns and learnings from this month, what changed, what stayed constant, what this suggests about their pacing and workload trends. Write it as a short reflective summary, not a list of the raw data points. Data: ' + JSON.stringify(log);
+
+    try {
+        var learnings = await callGemini(prompt);
+        saveReportToHistory('Monthly Brain Engine Learnings', learnings);
+        storageSet('ff-brain-report-log', []); // dispose of the raw month now that it's been distilled
+    } catch (e) {
+        // If synthesis fails, leave the log intact so it can be retried next time a report is generated.
     }
 }
 
