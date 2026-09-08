@@ -43,10 +43,13 @@ function switchView(viewId) {
     document.querySelectorAll('.nav-btn').forEach(function(btn) {
         btn.classList.toggle('active', btn.dataset.view === viewId);
     });
-    saveScrollPositions();
+    window.scrollTo(0, 0);
     if (viewId === 'activity') {
         renderDailyRecap();
         renderEstimateLog();
+    }
+    if (viewId === 'reports') {
+        renderReportHistory();
     }
 }
 
@@ -495,7 +498,7 @@ function getPrioritizedOpenTasks() {
     var topLevel = [];
     boardData.forEach(function(col, ci) {
         col.tasks.forEach(function(task, ti) {
-            if (!task.completed && !task.parentId) {
+            if (!task.completed && !task.parentId && !task.isHidden) {
                 topLevel.push({ col: col, task: task, ci: ci, ti: ti });
             }
         });
@@ -510,6 +513,10 @@ function getPrioritizedOpenTasks() {
         if (aUrgent && !bUrgent) return -1;
         if (!aUrgent && bUrgent) return 1;
         if (aUrgent && bUrgent) return aDeadMs - bDeadMs;
+
+        var aStar = a.task.isTopPriority ? 1 : 0;
+        var bStar = b.task.isTopPriority ? 1 : 0;
+        if (aStar !== bStar) return bStar - aStar;
 
         var aCarried = a.task.carriedOver ? 1 : 0;
         var bCarried = b.task.carriedOver ? 1 : 0;
@@ -642,6 +649,8 @@ function renderInternalQueue() {
         var indentStyle = isSub ? 'margin-left:22px;' : '';
         var subtaskIcon = isSub ? '<span style="color:var(--amber);margin-right:4px;">\u21B3</span>' : '';
         var groupBadge = entry.isGroupParent ? '<span style="font-size:0.65rem;color:#888;margin-left:4px;">(parent)</span>' : '';
+        var starBadge = entry.task.isTopPriority ? '<span title="Top priority in ' + escapeHTML(entry.col.title) + '" style="color:var(--cherry-red);margin-right:4px;">&#9733;</span>' : '';
+        var columnTag = entry.task.isTopPriority ? '<span class="queue-column-tag">' + escapeHTML(entry.col.title) + '</span>' : '';
         var upDownHtml = !isSub ? (
             '<span style="display:flex;flex-direction:column;line-height:0.6;">' +
             '<button class="icon-btn" style="font-size:0.55rem;padding:0;" onclick="event.stopPropagation();nudgeQueueEntry(\'' + entry.task.id + '\', -1)" title="Move up">\u25B2</button>' +
@@ -657,7 +666,7 @@ function renderInternalQueue() {
             '<span style="color:var(--cherry-red);font-size:1.1rem;cursor:grab;padding-right:4px;" title="Drag to reorder">\u2261</span>' +
             upDownHtml +
             numberHtml +
-            subtaskIcon + escapeHTML(entry.task.text) + groupBadge +
+            starBadge + subtaskIcon + escapeHTML(entry.task.text) + groupBadge + columnTag +
             '</div>' +
             getDeadlineBadge(entry.task) +
             '</li>';
@@ -775,6 +784,7 @@ function advanceFlow() {
 function completeFlowTask(entry, actualSeconds) {
     var task = entry.task;
     task.completed = true;
+    task.isTopPriority = false;
     task.isTracking = false;
     task.trackedSeconds = actualSeconds;
     task.completedAt = Date.now();
@@ -1092,12 +1102,15 @@ function refreshPlanningPriorityPicker() {
     if (!list) return;
     var html = '';
     boardData.forEach(function(col, ci) {
+        var openTasks = col.tasks.filter(function(t) { return !t.completed && !t.parentId; });
+        if (openTasks.length === 0) return;
+        var starredCount = countTopPriorityTasksInColumn(ci);
+        html += '<li class="planning-priority-col-header">' + escapeHTML(col.title) + ' <span>(' + starredCount + '/5 starred)</span></li>';
         col.tasks.forEach(function(task, ti) {
             if (task.completed || task.parentId) return;
             html += '<li class="' + (task.isTopPriority ? 'is-priority' : '') + '">' +
                 '<button class="priority-star-btn ' + (task.isTopPriority ? 'active' : '') + '" onclick="toggleTopPriority(' + ci + ', ' + ti + ')">&#9733;</button>' +
                 '<span>' + escapeHTML(task.text) + '</span>' +
-                '<span class="planning-priority-col">' + escapeHTML(col.title) + '</span>' +
                 '</li>';
         });
     });
@@ -1120,6 +1133,32 @@ function closeDailyPlanningSession() {
     renderDailyRecap();
 }
 
+function buildCheckInTaskData(tasksFilter) {
+    var byColumn = {};
+    boardData.forEach(function(col) {
+        var openTasks = col.tasks.filter(function(t) {
+            if (t.completed || t.parentId || t.isHidden) return false;
+            return tasksFilter(t);
+        }).map(function(t) {
+            var subtasks = col.tasks.filter(function(st) { return st.parentId === t.id && !st.completed; });
+            if (subtasks.length > 0) {
+                return { task: t.text, minutes: t.estimateMinutes, steps: subtasks.map(function(st) { return { text: st.text, minutes: st.estimateMinutes }; }) };
+            }
+            return { task: t.text, minutes: t.estimateMinutes };
+        });
+        if (openTasks.length > 0) {
+            byColumn[col.title] = { manager: col.managerName || null, tasks: openTasks };
+        }
+    });
+    return byColumn;
+}
+
+function buildCheckInPrompt(byColumn) {
+    return 'Write this exactly as if I am personally telling my manager my plan for today, in my own first-person voice, the way a real person would type a quick morning message, not a formal report written about me. ' +
+        'Open with "Good morning." and nothing else as a greeting, no pleasantries after it. Lead with the single most important priority or meeting of the day. Then walk through the rest of the day in a sensible, logical order, referencing time naturally ("before that", "after the meeting", "once X is done") rather than listing raw minute counts. If a task includes listed steps, use them to explain what the work actually involves rather than just naming the task. Where a project lists a manager name, you are writing this portion for that manager specifically. Close with one short line offering to help further, such as "Let me know if you need anything else." and a brief sign-off, nothing more. Be specific and concrete throughout, never generic praise or filler. ' +
+        'Today\'s tasks grouped by project: ' + JSON.stringify(byColumn);
+}
+
 async function runFullDailyCheckIn() {
     var resultBox = document.getElementById('planning-checkin-result');
     if (resultBox) resultBox.textContent = 'Generating your check-in...';
@@ -1130,31 +1169,94 @@ async function runFullDailyCheckIn() {
         return;
     }
 
-    var byColumn = {};
     var priorityFilter = countTopPriorityTasks() > 0;
-    boardData.forEach(function(col) {
-        var openTasks = col.tasks.filter(function(t) {
-            if (t.completed || t.parentId) return false;
-            return priorityFilter ? t.isTopPriority : true;
-        }).map(function(t) { return t.text; });
-        if (openTasks.length > 0) byColumn[col.title] = openTasks;
-    });
+    var byColumn = buildCheckInTaskData(function(t) { return priorityFilter ? t.isTopPriority : true; });
 
     if (Object.keys(byColumn).length === 0) {
         if (resultBox) resultBox.textContent = priorityFilter ? 'No open top-priority tasks found.' : 'No open tasks yet, add some above first.';
         return;
     }
 
-    var prompt = (priorityFilter
-        ? 'Act as a world-class formal assistant. Write one short, warm, encouraging daily check-in brief covering only today\'s top priorities, organized by project/client. Data grouped by project: '
-        : 'Act as a world-class formal assistant. Write one short, warm, encouraging daily check-in brief covering everything on the agenda today, organized by project/client. Data grouped by project: '
-    ) + JSON.stringify(byColumn) + '. Use formal language. Do not use em-dashes.';
+    var prompt = buildCheckInPrompt(byColumn);
     try {
         var result = await callGemini(prompt);
         if (resultBox) resultBox.textContent = result;
+        saveReportToHistory('Daily Check-In', result);
     } catch (e) {
         if (resultBox) resultBox.textContent = 'Error: ' + e.message;
     }
+}
+
+function saveReportToHistory(label, content) {
+    var history = storageGet('ff-report-history', []);
+    history.unshift({
+        id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+        label: label,
+        content: content,
+        createdAt: Date.now()
+    });
+    if (history.length > 100) history = history.slice(0, 100);
+    storageSet('ff-report-history', history);
+    if (document.getElementById('view-reports').classList.contains('active')) renderReportHistory();
+}
+
+function renderReportHistory() {
+    var list = document.getElementById('report-history-list');
+    if (!list) return;
+    var history = storageGet('ff-report-history', []);
+    if (history.length === 0) {
+        list.innerHTML = '<li style="color:#888;">No saved reports yet. Generated check-ins and summaries will appear here.</li>';
+        return;
+    }
+    list.innerHTML = history.map(function(r) {
+        var dateStr = new Date(r.createdAt).toLocaleString();
+        return '<li class="report-history-item">' +
+            '<div class="report-history-row" onclick="toggleReportPreview(\'' + r.id + '\')">' +
+            '<span><strong>' + escapeHTML(r.label) + '</strong> <span class="report-history-date">' + dateStr + '</span></span>' +
+            '</div>' +
+            '<div class="report-history-preview" id="report-preview-' + r.id + '" style="display:none;">' +
+            '<div class="report-history-text">' + escapeHTML(r.content) + '</div>' +
+            '<div class="report-history-actions">' +
+            '<button class="btn-secondary btn-small" onclick="exportReportPDF(\'' + r.id + '\')">Export PDF</button>' +
+            '<button class="delete-btn" onclick="deleteReportFromHistory(\'' + r.id + '\')">Delete</button>' +
+            '</div></div></li>';
+    }).join('');
+}
+
+function toggleReportPreview(id) {
+    var el = document.getElementById('report-preview-' + id);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function deleteReportFromHistory(id) {
+    if (!confirm('Delete this saved report? This cannot be undone.')) return;
+    var history = storageGet('ff-report-history', []);
+    history = history.filter(function(r) { return r.id !== id; });
+    storageSet('ff-report-history', history);
+    renderReportHistory();
+}
+
+function exportReportPDF(id) {
+    var history = storageGet('ff-report-history', []);
+    var report = history.find(function(r) { return r.id === id; });
+    if (!report) return;
+    var printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+        alert('Please allow pop-ups to generate PDF reports.');
+        return;
+    }
+    var dateStr = new Date(report.createdAt).toLocaleString();
+    var html = '<!DOCTYPE html><html><head><title>' + escapeHTML(report.label) + '</title>' +
+        '<style>body{font-family:Georgia,serif;padding:40px;max-width:800px;margin:0 auto;white-space:pre-wrap;line-height:1.6;}' +
+        'h1{color:#ff3366;border-bottom:2px solid #ff3366;padding-bottom:10px;}' +
+        '.meta{color:#888;font-size:0.85rem;margin-bottom:25px;}</style></head><body>' +
+        '<h1>' + escapeHTML(report.label) + '</h1>' +
+        '<div class="meta">' + dateStr + '</div>' +
+        '<div>' + escapeHTML(report.content) + '</div></body></html>';
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(function() { printWindow.print(); }, 400);
 }
 
 function calculateTodayCompletionRatio() {
@@ -1343,7 +1445,7 @@ function adjustTasksForMidnight() {
     var changed = false;
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
-            if (!task.completed && task.dateAdded !== today) {
+            if (!task.recurrence && !task.completed && task.dateAdded !== today) {
                 task.dateAdded = today;
                 task.carriedOver = true;
                 task.originalDate = task.originalDate || task.dateAdded;
@@ -1371,6 +1473,7 @@ function adjustTasksForMidnight() {
 boardData.forEach(function(col) {
     if (col.collapsed === undefined) col.collapsed = false;
     if (col.notesRequired === undefined) col.notesRequired = false;
+    if (col.managerName === undefined) col.managerName = '';
     col.tasks.forEach(function(t) {
         if (t.estimateMinutes === undefined) t.estimateMinutes = 15;
         if (t.trackedSeconds === undefined) t.trackedSeconds = 0;
@@ -1394,6 +1497,7 @@ boardData.forEach(function(col) {
         if (t.collapsedControls === undefined) t.collapsedControls = true; 
         if (t.carriedOver === undefined) t.carriedOver = false;
         if (t.isTopPriority === undefined) t.isTopPriority = false;
+        if (t.isHidden === undefined) t.isHidden = false;
         if (t.originalDate === undefined) t.originalDate = null;
     });
 });
@@ -1432,6 +1536,7 @@ var _toggledDateGroups = {};
 function groupTasksByDate(tasks, colIndex) {
     var groups = {};
     tasks.forEach(function(task, originalIndex) {
+        if (task.isHidden) return;
         var key = task.dateAdded || getTodayKey();
         if (!groups[key]) groups[key] = { incomplete: [], completed: [] };
         if (task.completed) groups[key].completed.push({ task: task, originalIndex: originalIndex });
@@ -1458,14 +1563,13 @@ function groupTasksByDate(tasks, colIndex) {
 }
 
 function toggleDateGroup(colIndex, key) {
-    saveScrollPositions();
     var groupKey = colIndex + '-' + key;
     var today = getTodayKey();
     var yesterday = getYesterdayKey();
     var isCurrentlyCollapsed = (key !== today && key !== yesterday);
     if (_toggledDateGroups[groupKey] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[groupKey];
     _toggledDateGroups[groupKey] = !isCurrentlyCollapsed;
-    renderBoard();
+    renderSingleColumn(colIndex);
 }
 
 function setupAutosuggest(inputElement) {
@@ -1541,6 +1645,7 @@ async function naturalLanguageAddTask(ci) {
             lastRecurrenceDate: null,
             carriedOver: false,
             isTopPriority: false,
+            isHidden: false,
             originalDate: null
         };
         col.tasks.push(newTask);
@@ -1562,7 +1667,6 @@ function setupRecurringTasks() {
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
             if (!task.recurrence) return;
-            if (!task.completed) return; // still open (carried or otherwise): this IS today's instance already, don't spawn a sibling
 
             var shouldCreateNew = shouldRecurToday(task);
             if (shouldCreateNew) {
@@ -1857,6 +1961,9 @@ function renderSingleColumn(colIndex) {
             <button class="delete-btn" onclick="deleteColumn(${colIndex})">&times;</button>
         </div>
     </div>
+    ${!col.collapsed ? `
+    <input type="text" class="manager-name-input" value="${escapeHTML(col.managerName || '')}" placeholder="Manager/boss name for this column (used in AI reports)" oninput="updateColumnManagerName(${colIndex}, this.value)">
+    ` : ''}
 
     <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
 
@@ -1907,6 +2014,7 @@ function renderSingleColumn(colIndex) {
                             <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">&#9660;</button>
                             ` : ''}
                             <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' &bull;' : ''}</button>
+                            <button class="details-trigger-btn" onclick="hideTaskForLater(${colIndex}, ${taskIndex})" title="Hide this task from view until you restore it">Hide</button>
                             ${hasSubtasks ? `
                                 <button class="details-trigger-btn subtasks-toggle-btn" onclick="toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? 'Show Subtasks' : 'Hide Subtasks'}</button>
                                 <button class="details-trigger-btn" onclick="removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">Remove All</button>
@@ -1969,6 +2077,24 @@ function renderSingleColumn(colIndex) {
             }).join('')}
         `).join('')}
     </ul>
+
+    ${(function() {
+        var hiddenTasks = col.tasks.filter(function(t) { return t.isHidden; });
+        if (hiddenTasks.length === 0) return '';
+        return `
+        <div class="hidden-tasks-toggle" onclick="toggleHiddenTasksPanel(${colIndex})">
+            Hidden (${hiddenTasks.length}) <span style="font-size:0.65rem;">tap to view / restore</span>
+        </div>
+        <ul class="hidden-tasks-panel" id="hidden-tasks-panel-${colIndex}" style="display:none;">
+            ${hiddenTasks.map(function(t) {
+                var idx = col.tasks.indexOf(t);
+                return `<li>
+                    <span>${escapeHTML(t.text)}</span>
+                    <button class="btn-secondary btn-small" onclick="restoreHiddenTask(${colIndex}, ${idx})">Restore</button>
+                </li>`;
+            }).join('')}
+        </ul>`;
+    })()}
 
     <div class="ai-batch-actions">
         <button onclick="startFlow(${colIndex})" title="Run Auto Flow using only this column's tasks">Start Flow (this column)</button>
@@ -2044,6 +2170,30 @@ function moveColumn(ci, dir) {
 }
 
 function updateColumnTitle(ci, v) { boardData[ci].title = v; saveBoardData(); }
+function updateColumnManagerName(ci, v) { boardData[ci].managerName = v; saveBoardData(); }
+
+function hideTaskForLater(ci, ti) {
+    boardData[ci].tasks[ti].isHidden = true;
+    saveBoardData();
+    renderSingleColumn(ci);
+    renderInternalQueue();
+}
+
+function restoreHiddenTask(ci, ti) {
+    boardData[ci].tasks[ti].isHidden = false;
+    saveBoardData();
+    renderSingleColumn(ci);
+    renderInternalQueue();
+}
+
+function countHiddenTasksInColumn(ci) {
+    return boardData[ci].tasks.filter(function(t) { return t.isHidden; }).length;
+}
+
+function toggleHiddenTasksPanel(ci) {
+    var panel = document.getElementById('hidden-tasks-panel-' + ci);
+    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
 
 function toggleColumnCollapse(ci) {
     boardData[ci].collapsed = !boardData[ci].collapsed;
@@ -2054,7 +2204,7 @@ function toggleColumnCollapse(ci) {
 function addColumn() {
     if (boardData.length >= 8) { alert('Maximum of 8 columns.'); return; }
     saveScrollPositions();
-    boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false });
+    boardData.push({ id: Date.now(), title: 'New Project', collapsed: false, tasks: [], notesRequired: false, managerName: '' });
     saveBoardData();
     renderBoard();
 }
@@ -2178,21 +2328,19 @@ function removeAllSubtasks(ci, ti) {
 }
 
 function setRecurrence(ci, ti, value) {
-    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.recurrence = value || null;
     task.lastRecurrenceDate = value ? getTodayKey() : null;
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
 }
 
 function removeRecurrence(ci, ti) {
-    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     task.recurrence = null;
     task.lastRecurrenceDate = null;
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
 }
 
 function updateDailyProgress() {
@@ -2381,6 +2529,7 @@ function addTask(ci) {
         lastRecurrenceDate: null,
         carriedOver: false,
         isTopPriority: false,
+        isHidden: false,
         originalDate: null
     };
     col.tasks.push(task);
@@ -2452,6 +2601,7 @@ function addPastedTasks(ci) {
             lastRecurrenceDate: null,
             carriedOver: false,
             isTopPriority: false,
+            isHidden: false,
             originalDate: null
         };
     });
@@ -2459,8 +2609,7 @@ function addPastedTasks(ci) {
     col.tasks.push.apply(col.tasks, newTasks);
     textarea.value = '';
     saveBoardData();
-    saveScrollPositions();
-    renderBoard();
+    renderSingleColumn(ci);
 
     newTasks.forEach(function(task) {
         if (task.estimateMinutes <= 15) {
@@ -2498,7 +2647,6 @@ function updateTaskEstimate(ci, ti, v) {
     if (task.parentId) renderSingleColumn(ci); // parent's own displayed number changed, only this column needs it
 }
 function moveTask(ci, ti, dir) {
-    saveScrollPositions();
     var tasks = boardData[ci].tasks;
     var task = tasks[ti];
     if (task.completed) return;
@@ -2510,7 +2658,7 @@ function moveTask(ci, ti, dir) {
             tasks[ti] = tasks[target];
             tasks[target] = temp;
             saveBoardData();
-            renderBoard();
+            renderSingleColumn(ci);
             return;
         }
         target += dir;
@@ -2675,23 +2823,22 @@ function dismissAISuggestion(ci, sIdx) {
 async function generateColumnCheckIn(ci) {
     switchView('reports');
     var summaryBox = $('summary-content');
-    summaryBox.textContent = 'Generating daily check-in for ' + boardData[ci].title + '...';
+    var colTitle = boardData[ci].title;
+    summaryBox.textContent = 'Generating daily check-in for ' + colTitle + '...';
     var priorityFilter = countTopPriorityTasks() > 0;
-    var openTasks = boardData[ci].tasks.filter(function(t) {
-        if (t.completed) return false;
-        return priorityFilter ? t.isTopPriority : true;
-    }).map(function(t) { return t.text; });
-    if (openTasks.length === 0) {
-        summaryBox.textContent = priorityFilter ? 'No open top-priority tasks in ' + boardData[ci].title + ' today.' : 'No open tasks for ' + boardData[ci].title + ' today.';
+    var fullData = buildCheckInTaskData(function(t) { return priorityFilter ? t.isTopPriority : true; });
+    var byColumn = {};
+    if (fullData[colTitle]) byColumn[colTitle] = fullData[colTitle];
+
+    if (Object.keys(byColumn).length === 0) {
+        summaryBox.textContent = priorityFilter ? 'No open top-priority tasks in ' + colTitle + ' today.' : 'No open tasks for ' + colTitle + ' today.';
         return;
     }
-    var prompt = (priorityFilter
-        ? 'Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing today\'s top priorities for the project/client "'
-        : 'Act as a world-class formal assistant. Write a short, warm, encouraging daily check-in brief summarizing what is on the agenda today for the project/client "'
-    ) + boardData[ci].title + '" based on this task list: ' + JSON.stringify(openTasks) + '. Use formal language. Do not use em-dashes.';
+    var prompt = buildCheckInPrompt(byColumn);
     try {
         var result = await callGemini(prompt);
         summaryBox.textContent = result;
+        saveReportToHistory('Check-In: ' + colTitle, result);
     } catch(e) {
         summaryBox.textContent = 'Error: ' + e.message;
     }
@@ -2701,10 +2848,15 @@ async function generateAISummary(silent) {
     var summaryBox = $('summary-content');
     if (!silent) summaryBox.textContent = 'Generating monthly report...';
     var thisMonthData = historyData.filter(function(h) { return new Date(h.completedAt).getMonth() === new Date().getMonth(); });
-    var prompt = 'Write a polished, professional monthly client report grouping accomplishments by client based on: ' + JSON.stringify(thisMonthData) + '. Do not use em-dashes.';
+
+    var managerByColumn = {};
+    boardData.forEach(function(col) { if (col.managerName) managerByColumn[col.title] = col.managerName; });
+
+    var prompt = 'Write this exactly as if I am personally summarizing my own completed work this month, in my own first-person voice ("I completed", "I finished"), the way a real person reflects on their month, not a formal document written about someone else in the third person. Group the summary by project. Where a project has a manager name listed, address that part of the summary as if reporting to them specifically. Be specific and concrete about what was actually done, never generic praise or filler phrases. Completed work this month: ' + JSON.stringify(thisMonthData) + '. Project managers: ' + JSON.stringify(managerByColumn);
     try {
         var result = await callGemini(prompt);
         if (!silent) summaryBox.textContent = result;
+        saveReportToHistory('Monthly Summary', result);
     } catch(e) {
         if (!silent) summaryBox.textContent = 'Error: ' + e.message;
     }
@@ -3639,6 +3791,7 @@ async function submitQuickAdd() {
         lastRecurrenceDate: null,
         carriedOver: false,
         isTopPriority: false,
+        isHidden: false,
         originalDate: null
     };
     col.tasks.push(newTask);
@@ -3762,6 +3915,12 @@ function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, function(tag) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[tag] || tag; }); }
 
+function countTopPriorityTasksInColumn(ci) {
+    var count = 0;
+    boardData[ci].tasks.forEach(function(t) { if (t.isTopPriority && !t.completed) count++; });
+    return count;
+}
+
 function countTopPriorityTasks() {
     var count = 0;
     boardData.forEach(function(col) { col.tasks.forEach(function(t) { if (t.isTopPriority && !t.completed) count++; }); });
@@ -3770,8 +3929,8 @@ function countTopPriorityTasks() {
 
 function toggleTopPriority(ci, ti) {
     var task = boardData[ci].tasks[ti];
-    if (!task.isTopPriority && countTopPriorityTasks() >= 5) {
-        alert('You can mark up to 5 top priorities for today. Unstar one first to add another.');
+    if (!task.isTopPriority && countTopPriorityTasksInColumn(ci) >= 5) {
+        alert('You can mark up to 5 top priorities per column. Unstar one in "' + boardData[ci].title + '" first to add another.');
         return;
     }
     task.isTopPriority = !task.isTopPriority;
@@ -3861,6 +4020,7 @@ function triggerTaskMicroCelebration(ci, ti) {
 function finalizeTaskCompletion(ci, ti, actualSeconds) {
     var task = boardData[ci].tasks[ti];
     task.completed = true;
+    task.isTopPriority = false;
     task.isTracking = false;
     task.trackedSeconds = actualSeconds;
     task.completedAt = Date.now();
@@ -3928,7 +4088,6 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
 var pendingDeletionTimeout = null;
 
 function deleteTask(ci, ti) {
-    saveScrollPositions();
     var task = boardData[ci].tasks[ti];
     var subtasks = boardData[ci].tasks.filter(function(t) { return t.parentId === task.id; });
     var taskIndex = boardData[ci].tasks.indexOf(task);
@@ -3938,7 +4097,7 @@ function deleteTask(ci, ti) {
     boardData[ci].tasks = boardData[ci].tasks.filter(function(t) { return t.parentId !== task.id; });
     boardData[ci].tasks.splice(boardData[ci].tasks.indexOf(task), 1);
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
     renderInternalQueue();
     showUndoToast('Task deleted');
 }
@@ -3950,9 +4109,10 @@ function undoLastDeletion() {
     var insertAt = Math.min(pendingDeletion.taskIndex, col.tasks.length);
     col.tasks.splice(insertAt, 0, pendingDeletion.task);
     pendingDeletion.subtasks.forEach(function(st) { col.tasks.push(st); });
+    var restoredCi = pendingDeletion.ci;
     pendingDeletion = null;
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(restoredCi);
     renderInternalQueue();
     hideUndoToast();
 }

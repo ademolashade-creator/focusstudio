@@ -335,6 +335,13 @@
             <div class="summary-content" id="summary-content" style="margin-top:10px;">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
         </div>
 
+        <!-- Report History Card -->
+        <div class="summary-container" style="width:100%;">
+            <h3 style="margin:0 0 0.6rem;color:var(--cherry-red);">Saved Reports</h3>
+            <p style="font-size:0.72rem;color:#888;margin:0 0 0.6rem;">Every check-in and monthly summary you generate is kept here automatically. Click one to preview, export as PDF, or delete it.</p>
+            <ul id="report-history-list" class="report-history-list"></ul>
+        </div>
+
         <!-- AI Adaptive Brain Engine Report Card -->
         <div class="summary-container" style="width:100%;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
@@ -607,6 +614,13 @@
     window.applyTaskEstimate = applyTaskEstimate;
     window.dismissTaskEstimate = dismissTaskEstimate;
     window.generateColumnCheckIn = generateColumnCheckIn;
+    window.updateColumnManagerName = updateColumnManagerName;
+    window.hideTaskForLater = hideTaskForLater;
+    window.restoreHiddenTask = restoreHiddenTask;
+    window.toggleHiddenTasksPanel = toggleHiddenTasksPanel;
+    window.toggleReportPreview = toggleReportPreview;
+    window.deleteReportFromHistory = deleteReportFromHistory;
+    window.exportReportPDF = exportReportPDF;
     window.startVoiceInput = startVoiceInput;
     window.naturalLanguageAddTask = naturalLanguageAddTask;
     window.setRecurrence = setRecurrence;

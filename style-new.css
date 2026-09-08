@@ -439,6 +439,15 @@ header { text-align: center; margin-bottom: 1rem; width: 100%; max-width: 1100px
 .planning-priority-list li.is-priority { background: rgba(232,67,110,0.06); }
 .planning-priority-list li span:first-of-type { flex: 1; }
 .planning-priority-col { font-size: 0.65rem; color: #888; flex-shrink: 0; }
+.planning-priority-col-header {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--cherry-red);
+    background: var(--card-bg);
+    padding: 4px 10px !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+.planning-priority-col-header span { font-weight: 400; color: #888; }
 
 .timer-card, .stats-card, .hacks-card, .log-card, .summary-container {
     background-color: var(--card-bg);
@@ -562,8 +571,51 @@ button:active { transform: scale(0.96); }
     padding-bottom: 0.2rem;
     outline: none;
 }
+.manager-name-input {
+    font-family: var(--font-family);
+    font-size: 0.72rem;
+    color: #888;
+    border: none;
+    border-bottom: 1px dashed var(--border-color);
+    background: transparent;
+    width: 100%;
+    padding: 2px 0 6px;
+    margin-bottom: 6px;
+    outline: none;
+}
+.manager-name-input:focus { color: var(--text-color); border-bottom-color: var(--cherry-red); }
 
 .ai-batch-actions { display: flex; gap: 4px; margin-bottom: 0.5rem; flex-wrap: wrap; }
+
+.hidden-tasks-toggle {
+    font-size: 0.7rem;
+    color: #888;
+    cursor: pointer;
+    padding: 4px 2px;
+    margin-bottom: 4px;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 8px;
+}
+.hidden-tasks-toggle:hover { color: var(--cherry-red); }
+.hidden-tasks-panel {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+    background: var(--input-bg);
+    border-radius: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+.hidden-tasks-panel li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.hidden-tasks-panel li:last-child { border-bottom: none; }
 .ai-batch-actions button { font-size: 0.6rem; padding: 0.2rem 0.4rem; flex: 1; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--cherry-red); border-radius: 8px; }
 
 .task-input-group {
@@ -880,6 +932,26 @@ button:active { transform: scale(0.96); }
     overflow-y: auto;
 }
 
+.report-history-list { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; }
+.report-history-item { border-bottom: 1px solid var(--border-color); }
+.report-history-item:last-child { border-bottom: none; }
+.report-history-row { padding: 8px 4px; cursor: pointer; font-size: 0.82rem; display: flex; justify-content: space-between; }
+.report-history-row:hover { color: var(--cherry-red); }
+.report-history-date { font-size: 0.68rem; color: #888; margin-left: 8px; }
+.report-history-preview { padding: 8px 4px 12px; }
+.report-history-text {
+    font-size: 0.78rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    background: var(--input-bg);
+    border-radius: 8px;
+    padding: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+}
+.report-history-actions { display: flex; gap: 6px; }
+
 .monthly-alert-banner {
     background-color: var(--cherry-red);
     color: white;
@@ -940,6 +1012,15 @@ button:active { transform: scale(0.96); }
 }
 .internal-queue li:last-child { border-bottom: none; }
 .internal-queue li.dragging { opacity: 0.5; }
+.queue-column-tag {
+    font-size: 0.6rem;
+    color: var(--cherry-red);
+    background: rgba(232,67,110,0.08);
+    border-radius: 8px;
+    padding: 1px 6px;
+    margin-left: 6px;
+    white-space: nowrap;
+}
 
 .deadline-badge {
     font-size: 0.55rem;
