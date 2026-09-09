@@ -1413,7 +1413,7 @@ function calculateTodayCompletionRatio() {
     var completedToday = 0;
     boardData.forEach(col => {
         col.tasks.forEach(t => {
-            if (t.dateAdded === todayKey || (t.completed && dateKeyFromISO(t.completedAtIso) === todayKey)) {
+            if ((t.dateAdded === todayKey || (t.completed && dateKeyFromISO(t.completedAtIso) === todayKey)) && !t.isHidden) {
                 todayTasks++;
                 if (t.completed) completedToday++;
             }

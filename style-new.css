@@ -1112,7 +1112,7 @@ button:active { transform: scale(0.96); }
 .copy-icon-btn svg { width: 15px; height: 15px; display: block; }
 .copy-icon-btn:hover { color: var(--cherry-red); background: var(--border-color-pink); }
 
-.report-box-wrapper { position: relative; }
+.report-box-wrapper { position: relative; display: flex; flex-direction: column; flex: 1; }
 .report-box-wrapper .copy-icon-btn {
     position: absolute;
     top: 8px;
