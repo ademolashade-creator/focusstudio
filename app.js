@@ -1615,6 +1615,61 @@ function formatMinSec(totalSeconds) {
 }
 
 var _toggledDateGroups = {};
+var _hiddenPanelsOpen = {};
+var _openActionMenuId = null;
+
+function toggleActionMenu(menuId, event) {
+    if (event) event.stopPropagation();
+    var menu = document.getElementById(menuId);
+    if (!menu) return;
+    if (_openActionMenuId && _openActionMenuId !== menuId) {
+        var prev = document.getElementById(_openActionMenuId);
+        if (prev) prev.style.display = 'none';
+    }
+    var willOpen = menu.style.display !== 'block';
+    if (!willOpen) {
+        menu.style.display = 'none';
+        _openActionMenuId = null;
+        return;
+    }
+
+    var trigger = event ? event.currentTarget : null;
+    menu.style.display = 'block'; // must be visible before measuring its own size
+    if (trigger) {
+        var rect = trigger.getBoundingClientRect();
+        var menuRect = menu.getBoundingClientRect();
+
+        var top = rect.bottom + 4;
+        var left = rect.left;
+
+        if (left + menuRect.width > window.innerWidth - 8) {
+            left = window.innerWidth - menuRect.width - 8;
+        }
+        if (left < 8) left = 8;
+        if (top + menuRect.height > window.innerHeight - 8) {
+            top = rect.top - menuRect.height - 4; // not enough room below, open upward instead
+        }
+        if (top < 8) top = 8;
+
+        menu.style.top = top + 'px';
+        menu.style.left = left + 'px';
+    }
+    _openActionMenuId = menuId;
+}
+
+function closeAllActionMenus() {
+    if (!_openActionMenuId) return;
+    var menu = document.getElementById(_openActionMenuId);
+    if (menu) menu.style.display = 'none';
+    _openActionMenuId = null;
+}
+
+document.addEventListener('click', function() {
+    closeAllActionMenus();
+});
+document.addEventListener('scroll', function() {
+    closeAllActionMenus();
+}, true);
 function groupTasksByDate(tasks, colIndex) {
     var groups = {};
     tasks.forEach(function(task, originalIndex) {
@@ -2099,29 +2154,34 @@ function renderSingleColumn(colIndex) {
                         </div>
 
                         <div class="task-controls-row">
-                            ${deadlineHtml}
                             ${getDeadlineBadge(task)}
                             <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
                             ${!task.completed ? `
                             <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">&#9650;</button>
                             <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">&#9660;</button>
                             ` : ''}
-                            <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' &bull;' : ''}</button>
-                            <button class="details-trigger-btn" onclick="hideTaskForLater(${colIndex}, ${taskIndex})" title="Hide this task from view until you restore it">Hide</button>
-                            ${hasSubtasks ? `
-                                <button class="details-trigger-btn subtasks-toggle-btn" onclick="toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? 'Show Subtasks' : 'Hide Subtasks'}</button>
-                                <button class="details-trigger-btn" onclick="removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">Remove All</button>
-                            ` : ''}
-                            ${!task.recurrence ? `
-                                <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)">
-                                    <option value="">No Repeat</option>
-                                    <option value="daily">Daily</option>
-                                    <option value="weekly">Weekly</option>
-                                    <option value="monthly">Monthly</option>
-                                </select>
-                            ` : `
-                                <button class="details-trigger-btn" onclick="removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕ Repeat</button>
-                            `}
+                            <div class="action-menu-wrapper">
+                                <button class="icon-btn action-menu-trigger" onclick="toggleActionMenu('task-menu-${colIndex}-${taskIndex}', event)" title="More actions">&#8942;</button>
+                                <div class="action-menu" id="task-menu-${colIndex}-${taskIndex}" style="display:none;">
+                                    ${deadlineHtml}
+                                    <button class="details-trigger-btn" onclick="closeAllActionMenus();openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' &bull;' : ''}</button>
+                                    <button class="details-trigger-btn" onclick="closeAllActionMenus();hideTaskForLater(${colIndex}, ${taskIndex})" title="Hide this task from view until you restore it">Hide</button>
+                                    ${hasSubtasks ? `
+                                        <button class="details-trigger-btn subtasks-toggle-btn" onclick="closeAllActionMenus();toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? 'Show Subtasks' : 'Hide Subtasks'}</button>
+                                        <button class="details-trigger-btn" onclick="closeAllActionMenus();removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">Remove All</button>
+                                    ` : ''}
+                                    ${!task.recurrence ? `
+                                        <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)" onclick="event.stopPropagation()">
+                                            <option value="">No Repeat</option>
+                                            <option value="daily">Daily</option>
+                                            <option value="weekly">Weekly</option>
+                                            <option value="monthly">Monthly</option>
+                                        </select>
+                                    ` : `
+                                        <button class="details-trigger-btn" onclick="closeAllActionMenus();removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕ Repeat</button>
+                                    `}
+                                </div>
+                            </div>
                         </div>
 
                         ${task.stagedEstimate ? `
@@ -2151,14 +2211,19 @@ function renderSingleColumn(colIndex) {
                                                 </div>
                                             </div>
                                             <div class="task-controls-row">
-                                                ${subtask.deadlineTime ? `<span class="deadline-label" onclick="promptDeadline(${colIndex}, ${subIdx})">Deadline: ${new Date(subtask.deadlineTime).toLocaleString()}</span>` : `<button class="deadline-trigger-btn" onclick="promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`}
                                                 ${getDeadlineBadge(subtask)}
                                                 <input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))">m
                                                 ${!subtask.completed ? `
                                                 <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, -1)">&#9650;</button>
                                                 <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, 1)">&#9660;</button>
                                                 ` : ''}
-                                                <button class="details-trigger-btn" onclick="openDetailsModal(${colIndex}, ${subIdx})">Details${subtask.notes ? ' &bull;' : ''}</button>
+                                                <div class="action-menu-wrapper">
+                                                    <button class="icon-btn action-menu-trigger" onclick="toggleActionMenu('subtask-menu-${colIndex}-${subIdx}', event)" title="More actions">&#8942;</button>
+                                                    <div class="action-menu" id="subtask-menu-${colIndex}-${subIdx}" style="display:none;">
+                                                        ${subtask.deadlineTime ? `<span class="deadline-label" onclick="closeAllActionMenus();promptDeadline(${colIndex}, ${subIdx})">Deadline: ${new Date(subtask.deadlineTime).toLocaleString()}</span>` : `<button class="deadline-trigger-btn" onclick="closeAllActionMenus();promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`}
+                                                        <button class="details-trigger-btn" onclick="closeAllActionMenus();openDetailsModal(${colIndex}, ${subIdx})">Details${subtask.notes ? ' &bull;' : ''}</button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </li>
                                     `;
@@ -2178,7 +2243,7 @@ function renderSingleColumn(colIndex) {
         <div class="hidden-tasks-toggle" onclick="toggleHiddenTasksPanel(${colIndex})">
             Hidden (${hiddenTasks.length}) <span style="font-size:0.65rem;">tap to view / restore</span>
         </div>
-        <ul class="hidden-tasks-panel" id="hidden-tasks-panel-${colIndex}" style="display:none;">
+        <ul class="hidden-tasks-panel" id="hidden-tasks-panel-${colIndex}" style="display:${_hiddenPanelsOpen[colIndex] ? 'block' : 'none'};">
             ${hiddenTasks.map(function(t) {
                 var idx = col.tasks.indexOf(t);
                 return `<li>
@@ -2190,12 +2255,17 @@ function renderSingleColumn(colIndex) {
     })()}
 
     <div class="ai-batch-actions">
-        <button onclick="startFlow(${colIndex})" title="Run Auto Flow using only this column's tasks">Start Flow (this column)</button>
-        <button onclick="suggestColumnTimesAI(${colIndex})" title="Suggest Times via AI">Suggest Time</button>
-        <button onclick="suggestMissingTasksAI(${colIndex})" title="Suggest missing steps via AI">Suggest Missing</button>
-        <button onclick="optimizeColumnFlowAI(${colIndex})" title="Reorder this column into a logical flow via AI">Optimize Flow</button>
-        <button onclick="generateColumnCheckIn(${colIndex})" title="Daily Check-In via AI">Check-In</button>
-        <button onclick="clearCompletedInColumn(${colIndex})" title="Remove all completed tasks in this column">Clear Done</button>
+        <button class="ai-btn column-start-flow-btn" onclick="startFlow(${colIndex})" title="Run Auto Flow using only this column's tasks">Start Flow</button>
+        <div class="action-menu-wrapper">
+            <button class="btn-secondary" onclick="toggleActionMenu('ai-tools-menu-${colIndex}', event)">AI Tools &#9662;</button>
+            <div class="action-menu" id="ai-tools-menu-${colIndex}" style="display:none;">
+                <button class="details-trigger-btn" onclick="closeAllActionMenus();suggestColumnTimesAI(${colIndex})" title="Suggest Times via AI">Suggest Time</button>
+                <button class="details-trigger-btn" onclick="closeAllActionMenus();suggestMissingTasksAI(${colIndex})" title="Suggest missing steps via AI">Suggest Missing</button>
+                <button class="details-trigger-btn" onclick="closeAllActionMenus();optimizeColumnFlowAI(${colIndex})" title="Reorder this column into a logical flow via AI">Optimize Flow</button>
+                <button class="details-trigger-btn" onclick="closeAllActionMenus();generateColumnCheckIn(${colIndex})" title="Daily Check-In via AI">Check-In</button>
+            </div>
+        </div>
+        <button class="details-trigger-btn" onclick="clearCompletedInColumn(${colIndex})" title="Remove all completed tasks in this column">Clear Done</button>
     </div>
 
     ${suggestionsHtml}
@@ -2286,7 +2356,10 @@ function countHiddenTasksInColumn(ci) {
 
 function toggleHiddenTasksPanel(ci) {
     var panel = document.getElementById('hidden-tasks-panel-' + ci);
-    if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (!panel) return;
+    var willOpen = panel.style.display === 'none';
+    panel.style.display = willOpen ? 'block' : 'none';
+    _hiddenPanelsOpen[ci] = willOpen;
 }
 
 function toggleColumnCollapse(ci) {
@@ -2426,6 +2499,7 @@ function setRecurrence(ci, ti, value) {
     task.recurrence = value || null;
     task.lastRecurrenceDate = value ? getTodayKey() : null;
     saveBoardData();
+    _openActionMenuId = null;
     renderSingleColumn(ci);
 }
 

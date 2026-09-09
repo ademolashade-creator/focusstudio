@@ -188,7 +188,7 @@
             <button class="lock-btn" id="start-ai-flow-btn" onclick="startAIFlow()" style="margin-top:6px;">Start AI Flow</button>
 
             <!-- Projected Completion -->
-            <div style="margin-top:12px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed var(--border-color); font-size:0.8rem; text-align:left;">
+            <div class="projected-completion-block" style="margin-top:12px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed var(--border-color); font-size:0.8rem; text-align:left;">
                 <div style="font-weight:700;margin-bottom:6px;color:var(--text-color);">Projected Completion</div>
                 <div id="time-counter-box">Add tasks to see your projected completion times.</div>
             </div>
@@ -657,6 +657,8 @@
     window.hideTaskForLater = hideTaskForLater;
     window.restoreHiddenTask = restoreHiddenTask;
     window.toggleHiddenTasksPanel = toggleHiddenTasksPanel;
+    window.toggleActionMenu = toggleActionMenu;
+    window.closeAllActionMenus = closeAllActionMenus;
     window.toggleReportPreview = toggleReportPreview;
     window.deleteReportFromHistory = deleteReportFromHistory;
     window.exportReportPDF = exportReportPDF;
