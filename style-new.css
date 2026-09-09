@@ -634,8 +634,8 @@ button:active { transform: scale(0.96); }
 .manager-name-input:focus { color: var(--text-color); border-bottom-color: var(--cherry-red); }
 .manager-name-input::placeholder { color: #d9b3c2; font-style: italic; }
 
-.ai-batch-actions { display: flex; gap: 4px; margin-bottom: 0.5rem; flex-wrap: wrap; align-items: center; }
-.column-start-flow-btn { flex: none; }
+.ai-batch-actions { display: flex; gap: 4px; margin-bottom: 0.5rem; flex-wrap: wrap; align-items: center; justify-content: center; }
+.column-start-flow-btn { flex: none; font-size: 0.95rem; font-weight: 700; }
 
 .action-menu-wrapper { position: relative; display: inline-flex; }
 .action-menu {
@@ -707,11 +707,41 @@ button:active { transform: scale(0.96); }
 
 .task-input-group {
     display: flex;
-    flex-direction: column; 
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
     gap: 6px;
     margin-bottom: 0.5rem;
 }
+.add-task-grow-wrap { flex: 1; min-width: 100px; }
+.add-task-grow-wrap textarea { min-height: 1.9rem; padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--input-bg); }
+.add-task-grow-wrap::after { padding: 0.4rem 0.6rem; }
+
+.round-add-btn {
+    background: var(--cherry-red);
+    color: white;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 0;
+    flex-shrink: 0;
+}
+.round-add-btn:hover { background: var(--cherry-hover); }
+
+.mic-btn {
+    background: none;
+    color: #888;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    flex-shrink: 0;
+}
+.mic-btn svg { width: 16px; height: 16px; }
+.mic-btn:hover { color: var(--cherry-red); background: var(--border-color-pink); }
+.add-pasted-btn { display: block; margin: 8px auto 0; }
 
 .task-input {
     flex: 1;
@@ -1152,6 +1182,8 @@ button:active { transform: scale(0.96); }
 }
 .deadline-badge.red { background: var(--cherry-red); }
 .deadline-badge.amber { background: var(--amber); }
+.overdue-icon { display: inline-flex; align-items: center; padding: 2px !important; }
+.overdue-icon svg { width: 12px; height: 12px; }
 
 .deadline-trigger-btn {
     font-size: 0.6rem;

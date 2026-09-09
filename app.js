@@ -1602,7 +1602,7 @@ function getDeadlineBadge(task) {
     if (!task.deadlineTime) return '';
     var ms = new Date(task.deadlineTime).getTime() - Date.now();
     var hrs = ms / 3600000;
-    if (hrs < 0) return '<span class="deadline-badge red">Overdue</span>';
+    if (hrs < 0) return '<span class="deadline-badge red overdue-icon" title="Overdue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>';
     if (hrs <= 1) return '<span class="deadline-badge red">&lt; 1h</span>';
     if (hrs <= 3) return '<span class="deadline-badge amber">&lt; 3h</span>';
     return '';
@@ -2266,12 +2266,12 @@ function renderSingleColumn(colIndex) {
     ${suggestionsHtml}
 
     <div class="task-input-group">
-        <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add task..." onkeypress="handleKeyPress(event, ${colIndex})">
-        <div style="display: flex; gap: 6px; align-items: center;">
-            <input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480">m
-            <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
-            <button class="btn-secondary" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">Voice</button>
-        </div>
+        <div class="grow-wrap add-task-grow-wrap" data-replicated-value=""><textarea class="task-input" id="task-input-${colIndex}" rows="1" placeholder="Add task..." oninput="this.parentNode.dataset.replicatedValue = this.value" onkeypress="handleKeyPress(event, ${colIndex})"></textarea></div>
+        <span class="estimate-inline"><input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480"><span class="estimate-unit">m</span></span>
+        <button class="round-add-btn" onclick="addTask(${colIndex})" title="Add task">&#43;</button>
+        <button class="mic-btn" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+        </button>
     </div>
 
     <details style="margin-bottom:0.6rem; border:1px solid var(--border-color); border-radius:8px; padding:6px; background:var(--card-bg);">
@@ -2284,7 +2284,7 @@ function renderSingleColumn(colIndex) {
                 <button class="add-task-btn" onclick="naturalLanguageAddTask(${colIndex})">Smart</button>
             </div>
             <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (separated by line)..."></textarea>
-            <button class="add-task-btn" style="margin-bottom:0.2rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
+            <button class="add-task-btn add-pasted-btn" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
         </div>
     </details>
 
@@ -4253,7 +4253,7 @@ function checkBackupReminder() {
 
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function saveUserName(name) { storageSet('ff-user-name', name); }
-function handleKeyPress(e, ci) { if (e.key === 'Enter') addTask(ci); }
+function handleKeyPress(e, ci) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addTask(ci); } }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, function(tag) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[tag] || tag; }); }
 
 function countTopPriorityTasksInColumn(ci) {
