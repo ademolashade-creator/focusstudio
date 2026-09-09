@@ -1269,6 +1269,58 @@ async function runFullDailyCheckIn() {
     }
 }
 
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+    }
+    // Fallback for contexts where the Clipboard API isn't available.
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+}
+
+function flashCopiedLabel(buttonEl) {
+    if (!buttonEl) return;
+    var original = buttonEl.textContent;
+    buttonEl.textContent = 'Copied!';
+    buttonEl.disabled = true;
+    setTimeout(function() {
+        buttonEl.textContent = original;
+        buttonEl.disabled = false;
+    }, 1200);
+}
+
+async function copyElementText(elementId, buttonEl) {
+    var el = document.getElementById(elementId);
+    if (!el) return;
+    var text = el.textContent.trim();
+    if (!text) return;
+    try {
+        await copyTextToClipboard(text);
+        flashCopiedLabel(buttonEl);
+    } catch (e) {
+        alert('Could not copy to clipboard: ' + e.message);
+    }
+}
+
+async function copyReportFromHistory(id, buttonEl) {
+    var history = storageGet('ff-report-history', []);
+    var report = history.find(function(r) { return r.id === id; });
+    if (!report) return;
+    try {
+        await copyTextToClipboard(report.content);
+        flashCopiedLabel(buttonEl);
+    } catch (e) {
+        alert('Could not copy to clipboard: ' + e.message);
+    }
+}
+
 function saveReportToHistory(label, content) {
     var history = storageGet('ff-report-history', []);
     history.unshift({
@@ -1299,6 +1351,7 @@ function renderReportHistory() {
             '<div class="report-history-preview" id="report-preview-' + r.id + '" style="display:none;">' +
             '<div class="report-history-text">' + escapeHTML(r.content) + '</div>' +
             '<div class="report-history-actions">' +
+            '<button class="btn-secondary btn-small" onclick="copyReportFromHistory(\'' + r.id + '\', this)">Copy</button>' +
             '<button class="btn-secondary btn-small" onclick="exportReportPDF(\'' + r.id + '\')">Export PDF</button>' +
             '<button class="delete-btn" onclick="deleteReportFromHistory(\'' + r.id + '\')">Delete</button>' +
             '</div></div></li>';

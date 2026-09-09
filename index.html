@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Focus & Flow">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="stylesheet" href="style-new.css?v=10">
+    <link rel="stylesheet" href="style-new.css?v=11">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <script>
@@ -338,6 +338,7 @@
                 <div class="summary-content report-card-content" id="summary-content">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
                 <div class="report-card-actions">
                     <button class="outline-btn" onclick="generateAISummary(false)">Generate Client Report</button>
+                    <button class="outline-btn" onclick="copyElementText('summary-content', this)">Copy</button>
                     <button class="outline-btn" onclick="generateICS()">Download .ics</button>
                     <button class="outline-btn" onclick="openPdfExportOverlay()">PDF Report</button>
                 </div>
@@ -352,6 +353,7 @@
                 <p style="font-size:0.72rem;color:#888;margin:0.6rem 0 4px;">Re-runs AI time estimates for every open task at once, using this same task-time memory, useful after a big batch add.</p>
                 <div class="report-card-actions">
                     <button class="outline-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
+                    <button class="outline-btn" onclick="copyElementText('brain-engine-report-content', this)">Copy</button>
                     <button class="outline-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
                 </div>
             </div>
@@ -581,7 +583,7 @@
 <!-- Confetti Overlay Container -->
 <div id="confetti-overlay" class="confetti-overlay"></div>
 
-<script src="app.js?v=20260907b"></script>
+<script src="app.js?v=20260908a"></script>
 <script>
     window.importAllDataJSON = importAllDataJSON;
     window.exportAllDataJSON = exportAllDataJSON;
@@ -662,6 +664,8 @@
     window.toggleReportPreview = toggleReportPreview;
     window.deleteReportFromHistory = deleteReportFromHistory;
     window.exportReportPDF = exportReportPDF;
+    window.copyElementText = copyElementText;
+    window.copyReportFromHistory = copyReportFromHistory;
     window.startVoiceInput = startVoiceInput;
     window.naturalLanguageAddTask = naturalLanguageAddTask;
     window.setRecurrence = setRecurrence;
