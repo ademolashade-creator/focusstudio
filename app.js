@@ -465,6 +465,7 @@ function updateSettings() { if (!isRunning) { setupMode(); updateAdaptiveHacks()
 
 // ---------- Auto Flow ----------
 let customQueueOrder = storageGet('ff-custom-queue', []);
+let manualOverdueOverrides = storageGet('ff-manual-overdue-overrides', []);
 
 function setFlowControlsVisible(active) {
     const startBtn = $('start-flow-btn');
@@ -494,6 +495,56 @@ function buildChunks(totalMinutes) {
     return { chunks: chunks, bonusBreakMinutes: bonusBreakMinutes };
 }
 
+function isTaskUrgent(task) {
+    if (!task.deadlineTime) return false;
+    return new Date(task.deadlineTime).getTime() < Date.now() + 10800000; // within 3 hours or overdue
+}
+
+function findTopLevelTaskById(taskId) {
+    for (var ci = 0; ci < boardData.length; ci++) {
+        var found = boardData[ci].tasks.find(function(t) { return t.id === taskId && !t.parentId; });
+        if (found) return found;
+    }
+    return null;
+}
+
+// Called after any manual reorder (drag, arrows, typed number) with the resulting order of ids.
+// A starred or carried task that the user has manually placed ahead of an overdue task earns
+// the right to actually stay there. This is never touched by AI reordering, only your own hand.
+function syncOverdueOverrideFromManualOrder(orderedIds) {
+    var urgentIndices = [];
+    orderedIds.forEach(function(id, idx) {
+        var t = findTopLevelTaskById(id);
+        if (t && isTaskUrgent(t)) urgentIndices.push(idx);
+    });
+    if (urgentIndices.length === 0) return;
+    var lastUrgentIdx = Math.max.apply(null, urgentIndices);
+
+    var changed = false;
+    orderedIds.forEach(function(id, idx) {
+        var t = findTopLevelTaskById(id);
+        if (!t || isTaskUrgent(t)) return;
+        var eligible = t.isTopPriority || t.carriedOver;
+        var alreadyOverridden = manualOverdueOverrides.indexOf(id) !== -1;
+        if (!eligible) {
+            if (alreadyOverridden) {
+                manualOverdueOverrides = manualOverdueOverrides.filter(function(x) { return x !== id; });
+                changed = true;
+            }
+            return;
+        }
+        var shouldOverride = idx < lastUrgentIdx;
+        if (shouldOverride && !alreadyOverridden) {
+            manualOverdueOverrides.push(id);
+            changed = true;
+        } else if (!shouldOverride && alreadyOverridden) {
+            manualOverdueOverrides = manualOverdueOverrides.filter(function(x) { return x !== id; });
+            changed = true;
+        }
+    });
+    if (changed) storageSet('ff-manual-overdue-overrides', manualOverdueOverrides);
+}
+
 function getPrioritizedOpenTasks() {
     var topLevel = [];
     boardData.forEach(function(col, ci) {
@@ -505,6 +556,18 @@ function getPrioritizedOpenTasks() {
     });
 
     topLevel.sort(function(a, b) {
+        var aOverride = manualOverdueOverrides.indexOf(a.task.id) !== -1 && (a.task.isTopPriority || a.task.carriedOver);
+        var bOverride = manualOverdueOverrides.indexOf(b.task.id) !== -1 && (b.task.isTopPriority || b.task.carriedOver);
+        if (aOverride && !bOverride) return -1;
+        if (!aOverride && bOverride) return 1;
+        if (aOverride && bOverride) {
+            var ovIdxA = customQueueOrder.indexOf(a.task.id);
+            var ovIdxB = customQueueOrder.indexOf(b.task.id);
+            if (ovIdxA !== -1 && ovIdxB !== -1) return ovIdxA - ovIdxB;
+            if (ovIdxA !== -1) return -1;
+            if (ovIdxB !== -1) return 1;
+        }
+
         var nowMs = Date.now();
         var aDeadMs = a.task.deadlineTime ? new Date(a.task.deadlineTime).getTime() : Infinity;
         var bDeadMs = b.task.deadlineTime ? new Date(b.task.deadlineTime).getTime() : Infinity;
@@ -512,7 +575,14 @@ function getPrioritizedOpenTasks() {
         var bUrgent = bDeadMs < nowMs + 10800000;
         if (aUrgent && !bUrgent) return -1;
         if (!aUrgent && bUrgent) return 1;
-        if (aUrgent && bUrgent) return aDeadMs - bDeadMs;
+        if (aUrgent && bUrgent) {
+            var urgIdxA = customQueueOrder.indexOf(a.task.id);
+            var urgIdxB = customQueueOrder.indexOf(b.task.id);
+            if (urgIdxA !== -1 && urgIdxB !== -1) return urgIdxA - urgIdxB;
+            if (urgIdxA !== -1) return -1;
+            if (urgIdxB !== -1) return 1;
+            return aDeadMs - bDeadMs;
+        }
 
         var aStar = a.task.isTopPriority ? 1 : 0;
         var bStar = b.task.isTopPriority ? 1 : 0;
@@ -601,6 +671,7 @@ function queueDrop(e, targetTaskId) {
 
     customQueueOrder = currentOrder;
     storageSet('ff-custom-queue', customQueueOrder);
+    syncOverdueOverrideFromManualOrder(currentOrder);
 
     renderInternalQueue();
 }
@@ -627,6 +698,7 @@ function promptQueueNumber(taskId) {
 
     customQueueOrder = currentOrder;
     storageSet('ff-custom-queue', customQueueOrder);
+    syncOverdueOverrideFromManualOrder(currentOrder);
     renderInternalQueue();
 }
 
@@ -686,6 +758,7 @@ function nudgeQueueEntry(taskId, direction) {
 
     customQueueOrder = parentLevelIds;
     storageSet('ff-custom-queue', customQueueOrder);
+    syncOverdueOverrideFromManualOrder(parentLevelIds);
     renderInternalQueue();
 }
 
@@ -785,6 +858,8 @@ function completeFlowTask(entry, actualSeconds) {
     var task = entry.task;
     task.completed = true;
     task.isTopPriority = false;
+    manualOverdueOverrides = manualOverdueOverrides.filter(function(id) { return id !== task.id; });
+    storageSet('ff-manual-overdue-overrides', manualOverdueOverrides);
     task.isTracking = false;
     task.trackedSeconds = actualSeconds;
     task.completedAt = Date.now();
@@ -2117,7 +2192,8 @@ function renderSingleColumn(colIndex) {
     <div class="ai-batch-actions">
         <button onclick="startFlow(${colIndex})" title="Run Auto Flow using only this column's tasks">Start Flow (this column)</button>
         <button onclick="suggestColumnTimesAI(${colIndex})" title="Suggest Times via AI">Suggest Time</button>
-        <button onclick="optimizeColumnFlowAI(${colIndex})" title="Optimize Flow via AI">Optimize</button>
+        <button onclick="suggestMissingTasksAI(${colIndex})" title="Suggest missing steps via AI">Suggest Missing</button>
+        <button onclick="optimizeColumnFlowAI(${colIndex})" title="Reorder this column into a logical flow via AI">Optimize Flow</button>
         <button onclick="generateColumnCheckIn(${colIndex})" title="Daily Check-In via AI">Check-In</button>
         <button onclick="clearCompletedInColumn(${colIndex})" title="Remove all completed tasks in this column">Clear Done</button>
     </div>
@@ -2755,14 +2831,14 @@ function dismissTaskEstimate(ci, ti) {
     renderBoard(); 
 }
 
-async function optimizeColumnFlowAI(ci) {
+async function suggestMissingTasksAI(ci) {
     var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) { alert('Add Gemini API key in reports view.'); return; }
 
     var openTasks = boardData[ci].tasks.filter(function(t) { return !t.completed; });
     if (openTasks.length === 0) return;
 
-    var prompt = 'Review these tasks for a project. \n1. Reorder them into the most logical execution sequence.\n2. If critical intermediate steps are missing based on standard project workflows, suggest them.\nReturn ONLY JSON format: {"orderedIds": ["id1", "id2"], "missingTasks": [{"task":"Name", "minutes": 15}]}\nTasks: ' + openTasks.map(function(t) { return '[id:' + t.id + '] ' + t.text; }).join('; ');
+    var prompt = 'Review these tasks for a project. Based on standard workflows for this kind of work, identify any critical intermediate steps that appear to be missing. Only suggest genuinely missing steps, not restatements of what is already listed. Return ONLY JSON format: {"missingTasks": [{"task":"Name", "minutes": 15}]}\nTasks: ' + openTasks.map(function(t) { return t.text; }).join('; ');
 
     try {
         var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
@@ -2777,29 +2853,77 @@ async function optimizeColumnFlowAI(ci) {
         var cleaned = raw.replace(/```json|```/g, '').trim();
         var result = JSON.parse(cleaned);
 
-        if (result.orderedIds && result.orderedIds.length === openTasks.length) {
-            var sortedOpen = [];
-            result.orderedIds.forEach(function(id) {
-                var found = openTasks.find(function(t) { return t.id === id; });
-                if (found) sortedOpen.push(found);
-            });
-            var comp = boardData[ci].tasks.filter(function(t) { return t.completed; });
-            boardData[ci].tasks = sortedOpen.concat(comp);
-
-            // The visual reorder above only affects display order. Start Flow reads customQueueOrder,
-            // so this column's new sequence needs to actually govern the flow too, not just look right on screen.
-            customQueueOrder = customQueueOrder.filter(function(id) { return !result.orderedIds.includes(id); });
-            customQueueOrder = result.orderedIds.concat(customQueueOrder);
-            storageSet('ff-custom-queue', customQueueOrder);
-        }
-
         if (result.missingTasks && result.missingTasks.length > 0) {
             boardData[ci].aiSuggestions = result.missingTasks;
+            saveBoardData();
+            renderSingleColumn(ci);
+        } else {
+            alert('No missing steps found, this column already looks complete.');
         }
+    } catch(e) { alert('AI suggestion error: ' + e.message); }
+}
+
+async function optimizeColumnFlowAI(ci) {
+    var apiKey = storageGet('gemini_api_key', null);
+    if (!apiKey) { alert('Add Gemini API key in reports view.'); return; }
+
+    var openTasks = boardData[ci].tasks.filter(function(t) { return !t.completed && !t.parentId; });
+    if (openTasks.length === 0) return;
+
+    var prompt = 'Reorder these tasks for a project into the most logical, efficient execution sequence. Consider natural dependencies, e.g. drafting before sending, researching before writing. Return ONLY JSON format: {"orderedIds": ["id1", "id2"]}, listing every task id exactly once.\nTasks: ' + openTasks.map(function(t) { return '[id:' + t.id + '] ' + t.text; }).join('; ');
+
+    try {
+        var res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        var data = await res.json();
+        var candidate = data.candidates && data.candidates[0];
+        var part = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0];
+        var raw = part ? part.text : '';
+        var cleaned = raw.replace(/```json|```/g, '').trim();
+        var result = JSON.parse(cleaned);
+
+        if (!result.orderedIds || result.orderedIds.length === 0) {
+            alert('The AI did not return a usable order. Nothing was changed.');
+            return;
+        }
+
+        // Robust by design: keep only ids that genuinely exist among this column's open tasks,
+        // then append anything the AI missed at the end, in its original order. Nothing is ever
+        // silently dropped, and a partial or imperfect AI response still produces a real result
+        // instead of quietly doing nothing.
+        var validIds = result.orderedIds.filter(function(id) {
+            return openTasks.some(function(t) { return t.id === id; });
+        });
+        var missedTasks = openTasks.filter(function(t) { return validIds.indexOf(t.id) === -1; });
+        var finalIds = validIds.concat(missedTasks.map(function(t) { return t.id; }));
+
+        var sortedOpen = [];
+        finalIds.forEach(function(id) {
+            var found = openTasks.find(function(t) { return t.id === id; });
+            if (found) sortedOpen.push(found);
+        });
+        var everythingElse = boardData[ci].tasks.filter(function(t) { return t.completed || t.parentId; });
+        boardData[ci].tasks = sortedOpen.concat(everythingElse);
+
+        // The reorder above only affects display order. Start Flow reads customQueueOrder, so this
+        // column's new sequence needs to actually govern the flow too, not just look right on screen.
+        // The overdue guardrail is untouched by this: the priority sort still checks urgency ahead of
+        // customQueueOrder regardless of what order this writes, and the manual override flag is never
+        // set here, only your own dragging, arrows, or typed number can ever grant that.
+        customQueueOrder = customQueueOrder.filter(function(id) { return finalIds.indexOf(id) === -1; });
+        customQueueOrder = finalIds.concat(customQueueOrder);
+        storageSet('ff-custom-queue', customQueueOrder);
 
         saveBoardData();
         renderSingleColumn(ci);
         renderInternalQueue();
+
+        if (validIds.length < openTasks.length) {
+            showGentleNotice('optimize-flow-notice-' + ci, 'Flow optimized. The AI missed ' + missedTasks.length + ' task(s), added at the end.', null, null);
+        }
     } catch(e) { alert('AI optimization error: ' + e.message); }
 }
 
@@ -4094,14 +4218,14 @@ function toggleTask(ci, ti) {
         }
         
         saveBoardData();
-        renderBoard();
+        renderSingleColumn(ci);
         renderEstimateLog();
         return;
     }
     
     if (boardData[ci].notesRequired && (!task.notes || task.notes.trim() === '')) {
         alert("This column requires notes! Please add notes via Details before completing.");
-        renderBoard();
+        renderSingleColumn(ci);
         return;
     }
     if (task.trackedSeconds === 0) {
@@ -4125,10 +4249,10 @@ function confirmCompletion() {
     document.getElementById('completion-overlay').style.display = 'none';
 }
 function cancelCompletion() {
+    var ci = pendingCompletion ? pendingCompletion.colIndex : null;
     pendingCompletion = null;
     document.getElementById('completion-overlay').style.display = 'none';
-    saveScrollPositions();
-    renderBoard();
+    if (ci !== null) renderSingleColumn(ci);
 }
 
 function triggerTaskMicroCelebration(ci, ti) {
@@ -4145,6 +4269,8 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
     var task = boardData[ci].tasks[ti];
     task.completed = true;
     task.isTopPriority = false;
+    manualOverdueOverrides = manualOverdueOverrides.filter(function(id) { return id !== task.id; });
+    storageSet('ff-manual-overdue-overrides', manualOverdueOverrides);
     task.isTracking = false;
     task.trackedSeconds = actualSeconds;
     task.completedAt = Date.now();
@@ -4203,7 +4329,7 @@ function finalizeTaskCompletion(ci, ti, actualSeconds) {
 
     rememberTaskTime(task.text, Math.round(actualSeconds / 60));
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
     renderEstimateLog();
     renderDailyRecap();
     renderInternalQueue();
