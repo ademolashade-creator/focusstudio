@@ -2124,7 +2124,8 @@ function renderSingleColumn(colIndex) {
     <div class="column-body" style="${col.collapsed ? 'display:none;' : ''}">
 
     <ul class="task-list" ondragover="allowDrop(event)" ondrop="dropTask(event, ${colIndex})">
-        ${groupTasksByDate(col.tasks, colIndex).map((group) => `
+        ${groupTasksByDate(col.tasks, colIndex).map((group, groupIdx, allGroups) => `
+            ${group.dateKey !== getTodayKey() && (groupIdx === 0 || allGroups[groupIdx - 1].dateKey === getTodayKey()) ? `<li class="clear-done-inline-wrapper"><button class="details-trigger-btn clear-done-btn" onclick="clearCompletedInColumn(${colIndex})" title="Remove all completed tasks in this column">Clear Done</button></li>` : ''}
             <li class="date-group-header" onclick="toggleDateGroup(${colIndex}, '${group.dateKey}')">${group.dateLabel} ${group.isCollapsed ? '&#9656;' : '&#9662;'}</li>
             ${group.isCollapsed ? '' : group.items.map(({ task, originalIndex: taskIndex }) => {
                 if (task.parentId) return '';
@@ -2142,7 +2143,7 @@ function renderSingleColumn(colIndex) {
 
                 let carriedOverBadge = '';
                 if (task.carriedOver) {
-                    carriedOverBadge = `<span class="carried-over-badge" title="Carried over from ${task.originalDate || 'previous day'}">Carried</span>`;
+                    carriedOverBadge = `<span class="carried-over-icon" title="Carried over from ${task.originalDate || 'previous day'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></span>`;
                 }
 
                 return `
@@ -2152,39 +2153,36 @@ function renderSingleColumn(colIndex) {
                                 <button class="priority-star-btn ${task.isTopPriority ? 'active' : ''}" onclick="toggleTopPriority(${colIndex}, ${taskIndex})" title="${task.isTopPriority ? 'Remove from today top priorities' : 'Mark as a top priority for today'}">&#9733;</button>
                                 <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
                                 <div class="grow-wrap" data-replicated-value="${escapeHTML(task.text)}"><textarea class="task-name-input" rows="1" oninput="this.parentNode.dataset.replicatedValue = this.value" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.text)}</textarea></div>
-                                <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
+                                <span class="estimate-inline"><input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))"><span class="estimate-unit">m</span></span>
                                 ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">Sub</span>` : ''}
-                                ${task.recurrence ? `<span class="recurrence-badge">Repeat: ${task.recurrence}</span>` : ''}
+                                ${task.recurrence ? `<span class="recurrence-icon" title="Repeats ${task.recurrence}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>` : ''}
                                 ${getDeadlineBadge(task)}
                                 ${carriedOverBadge}
+                                <div class="action-menu-wrapper">
+                                    <button class="icon-btn action-menu-trigger" onclick="toggleActionMenu('task-menu-${colIndex}-${taskIndex}', event)" title="More actions">&#8942;</button>
+                                    <div class="action-menu" id="task-menu-${colIndex}-${taskIndex}" style="display:none;">
+                                        ${deadlineHtml}
+                                        <button class="details-trigger-btn" onclick="closeAllActionMenus();openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' &bull;' : ''}</button>
+                                        <button class="details-trigger-btn" onclick="closeAllActionMenus();hideTaskForLater(${colIndex}, ${taskIndex})" title="Hide this task from view until you restore it">Hide</button>
+                                        ${hasSubtasks ? `
+                                            <button class="details-trigger-btn subtasks-toggle-btn" onclick="closeAllActionMenus();toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? 'Show Subtasks' : 'Hide Subtasks'}</button>
+                                            <button class="details-trigger-btn" onclick="closeAllActionMenus();removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">Remove All</button>
+                                        ` : ''}
+                                        ${!task.recurrence ? `
+                                            <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)" onclick="event.stopPropagation()">
+                                                <option value="">No Repeat</option>
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="monthly">Monthly</option>
+                                            </select>
+                                        ` : `
+                                            <button class="details-trigger-btn" onclick="closeAllActionMenus();removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕ Repeat</button>
+                                        `}
+                                    </div>
+                                </div>
                             </div>
                             <div class="task-top-actions">
                                 <button class="delete-btn" onclick="deleteTask(${colIndex}, ${taskIndex})">&times;</button>
-                            </div>
-                        </div>
-
-                        <div class="task-controls-row">
-                            <div class="action-menu-wrapper">
-                                <button class="icon-btn action-menu-trigger" onclick="toggleActionMenu('task-menu-${colIndex}-${taskIndex}', event)" title="More actions">&#8942;</button>
-                                <div class="action-menu" id="task-menu-${colIndex}-${taskIndex}" style="display:none;">
-                                    ${deadlineHtml}
-                                    <button class="details-trigger-btn" onclick="closeAllActionMenus();openDetailsModal(${colIndex}, ${taskIndex})">Details${task.notes ? ' &bull;' : ''}</button>
-                                    <button class="details-trigger-btn" onclick="closeAllActionMenus();hideTaskForLater(${colIndex}, ${taskIndex})" title="Hide this task from view until you restore it">Hide</button>
-                                    ${hasSubtasks ? `
-                                        <button class="details-trigger-btn subtasks-toggle-btn" onclick="closeAllActionMenus();toggleSubtasksCollapse(${colIndex}, ${taskIndex})">${isParentCollapsed ? 'Show Subtasks' : 'Hide Subtasks'}</button>
-                                        <button class="details-trigger-btn" onclick="closeAllActionMenus();removeAllSubtasks(${colIndex}, ${taskIndex})" style="color:var(--cherry-red);">Remove All</button>
-                                    ` : ''}
-                                    ${!task.recurrence ? `
-                                        <select class="recurrence-select" onchange="setRecurrence(${colIndex}, ${taskIndex}, this.value)" onclick="event.stopPropagation()">
-                                            <option value="">No Repeat</option>
-                                            <option value="daily">Daily</option>
-                                            <option value="weekly">Weekly</option>
-                                            <option value="monthly">Monthly</option>
-                                        </select>
-                                    ` : `
-                                        <button class="details-trigger-btn" onclick="closeAllActionMenus();removeRecurrence(${colIndex}, ${taskIndex})" style="font-size:0.6rem;">✕ Repeat</button>
-                                    `}
-                                </div>
                             </div>
                         </div>
 
@@ -2209,20 +2207,18 @@ function renderSingleColumn(colIndex) {
                                                     <input type="checkbox" ${subtask.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${subIdx})">
                                                     <span class="subtask-indent">↳</span>
                                                     <div class="grow-wrap" data-replicated-value="${escapeHTML(subtask.text)}"><textarea class="task-name-input subtask-name" rows="1" oninput="this.parentNode.dataset.replicatedValue = this.value" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">${escapeHTML(subtask.text)}</textarea></div>
-                                                    <input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))">m
+                                                    <span class="estimate-inline"><input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))"><span class="estimate-unit">m</span></span>
                                                     ${getDeadlineBadge(subtask)}
+                                                    <div class="action-menu-wrapper">
+                                                        <button class="icon-btn action-menu-trigger" onclick="toggleActionMenu('subtask-menu-${colIndex}-${subIdx}', event)" title="More actions">&#8942;</button>
+                                                        <div class="action-menu" id="subtask-menu-${colIndex}-${subIdx}" style="display:none;">
+                                                            ${subtask.deadlineTime ? `<span class="deadline-label" onclick="closeAllActionMenus();promptDeadline(${colIndex}, ${subIdx})">Deadline: ${new Date(subtask.deadlineTime).toLocaleString()}</span>` : `<button class="deadline-trigger-btn" onclick="closeAllActionMenus();promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`}
+                                                            <button class="details-trigger-btn" onclick="closeAllActionMenus();openDetailsModal(${colIndex}, ${subIdx})">Details${subtask.notes ? ' &bull;' : ''}</button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div class="task-top-actions">
                                                     <button class="delete-btn" onclick="deleteTask(${colIndex}, ${subIdx})">&times;</button>
-                                                </div>
-                                            </div>
-                                            <div class="task-controls-row">
-                                                <div class="action-menu-wrapper">
-                                                    <button class="icon-btn action-menu-trigger" onclick="toggleActionMenu('subtask-menu-${colIndex}-${subIdx}', event)" title="More actions">&#8942;</button>
-                                                    <div class="action-menu" id="subtask-menu-${colIndex}-${subIdx}" style="display:none;">
-                                                        ${subtask.deadlineTime ? `<span class="deadline-label" onclick="closeAllActionMenus();promptDeadline(${colIndex}, ${subIdx})">Deadline: ${new Date(subtask.deadlineTime).toLocaleString()}</span>` : `<button class="deadline-trigger-btn" onclick="closeAllActionMenus();promptDeadline(${colIndex}, ${subIdx})">+ Deadline</button>`}
-                                                        <button class="details-trigger-btn" onclick="closeAllActionMenus();openDetailsModal(${colIndex}, ${subIdx})">Details${subtask.notes ? ' &bull;' : ''}</button>
-                                                    </div>
                                                 </div>
                                             </div>
                                         </li>
@@ -2235,8 +2231,6 @@ function renderSingleColumn(colIndex) {
             }).join('')}
         `).join('')}
     </ul>
-
-    <button class="details-trigger-btn clear-done-btn" onclick="clearCompletedInColumn(${colIndex})" title="Remove all completed tasks in this column">Clear Done</button>
 
     ${(function() {
         var hiddenTasks = col.tasks.filter(function(t) { return t.isHidden; });
@@ -2275,7 +2269,7 @@ function renderSingleColumn(colIndex) {
         <input type="text" class="task-input" id="task-input-${colIndex}" placeholder="Add task..." onkeypress="handleKeyPress(event, ${colIndex})">
         <div style="display: flex; gap: 6px; align-items: center;">
             <input type="number" class="task-estimate-new" id="task-est-${colIndex}" value="15" min="1" max="480">m
-            <button class="add-task-btn" onclick="addTask(${colIndex})" style="flex: 1;">Add</button>
+            <button class="add-task-btn" onclick="addTask(${colIndex})">Add</button>
             <button class="btn-secondary" onclick="startVoiceInput(${colIndex})" id="voice-btn-${colIndex}" title="Voice input">Voice</button>
         </div>
     </div>
@@ -2290,7 +2284,7 @@ function renderSingleColumn(colIndex) {
                 <button class="add-task-btn" onclick="naturalLanguageAddTask(${colIndex})">Smart</button>
             </div>
             <textarea class="task-input paste-textarea" id="paste-box-${colIndex}" rows="2" placeholder="Paste bulk tasks here (separated by line)..."></textarea>
-            <button class="add-task-btn" style="width:100%;margin-bottom:0.2rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
+            <button class="add-task-btn" style="margin-bottom:0.2rem;" onclick="addPastedTasks(${colIndex})">Add Pasted Tasks</button>
         </div>
     </details>
 

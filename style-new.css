@@ -635,7 +635,7 @@ button:active { transform: scale(0.96); }
 .manager-name-input::placeholder { color: #d9b3c2; font-style: italic; }
 
 .ai-batch-actions { display: flex; gap: 4px; margin-bottom: 0.5rem; flex-wrap: wrap; align-items: center; }
-.column-start-flow-btn { flex: 1 1 auto; }
+.column-start-flow-btn { flex: none; }
 
 .action-menu-wrapper { position: relative; display: inline-flex; }
 .action-menu {
@@ -659,7 +659,7 @@ button:active { transform: scale(0.96); }
 .action-menu .recurrence-select { width: 100%; }
 .action-menu-trigger { font-weight: 700; }
 .icon-btn.action-menu-trigger {
-    background: var(--border-color-pink);
+    background: none;
     color: var(--cherry-red);
     border-radius: 50%;
     width: 26px;
@@ -667,14 +667,13 @@ button:active { transform: scale(0.96); }
     font-size: 1rem;
     padding: 0;
 }
-.icon-btn.action-menu-trigger:hover { background: var(--cherry-red); color: white; }
+.icon-btn.action-menu-trigger:hover { background: var(--border-color-pink); }
 .ai-tools-trigger {
-    background: var(--border-color-pink);
-    color: var(--cherry-red);
-    border: 1.5px solid var(--cherry-red);
-    font-weight: 700;
+    background: transparent;
+    color: var(--text-color);
+    border: 1.5px solid var(--text-color);
+    font-weight: 600;
 }
-.ai-tools-trigger:hover { background: var(--cherry-red); color: white; }
 
 .hidden-tasks-toggle {
     font-size: 0.7rem;
@@ -743,13 +742,13 @@ button:active { transform: scale(0.96); }
 
 .task-input-group .add-task-btn, 
 .task-input-group .btn-secondary {
-    background-color: var(--cherry-red);
-    color: white;
+    background-color: transparent;
+    color: var(--text-color);
+    border: 1.5px solid var(--text-color);
     padding: 0 0.8rem;
     border-radius: 8px;
     font-weight: 600;
     font-size: 0.8rem;
-    border: none;
     cursor: pointer;
     height: 1.9rem;
     display: flex;
@@ -883,6 +882,18 @@ button:active { transform: scale(0.96); }
 }
 
 .task-estimate-input { width: 34px; padding: 1px 2px; font-family: var(--font-family); font-weight: 600; text-align: center; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-color); font-size: 0.7rem; height: 1.3rem; }
+.estimate-inline { display: inline-flex; align-items: center; gap: 2px; }
+.estimate-unit { font-size: 0.6rem; color: #888; }
+
+.carried-over-icon, .recurrence-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--amber);
+    flex-shrink: 0;
+}
+.carried-over-icon svg, .recurrence-icon svg { width: 15px; height: 15px; }
+
+.clear-done-inline-wrapper { list-style: none; padding: 6px 0; text-align: center; border-top: 1px dashed var(--border-color); border-bottom: 1px dashed var(--border-color); margin: 4px 0; }
 
 .task-top-actions {
     display: flex;
@@ -1024,8 +1035,18 @@ button:active { transform: scale(0.96); }
 .report-card-flex { display: flex; flex-direction: column; }
 .report-card-content { flex: 1; min-height: 160px; }
 .report-card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
-.report-card-actions .ai-btn { flex: 1; }
-.report-card-actions .reestimate-btn { flex: none; }
+.report-card-actions .outline-btn { flex: none; }
+
+.outline-btn {
+    background: transparent;
+    color: var(--text-color);
+    border: 1.5px solid var(--text-color);
+    font-weight: 600;
+    padding: 0.4rem 0.8rem;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
 .report-card-actions:has(.reestimate-btn) .ai-btn { flex: none; }
 
 .hacks-content { font-size: 0.78rem; color: #b0507a; line-height: 1.5; }

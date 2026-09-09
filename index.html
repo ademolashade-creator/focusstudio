@@ -337,9 +337,9 @@
                 <p style="font-size:0.72rem;color:#888;margin:0.4rem 0 0.6rem;">A written first-person summary of what you completed, grouped by project, ready to send or archive. Also used for the per-column daily check-ins on each task card.</p>
                 <div class="summary-content report-card-content" id="summary-content">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
                 <div class="report-card-actions">
-                    <button class="ai-btn" onclick="generateAISummary(false)">Generate Client Report</button>
-                    <button class="ai-btn" onclick="generateICS()" style="background:var(--green);">Download .ics</button>
-                    <button class="ai-btn" onclick="openPdfExportOverlay()" style="background:var(--amber);">PDF Report</button>
+                    <button class="outline-btn" onclick="generateAISummary(false)">Generate Client Report</button>
+                    <button class="outline-btn" onclick="generateICS()">Download .ics</button>
+                    <button class="outline-btn" onclick="openPdfExportOverlay()">PDF Report</button>
                 </div>
             </div>
 
@@ -351,8 +351,8 @@
                 <div class="summary-content report-card-content" id="brain-engine-report-content">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
                 <p style="font-size:0.72rem;color:#888;margin:0.6rem 0 4px;">Re-runs AI time estimates for every open task at once, using this same task-time memory, useful after a big batch add.</p>
                 <div class="report-card-actions">
-                    <button class="ai-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
-                    <button class="btn-secondary reestimate-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
+                    <button class="outline-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
+                    <button class="outline-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
                 </div>
             </div>
         </div>
