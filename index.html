@@ -335,10 +335,14 @@
                 <div class="monthly-alert-banner" id="monthly-alert">It's the last day of the month — your monthly client report is ready to generate.</div>
                 <h3 style="margin:0;color:var(--cherry-red);">Monthly Summary & Client Report</h3>
                 <p style="font-size:0.72rem;color:#888;margin:0.4rem 0 0.6rem;">A written first-person summary of what you completed, grouped by project, ready to send or archive. Also used for the per-column daily check-ins on each task card.</p>
-                <div class="summary-content report-card-content" id="summary-content">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
+                <div class="report-box-wrapper">
+                    <div class="summary-content report-card-content" id="summary-content">Click "Generate Client Report," or it'll run automatically on the last day of the month if your key is saved.</div>
+                    <button class="copy-icon-btn" id="summary-content-copy-icon" onclick="copyElementText('summary-content', this)" title="Copy report text" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                </div>
                 <div class="report-card-actions">
                     <button class="outline-btn" onclick="generateAISummary(false)">Generate Client Report</button>
-                    <button class="outline-btn" onclick="copyElementText('summary-content', this)">Copy</button>
                     <button class="outline-btn" onclick="generateICS()">Download .ics</button>
                     <button class="outline-btn" onclick="openPdfExportOverlay()">PDF Report</button>
                 </div>
@@ -349,11 +353,15 @@
                 <h3 style="margin:0;color:var(--cherry-red);">AI Adaptive Brain Engine Report</h3>
                 <p style="font-size:0.72rem;color:#888;margin:0.4rem 0 0.6rem;">A written AI summary of your current workload and pace, how much is on your plate right now and whether you're on track, not a task-by-task list.</p>
                 <div class="hacks-content" id="adaptive-hacks" style="margin-bottom:0.6rem;">Analyzing your current task load...</div>
-                <div class="summary-content report-card-content" id="brain-engine-report-content">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
+                <div class="report-box-wrapper">
+                    <div class="summary-content report-card-content" id="brain-engine-report-content">Click "Generate Brain Report" to analyze your active task load, cognitive energy state, and completion velocity.</div>
+                    <button class="copy-icon-btn" id="brain-engine-report-content-copy-icon" onclick="copyElementText('brain-engine-report-content', this)" title="Copy report text" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </button>
+                </div>
                 <p style="font-size:0.72rem;color:#888;margin:0.6rem 0 4px;">Re-runs AI time estimates for every open task at once, using this same task-time memory, useful after a big batch add.</p>
                 <div class="report-card-actions">
                     <button class="outline-btn" onclick="generateBrainEngineReport()">Generate Brain Report</button>
-                    <button class="outline-btn" onclick="copyElementText('brain-engine-report-content', this)">Copy</button>
                     <button class="outline-btn" onclick="reEstimateAllTasks()">Re-estimate All (AI)</button>
                 </div>
             </div>

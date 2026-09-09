@@ -1102,6 +1102,26 @@ button:active { transform: scale(0.96); }
 }
 .report-history-actions { display: flex; gap: 6px; }
 
+.copy-icon-btn {
+    background: none;
+    color: #888;
+    padding: 4px;
+    border-radius: 6px;
+    border: none;
+}
+.copy-icon-btn svg { width: 15px; height: 15px; display: block; }
+.copy-icon-btn:hover { color: var(--cherry-red); background: var(--border-color-pink); }
+
+.report-box-wrapper { position: relative; }
+.report-box-wrapper .copy-icon-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    background: var(--bg-color);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
 .monthly-alert-banner {
     background-color: var(--cherry-red);
     color: white;

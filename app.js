@@ -1287,13 +1287,26 @@ async function copyTextToClipboard(text) {
 
 function flashCopiedLabel(buttonEl) {
     if (!buttonEl) return;
-    var original = buttonEl.textContent;
-    buttonEl.textContent = 'Copied!';
+    var original = buttonEl.innerHTML;
+    var isIcon = buttonEl.classList.contains('copy-icon-btn');
+    buttonEl.innerHTML = isIcon
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>'
+        : 'Copied!';
     buttonEl.disabled = true;
     setTimeout(function() {
-        buttonEl.textContent = original;
+        buttonEl.innerHTML = original;
         buttonEl.disabled = false;
     }, 1200);
+}
+
+function revealCopyIcon(elementId) {
+    var icon = document.getElementById(elementId + '-copy-icon');
+    if (icon) icon.style.display = 'flex';
+}
+
+function hideCopyIcon(elementId) {
+    var icon = document.getElementById(elementId + '-copy-icon');
+    if (icon) icon.style.display = 'none';
 }
 
 async function copyElementText(elementId, buttonEl) {
@@ -1351,7 +1364,7 @@ function renderReportHistory() {
             '<div class="report-history-preview" id="report-preview-' + r.id + '" style="display:none;">' +
             '<div class="report-history-text">' + escapeHTML(r.content) + '</div>' +
             '<div class="report-history-actions">' +
-            '<button class="btn-secondary btn-small" onclick="copyReportFromHistory(\'' + r.id + '\', this)">Copy</button>' +
+            '<button class="btn-secondary btn-small copy-icon-btn" onclick="copyReportFromHistory(\'' + r.id + '\', this)" title="Copy report text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' +
             '<button class="btn-secondary btn-small" onclick="exportReportPDF(\'' + r.id + '\')">Export PDF</button>' +
             '<button class="delete-btn" onclick="deleteReportFromHistory(\'' + r.id + '\')">Delete</button>' +
             '</div></div></li>';
@@ -3094,6 +3107,7 @@ async function generateColumnCheckIn(ci) {
     switchView('reports');
     var summaryBox = $('summary-content');
     var colTitle = boardData[ci].title;
+    hideCopyIcon('summary-content');
     summaryBox.textContent = 'Generating daily check-in for ' + colTitle + '...';
     var priorityFilter = countTopPriorityTasks() > 0;
     var fullData = buildCheckInTaskData(function(t) { return priorityFilter ? t.isTopPriority : true; });
@@ -3108,6 +3122,7 @@ async function generateColumnCheckIn(ci) {
     try {
         var result = await callGemini(prompt);
         summaryBox.textContent = result;
+        revealCopyIcon('summary-content');
         saveReportToHistory('Check-In: ' + colTitle, result);
     } catch(e) {
         summaryBox.textContent = 'Error: ' + e.message;
@@ -3116,7 +3131,10 @@ async function generateColumnCheckIn(ci) {
 
 async function generateAISummary(silent) {
     var summaryBox = $('summary-content');
-    if (!silent) summaryBox.textContent = 'Generating monthly report...';
+    if (!silent) {
+        hideCopyIcon('summary-content');
+        summaryBox.textContent = 'Generating monthly report...';
+    }
     var thisMonthData = historyData.filter(function(h) { return new Date(h.completedAt).getMonth() === new Date().getMonth(); });
 
     var managerByColumn = {};
@@ -3129,7 +3147,10 @@ async function generateAISummary(silent) {
     var prompt = 'Write this exactly as if I am personally summarizing my own completed work this month, in my own first-person voice ("I completed", "I finished"), the way a real person reflects on their month, not a formal document written about someone else in the third person. Group the summary by project. Where a project has a manager name listed, address that part of the summary as if reporting to them specifically. ' + nameInstruction + ' Be specific and concrete about what was actually done, never generic praise or filler phrases. Completed work this month: ' + JSON.stringify(thisMonthData) + '. Project managers: ' + JSON.stringify(managerByColumn);
     try {
         var result = await callGemini(prompt);
-        if (!silent) summaryBox.textContent = result;
+        if (!silent) {
+            summaryBox.textContent = result;
+            revealCopyIcon('summary-content');
+        }
         saveReportToHistory('Monthly Summary', result);
     } catch(e) {
         if (!silent) summaryBox.textContent = 'Error: ' + e.message;
@@ -3139,6 +3160,7 @@ async function generateAISummary(silent) {
 async function generateBrainEngineReport() {
     var box = $('brain-engine-report-content');
     if (!box) return;
+    hideCopyIcon('brain-engine-report-content');
     box.textContent = 'Synthesizing AI Adaptive Brain Engine Report...';
     var apiKey = storageGet('gemini_api_key', null);
     if (!apiKey) {
@@ -3159,6 +3181,7 @@ async function generateBrainEngineReport() {
     try {
         var res = await callGemini(prompt);
         box.textContent = res;
+        revealCopyIcon('brain-engine-report-content');
         logBrainEngineSnapshot(openTasksCount, totalEst, res);
         maybeSynthesizeMonthlyLearnings();
     } catch(e) {
