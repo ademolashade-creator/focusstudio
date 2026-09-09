@@ -658,6 +658,23 @@ button:active { transform: scale(0.96); }
 .action-menu .deadline-label { width: 100%; text-align: left; opacity: 1; }
 .action-menu .recurrence-select { width: 100%; }
 .action-menu-trigger { font-weight: 700; }
+.icon-btn.action-menu-trigger {
+    background: var(--border-color-pink);
+    color: var(--cherry-red);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    font-size: 1rem;
+    padding: 0;
+}
+.icon-btn.action-menu-trigger:hover { background: var(--cherry-red); color: white; }
+.ai-tools-trigger {
+    background: var(--border-color-pink);
+    color: var(--cherry-red);
+    border: 1.5px solid var(--cherry-red);
+    font-weight: 700;
+}
+.ai-tools-trigger:hover { background: var(--cherry-red); color: white; }
 
 .hidden-tasks-toggle {
     font-size: 0.7rem;
@@ -688,7 +705,6 @@ button:active { transform: scale(0.96); }
     border-bottom: 1px solid var(--border-color);
 }
 .hidden-tasks-panel li:last-child { border-bottom: none; }
-.ai-batch-actions button { font-size: 0.6rem; padding: 0.2rem 0.4rem; flex: 1; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--cherry-red); border-radius: 8px; }
 
 .task-input-group {
     display: flex;
@@ -809,6 +825,7 @@ button:active { transform: scale(0.96); }
 .task-checkbox-name {
     display: flex;
     align-items: flex-start;
+    flex-wrap: wrap;
     gap: 6px;
     flex: 1;
     min-width: 0;
@@ -1240,6 +1257,15 @@ button:active { transform: scale(0.96); }
 .badge-progress progress::-webkit-progress-bar { background: var(--border-color); border-radius: 3px; }
 .badge-progress progress::-webkit-progress-value { background: var(--cherry-red); border-radius: 3px; transition: width 0.3s ease; }
 .badge-progress progress::-moz-progress-bar { background: var(--cherry-red); border-radius: 3px; }
+
+.ladder-card { max-width: 170px; }
+.ladder-card.ladder-not-started { opacity: 0.55; }
+.ladder-progress { width: 100%; margin-top: 4px; }
+.ladder-progress-label { font-size: 0.6rem; color: #888; margin-bottom: 3px; }
+.ladder-progress progress { width: 100%; height: 5px; border-radius: 3px; border: none; overflow: hidden; }
+.ladder-progress progress::-webkit-progress-bar { background: var(--border-color); border-radius: 3px; }
+.ladder-progress progress::-webkit-progress-value { background: var(--cherry-red); border-radius: 3px; transition: width 0.3s ease; }
+.ladder-progress progress::-moz-progress-bar { background: var(--cherry-red); border-radius: 3px; }
 
 .recurrence-badge {
     font-size: 0.55rem;

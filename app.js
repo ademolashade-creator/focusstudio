@@ -1831,8 +1831,16 @@ function setupRecurringTasks() {
                 newTask.startedAtIso = null;
                 newTask._historyId = null;
                 newTask.lastRecurrenceDate = today;
+                newTask.carriedOver = false;
+                newTask.isTopPriority = false;
                 delete newTask._historyId;
                 col.tasks.push(newTask);
+
+                // Today's fresh copy now exists, so the old instance is retired quietly,
+                // whether it was finished or not. No history record, no completion time,
+                // it simply stops being an open duplicate sitting alongside the new one.
+                task.completed = true;
+                task.carriedOver = false;
                 task.lastRecurrenceDate = today;
             }
         });
@@ -2144,8 +2152,10 @@ function renderSingleColumn(colIndex) {
                                 <button class="priority-star-btn ${task.isTopPriority ? 'active' : ''}" onclick="toggleTopPriority(${colIndex}, ${taskIndex})" title="${task.isTopPriority ? 'Remove from today top priorities' : 'Mark as a top priority for today'}">&#9733;</button>
                                 <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${taskIndex})">
                                 <div class="grow-wrap" data-replicated-value="${escapeHTML(task.text)}"><textarea class="task-name-input" rows="1" oninput="this.parentNode.dataset.replicatedValue = this.value" onchange="updateTaskText(${colIndex}, ${taskIndex}, this.value)">${escapeHTML(task.text)}</textarea></div>
+                                <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
                                 ${hasSubtasks ? `<span class="subtask-badge" title="Has subtasks">Sub</span>` : ''}
                                 ${task.recurrence ? `<span class="recurrence-badge">Repeat: ${task.recurrence}</span>` : ''}
+                                ${getDeadlineBadge(task)}
                                 ${carriedOverBadge}
                             </div>
                             <div class="task-top-actions">
@@ -2154,12 +2164,6 @@ function renderSingleColumn(colIndex) {
                         </div>
 
                         <div class="task-controls-row">
-                            ${getDeadlineBadge(task)}
-                            <input type="number" class="task-estimate-input" value="${task.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${taskIndex}, parseInt(this.value))">m
-                            ${!task.completed ? `
-                            <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, -1)">&#9650;</button>
-                            <button class="icon-btn" onclick="moveTask(${colIndex}, ${taskIndex}, 1)">&#9660;</button>
-                            ` : ''}
                             <div class="action-menu-wrapper">
                                 <button class="icon-btn action-menu-trigger" onclick="toggleActionMenu('task-menu-${colIndex}-${taskIndex}', event)" title="More actions">&#8942;</button>
                                 <div class="action-menu" id="task-menu-${colIndex}-${taskIndex}" style="display:none;">
@@ -2205,18 +2209,14 @@ function renderSingleColumn(colIndex) {
                                                     <input type="checkbox" ${subtask.completed ? 'checked' : ''} onclick="toggleTask(${colIndex}, ${subIdx})">
                                                     <span class="subtask-indent">↳</span>
                                                     <div class="grow-wrap" data-replicated-value="${escapeHTML(subtask.text)}"><textarea class="task-name-input subtask-name" rows="1" oninput="this.parentNode.dataset.replicatedValue = this.value" onchange="updateTaskText(${colIndex}, ${subIdx}, this.value)">${escapeHTML(subtask.text)}</textarea></div>
+                                                    <input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))">m
+                                                    ${getDeadlineBadge(subtask)}
                                                 </div>
                                                 <div class="task-top-actions">
                                                     <button class="delete-btn" onclick="deleteTask(${colIndex}, ${subIdx})">&times;</button>
                                                 </div>
                                             </div>
                                             <div class="task-controls-row">
-                                                ${getDeadlineBadge(subtask)}
-                                                <input type="number" class="task-estimate-input" value="${subtask.estimateMinutes}" min="1" max="480" title="Estimated minutes" onchange="updateTaskEstimate(${colIndex}, ${subIdx}, parseInt(this.value))">m
-                                                ${!subtask.completed ? `
-                                                <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, -1)">&#9650;</button>
-                                                <button class="icon-btn" onclick="moveTask(${colIndex}, ${subIdx}, 1)">&#9660;</button>
-                                                ` : ''}
                                                 <div class="action-menu-wrapper">
                                                     <button class="icon-btn action-menu-trigger" onclick="toggleActionMenu('subtask-menu-${colIndex}-${subIdx}', event)" title="More actions">&#8942;</button>
                                                     <div class="action-menu" id="subtask-menu-${colIndex}-${subIdx}" style="display:none;">
@@ -2235,6 +2235,8 @@ function renderSingleColumn(colIndex) {
             }).join('')}
         `).join('')}
     </ul>
+
+    <button class="details-trigger-btn clear-done-btn" onclick="clearCompletedInColumn(${colIndex})" title="Remove all completed tasks in this column">Clear Done</button>
 
     ${(function() {
         var hiddenTasks = col.tasks.filter(function(t) { return t.isHidden; });
@@ -2257,7 +2259,7 @@ function renderSingleColumn(colIndex) {
     <div class="ai-batch-actions">
         <button class="ai-btn column-start-flow-btn" onclick="startFlow(${colIndex})" title="Run Auto Flow using only this column's tasks">Start Flow</button>
         <div class="action-menu-wrapper">
-            <button class="btn-secondary" onclick="toggleActionMenu('ai-tools-menu-${colIndex}', event)">AI Tools &#9662;</button>
+            <button class="btn-secondary ai-tools-trigger" onclick="toggleActionMenu('ai-tools-menu-${colIndex}', event)">AI Tools &#9662;</button>
             <div class="action-menu" id="ai-tools-menu-${colIndex}" style="display:none;">
                 <button class="details-trigger-btn" onclick="closeAllActionMenus();suggestColumnTimesAI(${colIndex})" title="Suggest Times via AI">Suggest Time</button>
                 <button class="details-trigger-btn" onclick="closeAllActionMenus();suggestMissingTasksAI(${colIndex})" title="Suggest missing steps via AI">Suggest Missing</button>
@@ -2265,7 +2267,6 @@ function renderSingleColumn(colIndex) {
                 <button class="details-trigger-btn" onclick="closeAllActionMenus();generateColumnCheckIn(${colIndex})" title="Daily Check-In via AI">Check-In</button>
             </div>
         </div>
-        <button class="details-trigger-btn" onclick="clearCompletedInColumn(${colIndex})" title="Remove all completed tasks in this column">Clear Done</button>
     </div>
 
     ${suggestionsHtml}
@@ -3364,6 +3365,73 @@ function renderBlossomTree() {
     }
 }
 
+var TASK_MILESTONE_TIERS = [
+    { threshold: 10, label: 'Bronze Milestone', color: '#c97a4a' },
+    { threshold: 50, label: 'Silver Milestone', color: '#9e9e9e' },
+    { threshold: 100, label: 'Gold Milestone', color: '#d4af37' },
+    { threshold: 250, label: 'Platinum Milestone', color: '#8b5fbf' },
+    { threshold: 500, label: 'Diamond Milestone', color: '#4fc3f7' }
+];
+var STREAK_MILESTONE_TIERS = [
+    { threshold: 3, label: '3-Day Streak', color: '#c9a227' },
+    { threshold: 7, label: '7-Day Streak', color: '#e08a00' },
+    { threshold: 14, label: '14-Day Streak', color: '#ff6b35' },
+    { threshold: 30, label: '30-Day Streak', color: 'var(--cherry-red)' },
+    { threshold: 60, label: '60-Day Streak', color: '#8b5fbf' },
+    { threshold: 100, label: '100-Day Streak', color: '#4fc3f7' }
+];
+var FLOW_MASTER_TIERS = [
+    { threshold: 5, label: 'Flow Starter', color: 'var(--green)' },
+    { threshold: 25, label: 'Flow Adept', color: '#2a9d8f' },
+    { threshold: 100, label: 'Flow Master', color: 'var(--cherry-red)' },
+    { threshold: 500, label: 'Flow Legend', color: '#8b5fbf' }
+];
+
+function getCurrentTier(tiers, value) {
+    var current = null;
+    for (var i = 0; i < tiers.length; i++) {
+        if (value >= tiers[i].threshold) current = tiers[i];
+    }
+    return current;
+}
+function getNextTier(tiers, value) {
+    for (var i = 0; i < tiers.length; i++) {
+        if (value < tiers[i].threshold) return tiers[i];
+    }
+    return null;
+}
+function getPrevThreshold(tiers, nextTier) {
+    var idx = tiers.indexOf(nextTier);
+    return idx > 0 ? tiers[idx - 1].threshold : 0;
+}
+
+function logBadgeEarned(key, label, detail) {
+    var log = storageGet('ff-badge-log', []);
+    if (log.some(function(e) { return e.key === key; })) return;
+    log.push({ key: key, label: label, detail: detail, date: new Date().toISOString() });
+    storageSet('ff-badge-log', log);
+}
+
+function renderLadderCard(iconPath, ladderName, currentTier, nextTier, value, badgeKeyPrefix) {
+    var color = currentTier ? currentTier.color : '#ccc';
+    var label = currentTier ? currentTier.label : 'Not started yet';
+    if (currentTier) logBadgeEarned(badgeKeyPrefix + '-' + currentTier.threshold, currentTier.label, ladderName + ' reached ' + currentTier.threshold + '.');
+
+    var progressHtml = '';
+    if (nextTier) {
+        progressHtml = '<div class="ladder-progress-label">' + value + ' / ' + nextTier.threshold + ' toward ' + nextTier.label + '</div>' +
+            '<progress value="' + value + '" max="' + nextTier.threshold + '"></progress>';
+    } else {
+        progressHtml = '<div class="ladder-progress-label">Highest tier reached</div>';
+    }
+
+    return '<div class="badge-card ladder-card ' + (currentTier ? '' : 'ladder-not-started') + '" style="border-left:3px solid ' + color + ';" title="' + ladderName + '">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:' + color + ';">' + iconPath + '</svg>' +
+        '<span>' + label + '</span>' +
+        '<div class="ladder-progress">' + progressHtml + '</div>' +
+        '</div>';
+}
+
 function updateStreaksAndBadges() {
     var streakEl = document.getElementById('streak-display');
     var badgesEl = document.getElementById('badges-display');
@@ -3399,88 +3467,42 @@ function updateStreaksAndBadges() {
     }
 
     var totalCompleted = historyData.length;
-    var icons = {
-        first: '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>',
-        ten: '<path d="M4 19h16M4 15h16M4 11h16M4 7h16"/>',
-        fifty: '<path d="M12 2v20M4 7l8-5 8 5M4 17l8 5 8-5"/>',
-        hundred: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>',
-        accuracy: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
-        flowmaster: '<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" stroke="none"/>',
-        streak7: '<path d="M12 2c-2 4-2 6 0 8 2-1 2-3 1-4 2 1 3 3 3 5a4 4 0 0 1-8 0c0-3 2-5 4-9z" fill="currentColor" stroke="none"/>'
-    };
-    var badgeColors = {
-        first: '#ffb3c6',
-        ten: '#ff8fab',
-        fifty: '#ff5c8a',
-        hundred: 'var(--cherry-red)',
-        accuracy: 'var(--amber)',
-        flowmaster: 'var(--green)',
-        streak7: '#ff6b35'
-    };
     var accuracyWithBoth = historyData.filter(function(h) { return h.estimateMinutes && h.actualMinutes; });
     var accuracyAvgVariance = accuracyWithBoth.length > 0
         ? accuracyWithBoth.reduce(function(a, h) { return a + Math.abs(h.actualMinutes - h.estimateMinutes); }, 0) / accuracyWithBoth.length
         : null;
-
-    var badgeDefinitions = [
-        { id: 'first', label: 'First Task', condition: totalCompleted >= 1, progress: totalCompleted, target: 1, desc: 'Completed your first task.' },
-        { id: 'ten', label: '10 Tasks', condition: totalCompleted >= 10, progress: totalCompleted, target: 10, desc: 'Finished 10 tasks total.' },
-        { id: 'fifty', label: '50 Tasks', condition: totalCompleted >= 50, progress: totalCompleted, target: 50, desc: 'Reached 50 completed tasks.' },
-        { id: 'hundred', label: '100 Tasks', condition: totalCompleted >= 100, progress: totalCompleted, target: 100, desc: 'A century of tasks.' },
-        { id: 'accuracy', label: 'Accuracy Pro', condition: accuracyWithBoth.length >= 10 && accuracyAvgVariance < 3,
-            desc: 'Precise estimations.',
-            isQuality: true,
-            qualityLabel: accuracyWithBoth.length < 10
-                ? (accuracyWithBoth.length + '/10 tracked tasks needed')
-                : ('avg variance ' + accuracyAvgVariance.toFixed(1) + 'm, need under 3m'),
-            qualityPct: accuracyWithBoth.length < 10
-                ? Math.round((accuracyWithBoth.length / 10) * 100)
-                : Math.max(0, Math.min(100, Math.round((3 - accuracyAvgVariance) / 3 * 100 + 100)))
-        },
-        { id: 'flowmaster', label: 'Flow Master', condition: flowBlocksCompleted >= 5, progress: flowBlocksCompleted, target: 5, desc: 'Completed 5 flow sessions.' },
-        { id: 'streak7', label: '7-Day Streak', condition: streak >= 7, progress: streak, target: 7, desc: 'Worked 7 days in a row.' }
-    ];
-
-    var earned = badgeDefinitions.filter(function(b) { return b.condition; });
-    var nextUp = badgeDefinitions.filter(function(b) { return !b.condition; })
-        .sort(function(a, b) {
-            var aPct = a.isQuality ? a.qualityPct : (a.progress / a.target) * 100;
-            var bPct = b.isQuality ? b.qualityPct : (b.progress / b.target) * 100;
-            return bPct - aPct;
-        })[0];
+    var accuracyEarned = accuracyWithBoth.length >= 10 && accuracyAvgVariance < 3;
+    if (accuracyEarned) logBadgeEarned('accuracy-pro', 'Accuracy Pro', 'Average timing variance dropped under 3 minutes across 10+ tracked tasks.');
 
     var streakColor = streak >= 7 ? '#ff3366' : (streak >= 3 ? '#e08a00' : (streak >= 1 ? '#c9a227' : '#aaa'));
     var streakGlow = streak >= 7 ? 'filter: drop-shadow(0 0 4px rgba(255,51,102,0.5));' : '';
     streakEl.innerHTML = '<svg viewBox="0 0 24 24" fill="' + streakColor + '" style="width:16px;height:16px;vertical-align:-3px;' + streakGlow + '"><path d="M12 2c-2 4-2 6 0 8 2-1 2-3 1-4 2 1 3 3 3 5a4 4 0 0 1-8 0c0-3 2-5 4-9z"/></svg> ' +
         'Streak: <strong style="color:' + streakColor + ';">' + streak + '</strong> day' + (streak !== 1 ? 's' : '');
 
+    var taskTier = getCurrentTier(TASK_MILESTONE_TIERS, totalCompleted);
+    var taskNext = getNextTier(TASK_MILESTONE_TIERS, totalCompleted);
+    var streakTier = getCurrentTier(STREAK_MILESTONE_TIERS, streak);
+    var streakNext = getNextTier(STREAK_MILESTONE_TIERS, streak);
+    var flowTier = getCurrentTier(FLOW_MASTER_TIERS, flowBlocksCompleted);
+    var flowNext = getNextTier(FLOW_MASTER_TIERS, flowBlocksCompleted);
+
     var html = '<div class="badge-grid">';
-    if (earned.length === 0) {
-        html += '<span style="color:#888;font-size:0.75rem;">No badges yet, complete tasks to earn milestones.</span>';
-    } else {
-        html += earned.map(function(b) {
-            var color = badgeColors[b.id] || 'var(--cherry-red)';
-            return '<div class="badge-card" title="' + b.desc + '" style="border-left:3px solid ' + color + ';">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:' + color + ';">' + icons[b.id] + '</svg>' +
-                '<span>' + b.label + '</span>' +
-                '</div>';
-        }).join('');
-    }
+    html += renderLadderCard('<path d="M12 2v20M4 7l8-5 8 5M4 17l8 5 8-5"/>', 'Task Milestones', taskTier, taskNext, totalCompleted, 'task-milestone');
+    html += renderLadderCard('<path d="M12 2c-2 4-2 6 0 8 2-1 2-3 1-4 2 1 3 3 3 5a4 4 0 0 1-8 0c0-3 2-5 4-9z" fill="currentColor" stroke="none"/>', 'Streak Milestones', streakTier, streakNext, streak, 'streak-milestone');
+    html += renderLadderCard('<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="currentColor" stroke="none"/>', 'Flow Milestones', flowTier, flowNext, flowBlocksCompleted, 'flow-milestone');
+
+    var accColor = accuracyEarned ? 'var(--amber)' : '#ccc';
+    var accQualityLabel = accuracyWithBoth.length < 10
+        ? (accuracyWithBoth.length + ' / 10 tracked tasks needed')
+        : (accuracyEarned ? 'Currently precise' : 'avg variance ' + accuracyAvgVariance.toFixed(1) + 'm, need under 3m');
+    var accPct = accuracyWithBoth.length < 10 ? Math.round((accuracyWithBoth.length / 10) * 100) : (accuracyEarned ? 100 : Math.max(0, Math.min(99, Math.round((3 - accuracyAvgVariance) / 3 * 100 + 100))));
+    html += '<div class="badge-card ladder-card ' + (accuracyEarned ? '' : 'ladder-not-started') + '" style="border-left:3px solid ' + accColor + ';" title="Accuracy Pro">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:' + accColor + ';"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>' +
+        '<span>' + (accuracyEarned ? 'Accuracy Pro' : 'Not there yet') + '</span>' +
+        '<div class="ladder-progress"><div class="ladder-progress-label">' + accQualityLabel + '</div><progress value="' + accPct + '" max="100"></progress></div>' +
+        '</div>';
+
     html += '</div>';
-    if (nextUp) {
-        if (nextUp.isQuality) {
-            html += '<div class="badge-progress" title="' + nextUp.desc + '">' +
-                '<div style="font-size:0.65rem;color:#888;margin-top:8px;">Next: ' + nextUp.label + ' (' + nextUp.qualityLabel + ')</div>' +
-                '<div><progress value="' + nextUp.qualityPct + '" max="100"></progress></div>' +
-                '</div>';
-        } else {
-            var pct = Math.min(100, Math.round((nextUp.progress / nextUp.target) * 100));
-            html += '<div class="badge-progress" title="' + nextUp.desc + '">' +
-                '<div style="font-size:0.65rem;color:#888;margin-top:8px;">Next: ' + nextUp.label + ' (' + nextUp.progress + '/' + nextUp.target + ')</div>' +
-                '<div><progress value="' + pct + '" max="100"></progress></div>' +
-                '</div>';
-        }
-    }
     badgesEl.innerHTML = html;
 }
 
@@ -3675,6 +3697,9 @@ function renderActivityTimeline() {
     if (clockState.clockedIn && clockState.startedAt) {
         addEvent(new Date(clockState.startedAt), 'Clocked In (' + clockState.latenessReason + ')', 'in');
     }
+
+    var badgeLog = storageGet('ff-badge-log', []);
+    badgeLog.forEach(function(b) { addEvent(new Date(b.date), 'Badge earned: ' + b.label + ', ' + b.detail, 'badge'); });
 
     var keys = Object.keys(eventsByDate).sort((a,b) => b.localeCompare(a));
     var html = '';
