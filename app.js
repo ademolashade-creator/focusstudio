@@ -1768,7 +1768,8 @@ function groupTasksByDate(tasks, colIndex) {
         var items = groups[key].incomplete.concat(groups[key].completed);
         if (key === today || key === yesterday) {
             var groupKey = colIndex + '-' + key;
-            var isCollapsed = _toggledDateGroups[groupKey] !== undefined ? _toggledDateGroups[groupKey] : false;
+            var defaultCollapsed = (key === yesterday);
+            var isCollapsed = _toggledDateGroups[groupKey] !== undefined ? _toggledDateGroups[groupKey] : defaultCollapsed;
             result.push({ dateKey: key, dateLabel: formatDateKey(key), isCollapsed: isCollapsed, items: items });
         } else {
             previousItems = previousItems.concat(items);
@@ -1787,8 +1788,7 @@ function groupTasksByDate(tasks, colIndex) {
 function toggleDateGroup(colIndex, key) {
     var groupKey = colIndex + '-' + key;
     var today = getTodayKey();
-    var yesterday = getYesterdayKey();
-    var isCurrentlyCollapsed = (key !== today && key !== yesterday);
+    var isCurrentlyCollapsed = (key !== today);
     if (_toggledDateGroups[groupKey] !== undefined) isCurrentlyCollapsed = _toggledDateGroups[groupKey];
     _toggledDateGroups[groupKey] = !isCurrentlyCollapsed;
     renderSingleColumn(colIndex);
@@ -3071,7 +3071,6 @@ async function optimizeColumnFlowAI(ci) {
 }
 
 function acceptAISuggestion(ci, sIdx) {
-    saveScrollPositions();
     var s = boardData[ci].aiSuggestions[sIdx];
     boardData[ci].tasks.unshift({
         id: 't_' + Math.random().toString(36).substr(2,9),
@@ -3101,14 +3100,13 @@ function acceptAISuggestion(ci, sIdx) {
     boardData[ci].aiSuggestions.splice(sIdx, 1);
     if (boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
 }
 function dismissAISuggestion(ci, sIdx) {
-    saveScrollPositions();
     boardData[ci].aiSuggestions.splice(sIdx, 1);
     if (boardData[ci].aiSuggestions.length === 0) delete boardData[ci].aiSuggestions;
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
 }
 
 async function generateColumnCheckIn(ci) {
@@ -4346,22 +4344,22 @@ function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function saveUserName(name) { storageSet('ff-user-name', name); }
 
 function findDuplicateRecurringGroups() {
-    var byText = {};
+    var byColumnAndText = {};
     boardData.forEach(function(col, ci) {
         col.tasks.forEach(function(task, ti) {
             if (task.parentId) return; // subtasks can't recur, not relevant here
-            var key = task.text.trim().toLowerCase();
-            if (!byText[key]) byText[key] = { text: task.text, entries: [] };
-            byText[key].entries.push({ ci: ci, ti: ti, task: task });
+            var key = ci + '::' + task.text.trim().toLowerCase();
+            if (!byColumnAndText[key]) byColumnAndText[key] = { ci: ci, colTitle: col.title, text: task.text, entries: [] };
+            byColumnAndText[key].entries.push({ ci: ci, ti: ti, task: task });
         });
     });
 
     var groups = [];
-    Object.values(byText).forEach(function(g) {
+    Object.values(byColumnAndText).forEach(function(g) {
         if (g.entries.length < 2) return;
         var activeCount = g.entries.filter(function(e) { return e.task.recurrence; }).length;
         if (activeCount === 0) return;
-        groups.push({ text: g.text, entries: g.entries, activeCount: activeCount });
+        groups.push({ ci: g.ci, colTitle: g.colTitle, text: g.text, entries: g.entries, activeCount: activeCount });
     });
     return groups;
 }
@@ -4379,8 +4377,8 @@ function openRecurrenceCleanupModal() {
         emptyEl.style.display = 'none';
         listEl.innerHTML = groups.map(function(g) {
             return '<li class="recurrence-cleanup-item">' +
-                '<span>"' + escapeHTML(g.text) + '", ' + g.entries.length + ' copies found, ' + g.activeCount + ' still repeating</span>' +
-                '<button class="btn-secondary btn-small" onclick="stopAllRecurrenceForText(\'' + escapeHTML(g.text).replace(/'/g, "\\'") + '\')">Stop All Repeats</button>' +
+                '<span>"' + escapeHTML(g.text) + '" in ' + escapeHTML(g.colTitle) + ', ' + g.entries.length + ' copies found, ' + g.activeCount + ' still repeating</span>' +
+                '<button class="btn-secondary btn-small" onclick="stopAllRecurrenceForText(' + g.ci + ', \'' + escapeHTML(g.text).replace(/'/g, "\\'") + '\')">Stop All Repeats</button>' +
                 '</li>';
         }).join('');
     }
@@ -4391,21 +4389,19 @@ function closeRecurrenceCleanupModal() {
     document.getElementById('recurrence-cleanup-overlay').style.display = 'none';
 }
 
-function stopAllRecurrenceForText(text) {
+function stopAllRecurrenceForText(ci, text) {
     var key = text.trim().toLowerCase();
     var count = 0;
-    boardData.forEach(function(col) {
-        col.tasks.forEach(function(task) {
-            if (task.parentId) return;
-            if (task.text.trim().toLowerCase() === key && task.recurrence) {
-                task.recurrence = null;
-                task.lastRecurrenceDate = null;
-                count++;
-            }
-        });
+    boardData[ci].tasks.forEach(function(task) {
+        if (task.parentId) return;
+        if (task.text.trim().toLowerCase() === key && task.recurrence) {
+            task.recurrence = null;
+            task.lastRecurrenceDate = null;
+            count++;
+        }
     });
     saveBoardData();
-    renderBoard();
+    renderSingleColumn(ci);
     openRecurrenceCleanupModal(); // refresh the list in place so the user sees the group is gone
 }
 function handleKeyPress(e, ci) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addTask(ci); } }
