@@ -1118,6 +1118,23 @@ function confirmLatenessAndClockIn() {
 function executeClockIn(latenessReason) {
     clockState = { clockedIn: true, startedAt: Date.now(), latenessReason: latenessReason || 'On Time' };
     storageSet('ff-clock-state', clockState);
+
+    // Stars reset once per new work day, but that day starts when you clock in, not
+    // whenever the calendar happens to roll over. Otherwise planning ahead the night
+    // before gets wiped by the first refresh after midnight, before the day even starts.
+    var today = getTodayKey();
+    var lastPriorityReset = storageGet('ff-priorities-reset-date', null);
+    if (lastPriorityReset !== today) {
+        var changed = false;
+        boardData.forEach(function(col) {
+            col.tasks.forEach(function(task) {
+                if (task.isTopPriority) { task.isTopPriority = false; changed = true; }
+            });
+        });
+        storageSet('ff-priorities-reset-date', today);
+        if (changed) { saveBoardData(); renderBoard(); }
+    }
+
     renderAttendanceCard();
     openDailyKickoff();
     setTimeout(function() { maybeOfferDailyPlanning(); }, 4000);
@@ -1594,23 +1611,14 @@ function adjustTasksForMidnight() {
     boardData.forEach(function(col) {
         col.tasks.forEach(function(task) {
             if (!task.recurrence && !task.completed && task.dateAdded !== today) {
+                var originalBeforeCarry = task.originalDate || task.dateAdded;
                 task.dateAdded = today;
                 task.carriedOver = true;
-                task.originalDate = task.originalDate || task.dateAdded;
+                task.originalDate = originalBeforeCarry;
                 changed = true;
             }
         });
     });
-
-    var lastPriorityReset = storageGet('ff-priorities-reset-date', null);
-    if (lastPriorityReset !== today) {
-        boardData.forEach(function(col) {
-            col.tasks.forEach(function(task) {
-                if (task.isTopPriority) { task.isTopPriority = false; changed = true; }
-            });
-        });
-        storageSet('ff-priorities-reset-date', today);
-    }
 
     if (changed) {
         saveBoardData();
@@ -4248,9 +4256,16 @@ function initApp() {
         }
     }
 
+    var _lastSeenDateKey = getTodayKey();
     setInterval(function() {
-        var now = new Date();
-        if (now.getHours() === 0 && now.getMinutes() === 0) {
+        // Checking for the exact minute the clock reads 00:00 is fragile: browsers routinely
+        // throttle timers on background tabs, sometimes by several minutes, so that exact
+        // one-minute window can be missed entirely if the tab isn't focused right then.
+        // Comparing against the last-seen date instead catches the change whenever this
+        // next actually gets to run, regardless of how late that happens to be.
+        var currentKey = getTodayKey();
+        if (currentKey !== _lastSeenDateKey) {
+            _lastSeenDateKey = currentKey;
             if (typeof adjustTasksForMidnight === 'function') adjustTasksForMidnight();
             if (typeof setupRecurringTasks === 'function') setupRecurringTasks();
         }
@@ -4329,6 +4344,70 @@ function checkBackupReminder() {
 
 function saveApiKey(key) { storageSet('gemini_api_key', key); }
 function saveUserName(name) { storageSet('ff-user-name', name); }
+
+function findDuplicateRecurringGroups() {
+    var byText = {};
+    boardData.forEach(function(col, ci) {
+        col.tasks.forEach(function(task, ti) {
+            if (task.parentId) return; // subtasks can't recur, not relevant here
+            var key = task.text.trim().toLowerCase();
+            if (!byText[key]) byText[key] = { text: task.text, entries: [] };
+            byText[key].entries.push({ ci: ci, ti: ti, task: task });
+        });
+    });
+
+    var groups = [];
+    Object.values(byText).forEach(function(g) {
+        if (g.entries.length < 2) return;
+        var activeCount = g.entries.filter(function(e) { return e.task.recurrence; }).length;
+        if (activeCount === 0) return;
+        groups.push({ text: g.text, entries: g.entries, activeCount: activeCount });
+    });
+    return groups;
+}
+
+function openRecurrenceCleanupModal() {
+    var groups = findDuplicateRecurringGroups();
+    var listEl = document.getElementById('recurrence-cleanup-list');
+    var emptyEl = document.getElementById('recurrence-cleanup-empty');
+    if (!listEl || !emptyEl) return;
+
+    if (groups.length === 0) {
+        listEl.innerHTML = '';
+        emptyEl.style.display = 'block';
+    } else {
+        emptyEl.style.display = 'none';
+        listEl.innerHTML = groups.map(function(g) {
+            return '<li class="recurrence-cleanup-item">' +
+                '<span>"' + escapeHTML(g.text) + '", ' + g.entries.length + ' copies found, ' + g.activeCount + ' still repeating</span>' +
+                '<button class="btn-secondary btn-small" onclick="stopAllRecurrenceForText(\'' + escapeHTML(g.text).replace(/'/g, "\\'") + '\')">Stop All Repeats</button>' +
+                '</li>';
+        }).join('');
+    }
+    document.getElementById('recurrence-cleanup-overlay').style.display = 'flex';
+}
+
+function closeRecurrenceCleanupModal() {
+    document.getElementById('recurrence-cleanup-overlay').style.display = 'none';
+}
+
+function stopAllRecurrenceForText(text) {
+    var key = text.trim().toLowerCase();
+    var count = 0;
+    boardData.forEach(function(col) {
+        col.tasks.forEach(function(task) {
+            if (task.parentId) return;
+            if (task.text.trim().toLowerCase() === key && task.recurrence) {
+                task.recurrence = null;
+                task.lastRecurrenceDate = null;
+                count++;
+            }
+        });
+    });
+    saveBoardData();
+    renderBoard();
+    openRecurrenceCleanupModal(); // refresh the list in place so the user sees the group is gone
+}
 function handleKeyPress(e, ci) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addTask(ci); } }
 function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, function(tag) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[tag] || tag; }); }
 

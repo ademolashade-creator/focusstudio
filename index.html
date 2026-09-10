@@ -389,6 +389,10 @@
                         <label style="font-size:0.7rem;font-weight:700;color:#888;display:block;margin-bottom:3px;">Gemini API Key</label>
                         <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Paste your Google Gemini API Key here (stored locally)..." oninput="saveApiKey(this.value)">
                     </div>
+                    <div>
+                        <label style="font-size:0.7rem;font-weight:700;color:#888;display:block;margin-bottom:3px;">Cleanup</label>
+                        <button class="btn-secondary" style="width:100%;" onclick="openRecurrenceCleanupModal()">Find Duplicate Repeating Tasks</button>
+                    </div>
                 </div>
             </details>
         </div>
@@ -496,6 +500,16 @@
             <button class="btn-primary" onclick="finalizeClockOut()">End Shift &amp; Save</button>
         </div>
         <button class="btn-secondary" style="width:100%;margin-top:8px;" onclick="closeDailyWrapUp()">Cancel (Keep working)</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="recurrence-cleanup-overlay">
+    <div class="modal-box" style="max-width: 500px;text-align:left;">
+        <h2 style="color:var(--cherry-red);margin-top:0;">Duplicate Repeating Tasks</h2>
+        <p style="font-size:0.85rem;">These are tasks that share the exact same name, where at least one copy still has repeat switched on. This can happen from repeat copies made before a fix, each with its own repeat setting. Stopping repeat here turns it off on every matching copy at once, so none of them create another one tomorrow.</p>
+        <p id="recurrence-cleanup-empty" style="font-size:0.85rem;color:#888;display:none;">Nothing found, no duplicate repeating tasks right now.</p>
+        <ul id="recurrence-cleanup-list" class="recurrence-cleanup-list"></ul>
+        <button class="btn-secondary" style="width:100%;margin-top:12px;" onclick="closeRecurrenceCleanupModal()">Close</button>
     </div>
 </div>
 
@@ -635,6 +649,9 @@
     window.openDailyPlanningFromNotice = openDailyPlanningFromNotice;
     window.saveApiKey = saveApiKey;
     window.saveUserName = saveUserName;
+    window.openRecurrenceCleanupModal = openRecurrenceCleanupModal;
+    window.closeRecurrenceCleanupModal = closeRecurrenceCleanupModal;
+    window.stopAllRecurrenceForText = stopAllRecurrenceForText;
     window.toggleFocusMode = toggleFocusMode;
     window.handleKeyPress = handleKeyPress;
     window.breakdownTask = breakdownTask;
